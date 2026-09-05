@@ -195,6 +195,15 @@ def aggregate_player_stats(df_raw):
     return agg
 
 
+SOFASCORE_ALIASES = {
+    ("Nico Paz", "COM"): "Paz N.",
+    ("Kenan Yıldız", "JUV"): "Yildiz",
+    ("Kenan Yildiz", "JUV"): "Yildiz",
+    ("Josep Martínez", "INT"): "Martinez Jo.",
+    ("Filippo Terracciano", "MIL"): "Terracciano F.",
+}
+
+
 def match_to_dataset(df_lineups, df_dataset):
     """
     Match Sofascore player names to our dataset player names using fuzzy matching.
@@ -211,6 +220,11 @@ def match_to_dataset(df_lineups, df_dataset):
         sofa_name = row["player_sofascore"]
         sofa_team = row["team"]
         sofa_norm = normalize_name(sofa_name)
+
+        # 0. Check explicit canonical aliases
+        if (sofa_name, sofa_team) in SOFASCORE_ALIASES:
+            matched.append(SOFASCORE_ALIASES[(sofa_name, sofa_team)])
+            continue
 
         # 1. Exact normalized match
         if sofa_norm in dataset_norm:

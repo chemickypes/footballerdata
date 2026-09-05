@@ -78,7 +78,7 @@ if os.path.exists(ENV_PATH):
 # Open-Source defaults: 500 cr, 3-8-8-6, Squadra 1..10
 # ──────────────────────────────────────────────────────────────────────
 
-DEFAULT_BUDGET = 500
+DEFAULT_BUDGET = 1000
 DEFAULT_ROSTER_SLOTS = {"P": 3, "D": 8, "C": 8, "A": 6}
 DEFAULT_TEAMS = [{"id": i, "name": f"Squadra {i}", "is_me": i == 1} for i in range(1, 11)]
 ADMIN_PASSWORD = "fanta2026"
@@ -1101,10 +1101,14 @@ def api_players():
             "price_fair_1000": fair_1000,
             "price_fair_500": fair_500,
             "price_fair_scaled": fair_scaled,
-            "price_fair_live": fair_live,
             "_budget_scale": budget_scale,
-            "surplus_value": int(row.get("surplus_value_cr", 0)),
             "score": float(row.get("score_composito", 0)),
+            "surplus_value": int(row.get("surplus_value_cr", 0)),
+            "target_price_1000": int(row.get("target_price_1000", fair_1000)),
+            "target_price_500": int(row.get("target_price_500", fair_500)),
+            "clearing_price_1000": int(row.get("clearing_price_1000", fair_1000)),
+            "clearing_price_500": int(row.get("clearing_price_500", fair_500)),
+            "target_flags": str(row.get("target_flags", "")),
             "pts_exp": p50,
             "pts_floor": p10,
             "pts_ceil": p90,
@@ -1716,7 +1720,7 @@ def api_live_snapshot():
         df = load_dataset()
         league_settings = load_league_settings()
         budget_arg = request.args.get("budget", type=int)
-        budget_total = budget_arg if (budget_arg and budget_arg > 0) else state.get("budget_total", league_settings.get("budget", DEFAULT_BUDGET))
+        budget_total = budget_arg if (budget_arg and budget_arg > 0) else state.get("budget_total", league_settings.get("budget", 1000))
         fair_col = "prezzo_fair_500" if budget_total == 500 else "prezzo_fair_1000"
 
         players_by_name = {}
@@ -1727,10 +1731,23 @@ def api_live_snapshot():
                 "role": str(row.get("role", "")),
                 "team": str(row.get("team", "")),
                 "price_fair_live": float(row.get(fair_col, row.get("prezzo_fair_1000", row.get("Prezzo_Consigliato_Cr", 1)))),
+                "prezzo_fair_1000": float(row.get("prezzo_fair_1000", row.get("Prezzo_Consigliato_Cr", 1))),
+                "prezzo_fair_500": float(row.get("prezzo_fair_500", 1)),
+                "target_price_1000": float(row.get("target_price_1000", row.get("prezzo_fair_1000", 1))),
+                "target_price_500": float(row.get("target_price_500", row.get("prezzo_fair_500", 1))),
+                "clearing_price_1000": float(row.get("clearing_price_1000", row.get("target_price_1000", row.get("prezzo_fair_1000", 1)))),
+                "clearing_price_500": float(row.get("clearing_price_500", row.get("target_price_500", row.get("prezzo_fair_500", 1)))),
+                "target_flags": str(row.get("target_flags", "")),
                 "score_composito": float(row.get("score_composito", 0.0)),
                 "pts_exp": float(row.get("predicted_pts_p50", 0.0)),
                 "fascia": int(row.get("fascia", 3)) if "fascia" in row and not pd.isna(row.get("fascia")) else 3,
             }
+
+        # Check if shard was cached in Redis for this room
+        if shard in ("auto", "none", "", None):
+            cached_r_shard = _redis_get(f"room_shard_{room_id}")
+            if cached_r_shard:
+                shard = str(cached_r_shard)
 
         res = live_adapter.get_advisory_snapshot(
             room_id=room_id,
@@ -1739,7 +1756,12 @@ def api_live_snapshot():
             auction_state=state,
             all_players_by_name=players_by_name,
             user_targets=user_targets,
+            budget_total=budget_total,
         )
+
+        # Cache resolved shard in Redis so future polls on any container are instant
+        if res.get("shard") and str(res["shard"]).lower() not in ("auto", "none", "null", ""):
+            _redis_set(f"room_shard_{room_id}", str(res["shard"]))
         return jsonify(res)
     except Exception as e:
         logger.error(f"Error in api_live_snapshot: {e}", exc_info=True)
@@ -3970,6 +3992,29 @@ HTML_TEMPLATE = """
                 </div>
             </div>
 
+            <!-- SECTION: Econometria Aste (Target & Clearing Pricing) -->
+            <div style="background:#0b111e; border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <b style="font-size:0.86rem; color:var(--primary);"><i class="fa-solid fa-scale-balanced" style="color:var(--gold); margin-right:6px;"></i>Prezzo Target & Clearing (Modello Econometrico)</b>
+                    <span id="pdClearingSourceBadge" style="font-size:0.70rem; font-weight:700; padding:2px 8px; border-radius:10px; background:rgba(99,102,241,0.15); color:var(--primary);"></span>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; text-align:center; margin-bottom:8px;">
+                    <div style="background:rgba(255,255,255,0.02); padding:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                        <div style="font-size:0.60rem; color:var(--text-muted); font-weight:700;">TARGET ECONOMETRICO</div>
+                        <div id="pdTargetPrice" style="font-size:1.1rem; font-weight:900; color:var(--gold);"></div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.02); padding:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                        <div style="font-size:0.60rem; color:var(--text-muted); font-weight:700;">CLEARING STORICO</div>
+                        <div id="pdClearingPrice" style="font-size:1.1rem; font-weight:900; color:var(--text);"></div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.02); padding:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                        <div style="font-size:0.60rem; color:var(--text-muted); font-weight:700;">SURPLUS / SCONTO</div>
+                        <div id="pdSurplusVal" style="font-size:1.1rem; font-weight:900;"></div>
+                    </div>
+                </div>
+                <div id="pdTargetFlags" style="font-size:0.72rem; color:var(--text-muted); font-family:monospace; word-break:break-all;"></div>
+            </div>
+
             <!-- SECTION: Finestra Medica -->
             <div style="background:#0b111e; border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:14px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -4507,6 +4552,34 @@ HTML_TEMPLATE = """
             document.getElementById('pdVorp').textContent = (p.vorp || 0).toFixed(1);
             document.getElementById('pdScore').textContent = (p.score || 0).toFixed(1);
             document.getElementById('pdFascia').textContent = p.fascia;
+
+            // Econometric Target & Clearing
+            const activeB = (typeof auctionState !== 'undefined' && auctionState && auctionState.budget_total) || (typeof leagueBudget !== 'undefined' ? leagueBudget : 1000);
+            const targetPr = activeB === 500 ? (p.target_price_500 || p.price_fair_500 || 1) : (p.target_price_1000 || p.price_fair_1000 || 1);
+            const clearPr = activeB === 500 ? (p.clearing_price_500 || targetPr) : (p.clearing_price_1000 || targetPr);
+            document.getElementById('pdTargetPrice').textContent = `${targetPr} cr`;
+            document.getElementById('pdClearingPrice').textContent = `${clearPr} cr`;
+            const surplus = targetPr - clearPr;
+            const surpEl = document.getElementById('pdSurplusVal');
+            surpEl.textContent = (surplus >= 0 ? '+' : '') + `${surplus} cr`;
+            surpEl.style.color = surplus >= 0 ? '#22c55e' : '#ef4444';
+
+            const flags = p.target_flags || '';
+            document.getElementById('pdTargetFlags').textContent = flags ? `Fattori: ${flags.replace(/;/g, ' • ')}` : 'Nessun fattore correttivo applicato';
+            const badgeEl = document.getElementById('pdClearingSourceBadge');
+            if (flags.includes('asta_xlsx')) {
+                badgeEl.textContent = 'Asta Reale (1000cr)';
+                badgeEl.style.background = 'rgba(34,197,94,0.15)';
+                badgeEl.style.color = '#22c55e';
+            } else if (flags.includes('fantabot_golden')) {
+                badgeEl.textContent = 'Aste Storiche (500cr)';
+                badgeEl.style.background = 'rgba(99,102,241,0.15)';
+                badgeEl.style.color = '#818cf8';
+            } else {
+                badgeEl.textContent = 'Stima Target';
+                badgeEl.style.background = 'rgba(255,255,255,0.05)';
+                badgeEl.style.color = 'var(--text-muted)';
+            }
 
             // Medical
             const med = p.medical || {};
@@ -5177,7 +5250,7 @@ HTML_TEMPLATE = """
 
         function getPlayerFairPrice(p, budget) {
             if (!p) return 1;
-            const b = budget || (typeof auctionState !== 'undefined' && auctionState && auctionState.budget_total) || (typeof leagueBudget !== 'undefined' ? leagueBudget : 500);
+            const b = budget || (typeof auctionState !== 'undefined' && auctionState && auctionState.budget_total) || (typeof leagueBudget !== 'undefined' ? leagueBudget : 1000);
 
             // If player object has _budget_scale from API matching this budget
             if (p._budget_scale !== undefined && Math.round(p._budget_scale * 1000) === b) {
@@ -5208,7 +5281,7 @@ HTML_TEMPLATE = """
         }
 
         async function fetchPlayers() {
-            const b = (typeof auctionState !== 'undefined' && auctionState && auctionState.budget_total) || (typeof leagueBudget !== 'undefined' ? leagueBudget : 500);
+            const b = (typeof auctionState !== 'undefined' && auctionState && auctionState.budget_total) || (typeof leagueBudget !== 'undefined' ? leagueBudget : 1000);
             const res = await fetch(`/api/players?budget=${b}`);
             const data = await res.json();
             allPlayers = data.players || [];
@@ -7710,6 +7783,9 @@ HTML_TEMPLATE = """
         let flLivePollTimer = null;
         let flCountdownTimer = null;
         let flCurrentLotData = null;
+        let flIsPolling = false;
+        let flPollFailures = 0;
+        let flLastGoodResponse = Date.now();
 
         function updateLiveCountdown() {
             if (!flCurrentLotData) return;
@@ -7807,6 +7883,9 @@ HTML_TEMPLATE = """
 
         async function pollFantaLabLiveSnapshot() {
             if (!flLiveSnifferActive) return;
+            if (flIsPolling) return; // Prevent concurrent/overlapping network requests
+            flIsPolling = true;
+
             const inputRoom = document.getElementById('flRoomId');
             const selectShard = document.getElementById('flShard');
             let roomId = inputRoom ? inputRoom.value.trim() : '';
@@ -7831,6 +7910,7 @@ HTML_TEMPLATE = """
             }
 
             if (!roomId) {
+                flIsPolling = false;
                 if (idleView) idleView.style.display = 'block';
                 if (activeView) activeView.style.display = 'none';
                 if (idleTitle) idleTitle.textContent = 'Nessun Room ID specificato';
@@ -7840,16 +7920,36 @@ HTML_TEMPLATE = """
 
             try {
                 const userTargets = loadUserTargets();
+                const activeBudget = (typeof auctionState !== 'undefined' && auctionState && auctionState.budget_total) || (typeof leagueBudget !== 'undefined' ? leagueBudget : 1000);
                 const params = new URLSearchParams({
                     room_id: roomId,
                     shard: shard,
                     profile_id: String(activeProfileId),
+                    budget: String(activeBudget),
                     user_targets: JSON.stringify(userTargets)
                 });
 
                 const res = await fetch('/api/live/snapshot?' + params.toString());
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
+
+                // Auto-pin detected shard so future polls avoid slow 24-shard concurrent scans
+                if (data.shard !== undefined && data.shard !== null && data.shard !== '' && selectShard) {
+                    const detectedShardStr = String(data.shard);
+                    if (selectShard.value === 'auto' || selectShard.value !== detectedShardStr) {
+                        for (let i = 0; i < selectShard.options.length; i++) {
+                            if (selectShard.options[i].value === detectedShardStr) {
+                                selectShard.value = detectedShardStr;
+                                localStorage.setItem('fantalab_shard', detectedShardStr);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Successful poll: reset failure counter
+                flPollFailures = 0;
+                flLastGoodResponse = Date.now();
 
                 if (data.status === 'warning') {
                     flCurrentLotData = null;
@@ -7935,7 +8035,8 @@ HTML_TEMPLATE = """
                         const iconBadge = rawBadge
                             .replace('🟢', '<i class="fa-solid fa-circle-play icon-pulse" style="margin-right:4px;"></i>')
                             .replace('🔴', '<i class="fa-solid fa-circle-stop icon-pulse" style="margin-right:4px;"></i>')
-                            .replace('🟡', '<i class="fa-solid fa-triangle-exclamation icon-pulse" style="margin-right:4px;"></i>');
+                            .replace('🟡', '<i class="fa-solid fa-triangle-exclamation icon-pulse" style="margin-right:4px;"></i>')
+                            .replace('⚪', '<i class="fa-solid fa-circle-info" style="margin-right:4px;"></i>');
                         badge.innerHTML = iconBadge;
                         badge.style.color = adv.color || 'var(--success)';
                     }
@@ -7962,11 +8063,23 @@ HTML_TEMPLATE = """
                     if (idleSub) idleSub.textContent = `Room ID: ${data.room_id || roomId}${shardInfo} • In attesa di un calciatore in battuta.`;
                 }
             } catch (err) {
-                console.warn('FantaLab Live Poll error:', err);
-                if (idleView) idleView.style.display = 'block';
-                if (activeView) activeView.style.display = 'none';
-                if (idleTitle) idleTitle.textContent = 'Connessione stanza in corso...';
-                if (idleSub) idleSub.textContent = 'Tentativo di lettura RTDB in background...';
+                flPollFailures++;
+                console.warn(`FantaLab Live Poll glitch (${flPollFailures}/3):`, err);
+
+                // Transient error debounce: do not wipe active lot unless 3 consecutive failures AND >5 seconds without response
+                if (flPollFailures >= 3 && (Date.now() - flLastGoodResponse > 5000)) {
+                    flCurrentLotData = null;
+                    if (flCountdownTimer) {
+                        clearInterval(flCountdownTimer);
+                        flCountdownTimer = null;
+                    }
+                    if (idleView) idleView.style.display = 'block';
+                    if (activeView) activeView.style.display = 'none';
+                    if (idleTitle) idleTitle.textContent = 'Riconnessione stanza in corso...';
+                    if (idleSub) idleSub.textContent = 'Tentativo di riaggancio al database live in background...';
+                }
+            } finally {
+                flIsPolling = false;
             }
         }
 

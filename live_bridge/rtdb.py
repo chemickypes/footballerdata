@@ -39,6 +39,12 @@ def node_url(db: int | str | None, path: str) -> str:
 ROOM_SHARD_CACHE: dict[str, Any] = {}
 
 
+_session = requests.Session()
+_adapter = requests.adapters.HTTPAdapter(pool_connections=25, pool_maxsize=35, max_retries=1)
+_session.mount("https://", _adapter)
+_session.mount("http://", _adapter)
+
+
 def read_snapshot(
     db: int | str | None,
     path: str,
@@ -52,9 +58,9 @@ def read_snapshot(
     url = node_url(db, path)
     try:
         try:
-            resp = requests.get(url, timeout=timeout)
+            resp = _session.get(url, timeout=timeout)
         except (requests.exceptions.SSLError, requests.exceptions.ConnectionError):
-            resp = requests.get(url, timeout=timeout, verify=False)
+            resp = _session.get(url, timeout=timeout, verify=False)
         if resp.status_code == 404:
             return None
         resp.raise_for_status()

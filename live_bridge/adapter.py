@@ -85,6 +85,7 @@ class FantaLabLiveAdapter:
         auction_state: dict[str, Any] | None = None,
         all_players_by_name: dict[str, dict[str, Any]] | None = None,
         user_targets: dict[str, dict[str, Any]] | None = None,
+        budget_total: int = 1000,
     ) -> dict[str, Any]:
         """Fetch current auction or assign node, analyze lot, and compute advisory verdict."""
         if not room_id or not str(room_id).strip():
@@ -160,39 +161,68 @@ class FantaLabLiveAdapter:
                         break
 
         # Defaults from dataset or fallback
+        auction_state = auction_state or {}
+        budget_scale_total = budget_total or auction_state.get("budget_total") or 1000
+
         if dataset_player:
             player_name = dataset_player.get("player", player_name)
             player_role = dataset_player.get("role", player_role)
             player_team = dataset_player.get("team", player_team)
-            fair_price = (
-                dataset_player.get("price_fair_live")
-                or dataset_player.get("price_fair_scaled")
-                or dataset_player.get("price_fair_1000")
-                or 1
-            )
+            if budget_scale_total == 500:
+                fair_price = (
+                    dataset_player.get("target_price_500")
+                    or dataset_player.get("price_fair_500")
+                    or dataset_player.get("price_fair_live")
+                    or 1
+                )
+                clearing_price = (
+                    dataset_player.get("clearing_price_500")
+                    or fair_price
+                )
+            else:
+                fair_price = (
+                    dataset_player.get("target_price_1000")
+                    or dataset_player.get("price_fair_1000")
+                    or dataset_player.get("price_fair_live")
+                    or 1
+                )
+                clearing_price = (
+                    dataset_player.get("clearing_price_1000")
+                    or fair_price
+                )
+            target_flags = dataset_player.get("target_flags", "")
             pts_exp = dataset_player.get("pts_exp", 0.0)
             score = dataset_player.get("score_composito", 0.0)
             fascia = dataset_player.get("fascia", 3)
         else:
             fair_price = price
+            clearing_price = price
+            target_flags = ""
             pts_exp = 0.0
             score = 0.0
             fascia = 4
 
-        # Roster limits & budget of user's team
+        # Roster limits & budget of user's team (max_bid reserve logic)
         user_targets = user_targets or {}
-        auction_state = auction_state or {}
         teams = auction_state.get("teams", [])
         my_team = next((t for t in teams if t.get("id") == active_profile_id), teams[0] if teams else None)
 
-        user_budget_remaining = my_team.get("remaining", 500) if my_team else 500
+        # Ensure remaining budget is computed from the requested budget_scale_total (e.g. 1000 or 500)
+        spent = my_team.get("spent", 0) if my_team else 0
+        user_budget_remaining = max(0, budget_scale_total - spent)
         my_roster = my_team.get("roster", []) if my_team else []
         role_roster_count = len([p for p in my_roster if p.get("role") == player_role])
         rs = auction_state.get("roster_structure") or {"P": 3, "D": 8, "C": 8, "A": 6}
         role_max_slots = rs.get(player_role, 8)
         slots_full = role_roster_count >= role_max_slots
 
-        # Decision Advisory
+        # Total slots required left across entire team
+        total_slots_needed = max(1, sum(rs.values()) - len(my_roster))
+        # Exact max_bid: reserve 1 credit for each unfilled slot beyond this one
+        reserve_credits = max(0, total_slots_needed - 1)
+        max_cap = max(0, user_budget_remaining - reserve_credits)
+
+        # Decision Advisory (reservation & bid guards)
         target_info = user_targets.get(player_name)
         is_target = target_info is not None
 
@@ -207,13 +237,21 @@ class FantaLabLiveAdapter:
             advisory_badge = "🔴 REPARTO PIENO"
             advisory_color = "var(--danger)"
             advisory_text = f"Hai già completato gli slot di {player_role} ({role_roster_count}/{role_max_slots})."
-        elif user_budget_remaining < price + 1:
+        elif price + 1 > max_cap:
             advisory_action = "DROP"
-            advisory_badge = "🔴 BUDGET ESAURITO"
+            advisory_badge = "🔴 CAP ROSA RAGGIUNTO"
             advisory_color = "var(--danger)"
-            advisory_text = f"Crediti residui ({user_budget_remaining} cr) insufficienti per rilanciare."
+            advisory_text = f"Rilancio impossibile: devi riservare almeno {reserve_credits} cr per completare gli altri {total_slots_needed - 1} slot obbligatori (Max Bid: {max_cap} cr)."
         elif is_target:
-            target_max = target_info.get("max_price") or int(fair_price * 1.1)
+            base_target_max = target_info.get("max_price")
+            if base_target_max:
+                target_budget_base = target_info.get("budget_base", 1000)
+                if target_budget_base and target_budget_base != budget_scale_total:
+                    base_target_max = int(base_target_max * (budget_scale_total / target_budget_base))
+            else:
+                base_target_max = int(fair_price * 1.1)
+
+            target_max = min(max_cap, base_target_max)
             priority = target_info.get("priority", "T1")
             max_limit_cr = target_max
 
@@ -221,46 +259,57 @@ class FantaLabLiveAdapter:
                 advisory_action = "RAISE"
                 advisory_badge = f"🟢 RILANCIA ({priority})"
                 advisory_color = "var(--success)"
-                advisory_text = f"Target {priority}! Prezzo attuale {price} cr < Target Max ({target_max} cr). Consigliato rilanciare."
+                advisory_text = f"Target {priority}! Prezzo attuale {price} cr < Target Max ({target_max} cr). Consigliato rilanciare (Riserva rosa: {reserve_credits} cr)."
             else:
                 advisory_action = "STOP"
                 advisory_badge = "🔴 STOP TARGET"
                 advisory_color = "var(--danger)"
                 advisory_text = f"Prezzo ({price} cr) ha superato il tuo budget massimo impostato ({target_max} cr)."
         else:
+            # Bargain Beta = 0.60 (sconto > 40% sul clearing price)
+            min_book = 20 if budget_scale_total == 500 else 40
+            is_bargain = (clearing_price >= min_book) and (price <= 0.60 * clearing_price)
+
             # Safe push / drain evaluation
             push_sugg = suggest_push(
                 player_id=player_uuid,
-                our_value=fair_price,
+                our_value=min(fair_price, max_cap),
                 current_price=price,
                 contesters=2,
                 in_our_plan=False,
             )
 
-            if price < fair_price * 0.8:
+            if is_bargain and price < max_cap:
+                bargain_ceiling = min(max_cap, int(0.60 * clearing_price))
+                advisory_action = "BUY"
+                advisory_badge = "🟢 OCCASIONE"
+                advisory_color = "var(--success)"
+                advisory_text = f"Occasione di valore: prezzo {price} cr con oltre il 40% di sconto sul prezzo di mercato ({int(clearing_price)} cr). Valuta acquisto fino a {bargain_ceiling} cr."
+                max_limit_cr = bargain_ceiling
+            elif price < fair_price * 0.8:
                 advisory_action = "BUY"
                 advisory_badge = "🟢 CONSIGLIATO (Sottoprezzo)"
                 advisory_color = "var(--success)"
-                advisory_text = f"Occasione di valore: prezzo attuale {price} cr ben sotto il fair stimato ({int(fair_price)} cr)."
-                max_limit_cr = int(fair_price)
-            elif push_sugg:
+                advisory_text = f"Occasione di valore: prezzo attuale {price} cr ben sotto il target stimato ({int(fair_price)} cr)."
+                max_limit_cr = min(max_cap, int(fair_price))
+            elif push_sugg and push_sugg.cap > price:
                 advisory_action = "PUSH"
                 advisory_badge = "🟡 ALZA / PUSH"
                 advisory_color = "var(--warning)"
-                advisory_text = f"Puoi rilanciare in sicurezza fino a {push_sugg.cap} cr per far spendere i rivali."
-                max_limit_cr = push_sugg.cap
+                advisory_text = f"Puoi rilanciare in sicurezza fino a {min(push_sugg.cap, max_cap)} cr per far spendere i rivali."
+                max_limit_cr = min(push_sugg.cap, max_cap)
             elif price <= fair_price:
                 advisory_action = "CONSIDER"
                 advisory_badge = "⚪ VALUTA"
                 advisory_color = "var(--text-muted)"
                 advisory_text = f"Prezzo di mercato coerente ({price} cr vs fair {int(fair_price)} cr)."
-                max_limit_cr = int(fair_price)
+                max_limit_cr = min(max_cap, int(fair_price))
             else:
                 advisory_action = "PASS"
                 advisory_badge = "🔴 PASSA"
                 advisory_color = "var(--danger)"
-                advisory_text = f"Prezzo in battuta ({price} cr) superiore al fair stimato ({int(fair_price)} cr). Lascia agli avversari."
-                max_limit_cr = int(fair_price)
+                advisory_text = f"Prezzo in battuta ({price} cr) superiore al target stimato ({int(fair_price)} cr). Lascia agli avversari."
+                max_limit_cr = min(max_cap, int(fair_price))
 
         lot_payload = {
             "player_id": player_uuid,
@@ -273,6 +322,9 @@ class FantaLabLiveAdapter:
             "pts_exp": pts_exp,
             "score": score,
             "fascia": fascia,
+            "clearing_price": clearing_price,
+            "target_flags": target_flags,
+            "max_cap": max_cap,
             "bidder_team_id": bidder_team_id,
             "bidder_user_id": bidder_user_id,
             "time_to_pass": time_to_pass,

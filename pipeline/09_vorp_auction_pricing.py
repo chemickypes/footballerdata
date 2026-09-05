@@ -119,40 +119,17 @@ def compute_vorp_and_fair_prices(df_input, n_teams=DEFAULT_N_TEAMS):
 
     df["vorp_points"] = vorp_list
 
-    # 2. Market-Calibrated Fair Prices
-    df["adj_market_fvm"] = get_adjusted_market_fvm(df)
+    # 2. Econometric Target & Clearing Pricing Engine
+    from pipeline.target_pricing import compute_target_prices
 
-    for budget_per_team, col_name in [(1000, "prezzo_fair_1000"), (500, "prezzo_fair_500")]:
-        fair_prices = []
+    df = compute_target_prices(df)
+    df["prezzo_fair_1000"] = df["target_price_1000"]
+    df["prezzo_fair_500"] = df["target_price_500"]
 
-        for _, row in df.iterrows():
-            role = row["role"]
-            role_df = df[df["role"] == role]
-            gamma = SCARCITY_EXPONENTS.get(role, 1.10)
-
-            fvm_series = role_df["adj_market_fvm"]
-            fvm_val = float(row["adj_market_fvm"])
-            role_fvm_powered = (fvm_series ** gamma).sum()
-
-            role_total_budget = n_teams * (budget_per_team * BUDGET_SHARES[role])
-            role_reserve_pool = n_teams * ROSTER_SLOTS[role] * 1
-            role_surplus_pool = role_total_budget - role_reserve_pool
-
-            if role_fvm_powered > 0 and fvm_val > 0:
-                price = 1.0 + (role_surplus_pool / n_teams) * ((fvm_val ** gamma) / role_fvm_powered * n_teams)
-            else:
-                price = 1.0
-
-            fair_prices.append(int(round(price)))
-
-        df[col_name] = fair_prices
-
-    # 3. Surplus Value (Fair Price 1000 - Consensus Market FVM 1000)
-    if "FVM_1000" in df.columns:
-        market_fvm = pd.to_numeric(df["FVM_1000"], errors="coerce").fillna(df["prezzo_fair_1000"])
-    else:
-        market_fvm = df["prezzo_fair_1000"].copy()
-    df["surplus_value_cr"] = (df["prezzo_fair_1000"] - market_fvm).astype(int)
+    # 3. Surplus Value (Target Price 1000 - Observed Clearing Price 1000)
+    # Positive surplus = Undervalued by market / Opportunity
+    # Negative surplus = Market hype / Overpriced
+    df["surplus_value_cr"] = (df["prezzo_fair_1000"] - df["clearing_price_1000"]).astype(int)
 
     return df, baselines
 
