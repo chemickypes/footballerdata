@@ -8304,7 +8304,8 @@ def api_trades_evaluate():
 
     result = evaluate_trade(team_a.get("roster", []), players_out, team_b.get("roster", []), players_in, df, overlay)
     if "error" in result:
-        return jsonify({"success": False, **result}), 400
+        status_code = 503 if result["error"] in ("feed_unavailable", "no_feasible_formation") else 400
+        return jsonify({"success": False, **result}), status_code
 
     return jsonify({"success": True, **result})
 
