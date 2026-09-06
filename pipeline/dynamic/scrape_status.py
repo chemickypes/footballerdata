@@ -5,6 +5,7 @@ Incrocia le pagine 'infortunati' e 'squalificati/diffidati' per produrre uno
 stato per giocatore (INFORTUNATO / SQUALIFICATO). I giocatori non presenti in
 nessuna delle due liste sono considerati OK a valle in build_feed.py.
 """
+import logging
 import os
 import sys
 
@@ -13,6 +14,8 @@ from bs4 import BeautifulSoup
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 from pipeline.dynamic.utils import fetch_with_retry
+
+logger = logging.getLogger(__name__)
 
 INJURIES_URL = "https://www.fantacalcio.it/infortunati-serie-a"
 SUSPENSIONS_URL = "https://www.fantacalcio.it/squalificati-e-diffidati-campionato-serie-a"
@@ -37,10 +40,16 @@ def scrape_all_statuses():
 
     injuries_resp = fetch_with_retry(INJURIES_URL, headers=config.HEADERS)
     if injuries_resp is not None:
-        statuses.update(parse_status_cards(injuries_resp.text, "INFORTUNATO"))
+        try:
+            statuses.update(parse_status_cards(injuries_resp.text, "INFORTUNATO"))
+        except Exception as e:
+            logger.warning(f"Failed to parse injuries page: {e}", exc_info=True)
 
     suspensions_resp = fetch_with_retry(SUSPENSIONS_URL, headers=config.HEADERS)
     if suspensions_resp is not None:
-        statuses.update(parse_status_cards(suspensions_resp.text, "SQUALIFICATO"))
+        try:
+            statuses.update(parse_status_cards(suspensions_resp.text, "SQUALIFICATO"))
+        except Exception as e:
+            logger.warning(f"Failed to parse suspensions page: {e}", exc_info=True)
 
     return statuses

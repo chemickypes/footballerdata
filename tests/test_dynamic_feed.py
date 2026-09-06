@@ -470,3 +470,43 @@ def test_scrape_all_statuses_merges_both_sources(mock_fetch):
     statuses = scrape_status.scrape_all_statuses()
     assert statuses["Sulemana K."] == "INFORTUNATO"
     assert statuses["Orsolini"] == "SQUALIFICATO"
+
+
+@patch("pipeline.dynamic.scrape_status.fetch_with_retry")
+def test_scrape_all_statuses_returns_injury_data_if_suspensions_fails(mock_fetch):
+    """Regression test: if suspensions page parsing fails, injury data must still be returned."""
+    injuries_resp = MagicMock()
+    injuries_resp.text = SAMPLE_STATUS_HTML
+    suspensions_resp = MagicMock()
+    suspensions_resp.text = None  # Simulates invalid markup (BeautifulSoup will fail)
+    mock_fetch.side_effect = [injuries_resp, suspensions_resp]
+
+    # Should not raise; suspensions parsing failure should not crash the function
+    statuses = scrape_status.scrape_all_statuses()
+    
+    # Injury data must still be present
+    assert statuses["Sulemana K."] == "INFORTUNATO"
+    assert statuses["Hien"] == "INFORTUNATO"
+    assert "Orsolini" not in statuses  # suspensions data was lost due to parsing failure
+
+
+@patch("pipeline.dynamic.scrape_status.fetch_with_retry")
+def test_scrape_all_statuses_returns_suspensions_data_if_injuries_fails(mock_fetch):
+    """Regression test: if injuries page parsing fails, suspensions data must still be returned."""
+    injuries_resp = MagicMock()
+    injuries_resp.text = None  # Simulates invalid markup (BeautifulSoup will fail)
+    suspensions_resp = MagicMock()
+    suspensions_resp.text = (
+        '<div id="team-2" class="card team-card"><ul class="unstyled">'
+        '<li><strong class="item-name">Orsolini</strong>'
+        '<div class="item-description"><p>Squalificato 1 turno.</p></div></li>'
+        '</ul></div>'
+    )
+    mock_fetch.side_effect = [injuries_resp, suspensions_resp]
+
+    # Should not raise; injuries parsing failure should not crash the function
+    statuses = scrape_status.scrape_all_statuses()
+    
+    # Suspensions data must still be present
+    assert statuses["Orsolini"] == "SQUALIFICATO"
+    assert len(statuses) == 1  # only suspensions data present
