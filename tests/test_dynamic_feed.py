@@ -126,8 +126,10 @@ def test_get_fixtures_parses_response(mock_fetch, mock_config):
     assert fixtures[0]["fixture_id"] == 111
 
 
+@patch("pipeline.dynamic.api_football_client.config")
 @patch("pipeline.dynamic.api_football_client.fetch_with_retry")
-def test_get_fixtures_returns_empty_list_on_failure(mock_fetch):
+def test_get_fixtures_returns_empty_list_on_failure(mock_fetch, mock_config):
+    mock_config.API_FOOTBALL_KEY = "test_key"
     mock_fetch.return_value = None
     assert afc.get_fixtures() == []
 
@@ -165,3 +167,177 @@ def test_get_fixture_player_ratings_parses_response(mock_fetch, mock_config):
     ratings = afc.get_fixture_player_ratings(111)
     assert ratings["Lautaro Martinez"] == 7.8
     assert "Yann Bisseck" not in ratings  # rating nullo -> escluso
+
+
+# Regression tests for exception safety
+
+
+@patch("pipeline.dynamic.api_football_client.config")
+@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+def test_get_fixtures_handles_json_decode_error(mock_fetch, mock_config):
+    """Test that get_fixtures returns [] when resp.json() raises JSONDecodeError."""
+    import json
+    mock_config.API_FOOTBALL_KEY = "test_key"
+    mock_resp = MagicMock()
+    mock_resp.json.side_effect = json.JSONDecodeError("msg", "doc", 0)
+    mock_fetch.return_value = mock_resp
+
+    fixtures = afc.get_fixtures()
+    assert fixtures == []
+
+
+@patch("pipeline.dynamic.api_football_client.config")
+@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+def test_get_fixtures_handles_missing_nested_keys(mock_fetch, mock_config):
+    """Test that get_fixtures skips items with missing required nested fields."""
+    mock_config.API_FOOTBALL_KEY = "test_key"
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "response": [
+            {
+                "fixture": {"id": 111},
+                "teams": {"home": {"name": "Inter"}},
+                # missing away.name -> should skip
+            },
+            {
+                "fixture": {"id": 222, "date": "2026-09-20T18:45:00+00:00"},
+                # missing teams -> should skip
+            },
+            {
+                "fixture": {"id": 333, "date": "2026-09-21T18:45:00+00:00"},
+                "teams": {
+                    "home": {"name": "Milan"},
+                    "away": {"name": "Juve"},
+                },
+                # all required fields present -> included
+            }
+        ]
+    }
+    mock_fetch.return_value = mock_resp
+
+    fixtures = afc.get_fixtures()
+    assert len(fixtures) == 1
+    assert fixtures[0]["fixture_id"] == 333
+
+
+@patch("pipeline.dynamic.api_football_client.config")
+@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+def test_get_odds_handles_json_decode_error(mock_fetch, mock_config):
+    """Test that get_odds returns {} when resp.json() raises JSONDecodeError."""
+    import json
+    mock_config.API_FOOTBALL_KEY = "test_key"
+    mock_resp = MagicMock()
+    mock_resp.json.side_effect = json.JSONDecodeError("msg", "doc", 0)
+    mock_fetch.return_value = mock_resp
+
+    odds = afc.get_odds(111)
+    assert odds == {}
+
+
+@patch("pipeline.dynamic.api_football_client.config")
+@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+def test_get_odds_handles_missing_bet_name(mock_fetch, mock_config):
+    """Test that get_odds skips bets with missing 'name' field."""
+    mock_config.API_FOOTBALL_KEY = "test_key"
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "response": [
+            {
+                "bookmakers": [
+                    {
+                        "bets": [
+                            {
+                                "name": "1X2",
+                                "values": [
+                                    {"value": "1", "odd": "2.5"},
+                                    {"value": "X", "odd": "3.2"},
+                                ]
+                            },
+                            {
+                                # missing name -> should skip
+                                "values": [{"value": "1", "odd": "2.6"}]
+                            },
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+    mock_fetch.return_value = mock_resp
+
+    odds = afc.get_odds(111)
+    assert "1X2" in odds
+    assert len(odds["1X2"]) == 2
+    assert len(odds) == 1  # only 1X2 market
+
+
+@patch("pipeline.dynamic.api_football_client.config")
+@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+def test_get_fixture_player_ratings_handles_json_decode_error(mock_fetch, mock_config):
+    """Test that get_fixture_player_ratings returns {} when resp.json() raises JSONDecodeError."""
+    import json
+    mock_config.API_FOOTBALL_KEY = "test_key"
+    mock_resp = MagicMock()
+    mock_resp.json.side_effect = json.JSONDecodeError("msg", "doc", 0)
+    mock_fetch.return_value = mock_resp
+
+    ratings = afc.get_fixture_player_ratings(111)
+    assert ratings == {}
+
+
+@patch("pipeline.dynamic.api_football_client.config")
+@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+def test_get_fixture_player_ratings_handles_empty_statistics_list(mock_fetch, mock_config):
+    """Test that get_fixture_player_ratings handles empty statistics list gracefully."""
+    mock_config.API_FOOTBALL_KEY = "test_key"
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "response": [
+            {
+                "players": [
+                    {
+                        "player": {"name": "Player One"},
+                        "statistics": [],  # empty list -> should not index error
+                    },
+                    {
+                        "player": {"name": "Player Two"},
+                        "statistics": [{"games": {"rating": "7.5"}}],
+                    },
+                ]
+            }
+        ]
+    }
+    mock_fetch.return_value = mock_resp
+
+    ratings = afc.get_fixture_player_ratings(111)
+    assert "Player One" not in ratings  # no rating available
+    assert ratings["Player Two"] == 7.5
+
+
+@patch("pipeline.dynamic.api_football_client.config")
+@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+def test_get_fixture_player_ratings_handles_missing_player_name(mock_fetch, mock_config):
+    """Test that get_fixture_player_ratings skips players with missing name."""
+    mock_config.API_FOOTBALL_KEY = "test_key"
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "response": [
+            {
+                "players": [
+                    {
+                        # missing player.name -> should skip
+                        "statistics": [{"games": {"rating": "7.8"}}],
+                    },
+                    {
+                        "player": {"name": "Valid Player"},
+                        "statistics": [{"games": {"rating": "7.9"}}],
+                    },
+                ]
+            }
+        ]
+    }
+    mock_fetch.return_value = mock_resp
+
+    ratings = afc.get_fixture_player_ratings(111)
+    assert len(ratings) == 1
+    assert ratings["Valid Player"] == 7.9
