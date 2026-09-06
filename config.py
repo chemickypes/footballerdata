@@ -159,4 +159,5 @@ API_FOOTBALL_SEASON = 2026    # Anno di inizio stagione (2026-27)
 CURRENT_MATCHDAY_JSON = os.path.join(DATA_DIR, "current_matchday.json")
 FALLBACK_MATCHDAY_JSON = os.path.join(DATA_DIR, "fallback_matchday.json")
 EWMA_STATE_JSON = os.path.join(DATA_DIR, "ewma_state.json")
+SEASON_TRACKING_JSONL = os.path.join(DATA_DIR, "season_tracking.jsonl")
 MIN_VALID_PLAYERS_IN_FEED = 450
