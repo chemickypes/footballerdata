@@ -510,3 +510,43 @@ def test_scrape_all_statuses_returns_suspensions_data_if_injuries_fails(mock_fet
     # Suspensions data must still be present
     assert statuses["Orsolini"] == "SQUALIFICATO"
     assert len(statuses) == 1  # only suspensions data present
+
+
+# Tests for scrape_results.py
+
+from pipeline.dynamic import scrape_results
+
+
+def test_update_ewma_first_observation_returns_rating_itself():
+    assert scrape_results.update_ewma(None, 7.0) == 7.0
+
+
+def test_update_ewma_applies_weighted_formula():
+    # EWMA_t = 0.35 * rating + 0.65 * prev
+    result = scrape_results.update_ewma(6.0, 8.0, alpha=0.35)
+    assert abs(result - (0.35 * 8.0 + 0.65 * 6.0)) < 1e-9
+
+
+def test_load_ewma_state_returns_empty_dict_when_file_missing(tmp_path, monkeypatch):
+    missing_path = tmp_path / "does_not_exist.json"
+    monkeypatch.setattr(scrape_results.config, "EWMA_STATE_JSON", str(missing_path))
+    assert scrape_results.load_ewma_state() == {}
+
+
+def test_save_then_load_ewma_state_roundtrip(tmp_path, monkeypatch):
+    state_path = tmp_path / "ewma_state.json"
+    monkeypatch.setattr(scrape_results.config, "EWMA_STATE_JSON", str(state_path))
+    scrape_results.save_ewma_state({"Lautaro Martinez": 7.4})
+    assert scrape_results.load_ewma_state() == {"Lautaro Martinez": 7.4}
+
+
+@patch("pipeline.dynamic.scrape_results.get_fixture_player_ratings")
+def test_update_form_from_fixtures_merges_new_ratings(mock_ratings, tmp_path, monkeypatch):
+    state_path = tmp_path / "ewma_state.json"
+    monkeypatch.setattr(scrape_results.config, "EWMA_STATE_JSON", str(state_path))
+    scrape_results.save_ewma_state({"Lautaro Martinez": 7.0})
+    mock_ratings.return_value = {"Lautaro Martinez": 8.0, "New Player": 6.5}
+
+    updated = scrape_results.update_form_from_fixtures([111])
+    assert abs(updated["Lautaro Martinez"] - (0.35 * 8.0 + 0.65 * 7.0)) < 1e-9
+    assert updated["New Player"] == 6.5
