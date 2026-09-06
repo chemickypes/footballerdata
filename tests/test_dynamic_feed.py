@@ -8,6 +8,7 @@ import sys
 from unittest.mock import patch, MagicMock
 
 import pandas as pd
+import pytest
 import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -550,3 +551,135 @@ def test_update_form_from_fixtures_merges_new_ratings(mock_ratings, tmp_path, mo
     updated = scrape_results.update_form_from_fixtures([111])
     assert abs(updated["Lautaro Martinez"] - (0.35 * 8.0 + 0.65 * 7.0)) < 1e-9
     assert updated["New Player"] == 6.5
+
+
+# Tests for build_feed.py
+
+from pipeline.dynamic import build_feed
+
+
+def test_compute_xpts_matches_capitolato_formula():
+    # xPts = (xMin/90) * [VotoBase + 3*P(Gol) + 1*P(Assist) - 1*E[GolSubiti] - 0.25*P(Ammon)]
+    result = build_feed.compute_xpts(
+        voto_base=6.0, p_gol=0.4, p_assist=0.2, e_gol_subiti=0.5, p_ammonizione=0.1, xmin=78
+    )
+    expected = (78 / 90) * (6.0 + 3 * 0.4 + 1 * 0.2 - 1 * 0.5 - 0.25 * 0.1)
+    assert abs(result - expected) < 1e-9
+
+
+def test_build_players_payload_applies_status_override_and_ewma():
+    dataset_df = pd.DataFrame({
+        "player": ["Lautaro Martinez"],
+        "team": ["INT"],
+        "role": ["A"],
+    })
+    lineup_players = [
+        {"player_name": "Lautaro Martinez", "match_id": "1", "side": "home", "href": ""}
+    ]
+    statuses = {}  # nessuno stato negativo -> resta OK
+    ewma_state = {"Lautaro Martinez": 7.4}
+    odds_feed = []
+
+    payload = build_feed.build_players_payload(
+        dataset_df, lineup_players, statuses, ewma_state, odds_feed
+    )
+    key = "int_lautaro_martinez_a"
+    assert key in payload
+    assert payload[key]["status"] == "OK"
+    assert payload[key]["ewma_form"] == 7.4
+    assert payload[key]["titular_prob"] == scrape_lineups.BASELINE_TITULAR_PROB
+
+
+def test_build_players_payload_marks_infortunato_status():
+    dataset_df = pd.DataFrame({"player": ["Hien"], "team": ["ATA"], "role": ["D"]})
+    statuses = {"Hien": "INFORTUNATO"}
+
+    payload = build_feed.build_players_payload(dataset_df, [], statuses, {}, [])
+    assert payload["ata_hien_d"]["status"] == "INFORTUNATO"
+    assert payload["ata_hien_d"]["titular_prob"] == 0.0
+
+
+def test_build_feed_payload_has_required_top_level_keys():
+    dataset_df = pd.DataFrame({"player": ["Test Player"], "team": ["ROM"], "role": ["C"]})
+    payload = build_feed.build_feed_payload(dataset_df, matchday=4, season="2026/2027")
+    assert set(["matchday", "season", "updated_at", "fixtures", "players"]).issubset(payload.keys())
+    assert payload["matchday"] == 4
+    assert payload["season"] == "2026/2027"
+
+
+@patch("pipeline.dynamic.build_feed.scrape_lineups.scrape_probable_lineups")
+@patch("pipeline.dynamic.build_feed.scrape_status.scrape_all_statuses")
+@patch("pipeline.dynamic.build_feed.scrape_results.load_ewma_state")
+@patch("pipeline.dynamic.build_feed.scrape_odds.build_odds_feed")
+def test_build_feed_payload_uses_mocked_scrapers(
+    mock_odds, mock_ewma, mock_status, mock_lineups
+):
+    """Verify build_feed_payload properly calls and uses all scraper functions."""
+    mock_lineups.return_value = [
+        {"player_name": "Lautaro Martinez", "match_id": "1", "side": "home", "href": ""}
+    ]
+    mock_status.return_value = {}
+    mock_ewma.return_value = {"Lautaro Martinez": 7.2}
+    mock_odds.return_value = [
+        {
+            "fixture_id": 1,
+            "home_team": "Inter",
+            "away_team": "Monza",
+            "date": "2026-09-20T18:45:00+00:00",
+            "odds_available": True,
+            "home_win_prob": 0.6,
+        }
+    ]
+    
+    dataset_df = pd.DataFrame({
+        "player": ["Lautaro Martinez"],
+        "team": ["INT"],
+        "role": ["A"],
+    })
+    
+    payload = build_feed.build_feed_payload(dataset_df, matchday=1, season="2026/2027")
+    
+    # Verify all scrapers were called
+    mock_lineups.assert_called_once()
+    mock_status.assert_called_once()
+    mock_ewma.assert_called_once()
+    mock_odds.assert_called_once()
+    
+    # Verify payload structure
+    assert payload["fixtures"] == mock_odds.return_value
+    assert "int_lautaro_martinez_a" in payload["players"]
+    assert payload["players"]["int_lautaro_martinez_a"]["ewma_form"] == 7.2
+
+
+@patch("pipeline.dynamic.build_feed.scrape_lineups.scrape_probable_lineups")
+@patch("pipeline.dynamic.build_feed.scrape_status.scrape_all_statuses")
+@patch("pipeline.dynamic.build_feed.scrape_results.load_ewma_state")
+@patch("pipeline.dynamic.build_feed.scrape_odds.build_odds_feed")
+def test_main_raises_when_insufficient_players(
+    mock_odds, mock_ewma, mock_status, mock_lineups, tmp_path, monkeypatch
+):
+    """Verify main() raises RuntimeError when fewer than MIN_VALID_PLAYERS_IN_FEED players."""
+    mock_lineups.return_value = []
+    mock_status.return_value = {}
+    mock_ewma.return_value = {}
+    mock_odds.return_value = []
+    
+    # Create a small dataset with fewer than MIN_VALID_PLAYERS_IN_FEED players
+    dataset_csv = tmp_path / "dataset_finale.csv"
+    small_df = pd.DataFrame({
+        "player": [f"Player{i}" for i in range(10)],
+        "team": ["INT"] * 10,
+        "role": ["A"] * 10,
+    })
+    small_df.to_csv(dataset_csv, index=False)
+    
+    # Also mock the output path
+    output_json = tmp_path / "current_matchday.json"
+    monkeypatch.setattr(build_feed.config, "DATASET_FINALE_CSV", str(dataset_csv))
+    monkeypatch.setattr(build_feed.config, "CURRENT_MATCHDAY_JSON", str(output_json))
+    
+    with pytest.raises(RuntimeError) as exc_info:
+        build_feed.main(matchday=1, season="2026/2027")
+    
+    assert "Feed dinamico incompleto" in str(exc_info.value)
+    assert "giocatori validi" in str(exc_info.value)
