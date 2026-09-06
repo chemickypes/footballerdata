@@ -422,3 +422,51 @@ def test_parse_probable_lineups_extracts_players_with_team_side():
 def test_scrape_probable_lineups_returns_empty_list_on_fetch_failure(mock_fetch):
     mock_fetch.return_value = None
     assert scrape_lineups.scrape_probable_lineups() == []
+
+
+from pipeline.dynamic import scrape_status
+
+SAMPLE_STATUS_HTML = """
+<div id="team-1" class="card team-card">
+  <span class="team-name">Atalanta</span>
+  <ul class="unstyled">
+    <li>
+      <strong class="item-name">Sulemana K.</strong>
+      <div class="item-description"><p>Lesione al ginocchio, rientro a ottobre.</p></div>
+    </li>
+    <li>
+      <strong class="item-name">Hien</strong>
+      <div class="item-description"><p>Operato, rientro a ottobre.</p></div>
+    </li>
+  </ul>
+</div>
+"""
+
+
+def test_parse_status_cards_extracts_player_names():
+    result = scrape_status.parse_status_cards(SAMPLE_STATUS_HTML, "INFORTUNATO")
+    assert result["Sulemana K."] == "INFORTUNATO"
+    assert result["Hien"] == "INFORTUNATO"
+    assert len(result) == 2
+
+
+def test_parse_status_cards_empty_html_returns_empty_dict():
+    assert scrape_status.parse_status_cards("<html></html>", "SQUALIFICATO") == {}
+
+
+@patch("pipeline.dynamic.scrape_status.fetch_with_retry")
+def test_scrape_all_statuses_merges_both_sources(mock_fetch):
+    injuries_resp = MagicMock()
+    injuries_resp.text = SAMPLE_STATUS_HTML
+    suspensions_resp = MagicMock()
+    suspensions_resp.text = (
+        '<div id="team-2" class="card team-card"><ul class="unstyled">'
+        '<li><strong class="item-name">Orsolini</strong>'
+        '<div class="item-description"><p>Squalificato 1 turno.</p></div></li>'
+        '</ul></div>'
+    )
+    mock_fetch.side_effect = [injuries_resp, suspensions_resp]
+
+    statuses = scrape_status.scrape_all_statuses()
+    assert statuses["Sulemana K."] == "INFORTUNATO"
+    assert statuses["Orsolini"] == "SQUALIFICATO"
