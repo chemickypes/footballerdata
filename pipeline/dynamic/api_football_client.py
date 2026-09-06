@@ -19,24 +19,34 @@ def _headers():
     return {"x-apisports-key": config.API_FOOTBALL_KEY}
 
 
-def get_fixtures(round_hint=None):
-    """Ritorna le fixture del prossimo turno Serie A non ancora giocato.
-    Ritorna lista vuota se la chiave manca o la richiesta fallisce.
-    
+def get_fixtures(round_hint=None, status_filter=None):
+    """Ritorna le fixture Serie A. Ritorna lista vuota se la chiave manca o la richiesta fallisce.
+
+    Di default ritorna le prossime fixture non ancora giocate ('next'). Se status_filter e'
+    valorizzato (es. 'FT' per le partite concluse/terminate), interroga invece le fixture
+    concluse piu' recenti ('last') filtrate per quello stato, utile per aggiornare la forma
+    EWMA post-turno.
+
     Required fields: fixture.id, fixture.date, teams.home.name, teams.away.name.
     Missing/malformed fields cause the item to be skipped.
     """
     if not config.API_FOOTBALL_KEY:
         return []
 
+    params = {
+        "league": config.API_FOOTBALL_LEAGUE_ID,
+        "season": config.API_FOOTBALL_SEASON,
+    }
+    if status_filter:
+        params["last"] = 10
+        params["status"] = status_filter
+    else:
+        params["next"] = 10
+
     resp = fetch_with_retry(
         f"{API_FOOTBALL_BASE}/fixtures",
         headers=_headers(),
-        params={
-            "league": config.API_FOOTBALL_LEAGUE_ID,
-            "season": config.API_FOOTBALL_SEASON,
-            "next": 10,
-        },
+        params=params,
     )
     if resp is None:
         return []

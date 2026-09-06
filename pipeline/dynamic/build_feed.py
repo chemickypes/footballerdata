@@ -5,6 +5,7 @@ Unisce formazioni probabili, stato clinico/disciplinare, quote de-vig e forma
 EWMA in data/current_matchday.json secondo il contratto dati del capitolato.
 Fail-fast se il numero di giocatori validi è insufficiente (< MIN_VALID_PLAYERS_IN_FEED).
 """
+import argparse
 import datetime
 import json
 import logging
@@ -15,7 +16,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
-from pipeline.dynamic import scrape_lineups, scrape_odds, scrape_results, scrape_status
+from pipeline.dynamic import api_football_client, scrape_lineups, scrape_odds, scrape_results, scrape_status
 from pipeline.dynamic.utils import PlayerMatcher, normalize_name
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,30 @@ def _player_key(team_value, player_name, role):
     return f"{_team_slug(team_value)}_{normalize_name(player_name).replace(' ', '_')}_{str(role).lower()}"
 
 
+def _match_foreign_dict(items_dict, matcher):
+    """Riconcilia un dict {nome_esterno: valore} sui nomi del dataset via PlayerMatcher.
+    Usato per statuses (fantacalcio.it) ed ewma_state (api-football), i cui nomi
+    non coincidono in generale con lo spazio dei nomi del dataset."""
+    matched = {}
+    for foreign_name, value in items_dict.items():
+        matched_name = matcher.match(foreign_name, "")
+        if matched_name:
+            matched[matched_name] = value
+    return matched
+
+
+def update_ewma_from_concluded_fixtures():
+    """Recupera le fixture concluse piu' recenti da api-football e aggiorna/persiste
+    lo stato EWMA. Exception-safe: se il recupero fallisce, non aggiorna nulla."""
+    try:
+        concluded_fixtures = api_football_client.get_fixtures(status_filter="FT")
+        fixture_ids = [f["fixture_id"] for f in concluded_fixtures]
+        if fixture_ids:
+            scrape_results.update_form_from_fixtures(fixture_ids)
+    except Exception:
+        logger.exception("Aggiornamento EWMA da fixture concluse fallito")
+
+
 def build_players_payload(dataset_df, lineup_players, statuses, ewma_state, odds_feed):
     """Constructs the 'players' dict of the JSON contract for each player in dataset."""
     matcher = PlayerMatcher(dataset_df)
@@ -46,6 +71,9 @@ def build_players_payload(dataset_df, lineup_players, statuses, ewma_state, odds
         if matched:
             lineup_by_matched_name[matched] = lp
 
+    statuses_by_matched_name = _match_foreign_dict(statuses, matcher)
+    ewma_by_matched_name = _match_foreign_dict(ewma_state, matcher)
+
     players = {}
     for _, row in dataset_df.iterrows():
         name = row["player"]
@@ -53,9 +81,9 @@ def build_players_payload(dataset_df, lineup_players, statuses, ewma_state, odds
         role = row["role"]
         key = _player_key(team, name, role)
 
-        status = statuses.get(name, "OK")
+        status = statuses_by_matched_name.get(name, "OK")
         is_starter = name in lineup_by_matched_name
-        ewma_form = ewma_state.get(name, 6.0)
+        ewma_form = ewma_by_matched_name.get(name, 6.0)
 
         if status in ("INFORTUNATO", "SQUALIFICATO"):
             titular_prob = 0.0
@@ -93,6 +121,7 @@ def build_feed_payload(dataset_df, matchday, season):
     """Builds the complete JSON feed payload."""
     lineup_players = scrape_lineups.scrape_probable_lineups()
     statuses = scrape_status.scrape_all_statuses()
+    update_ewma_from_concluded_fixtures()
     ewma_state = scrape_results.load_ewma_state()
     odds_feed = scrape_odds.build_odds_feed()
 
@@ -130,5 +159,15 @@ def main(matchday=1, season="2026/2027"):
     print(f"[OK] Feed scritto in {config.CURRENT_MATCHDAY_JSON} ({valid_players} giocatori validi)")
 
 
+def _parse_cli_matchday(argv):
+    """Estrae opzionalmente il numero di giornata da linea di comando (default 1)."""
+    parser = argparse.ArgumentParser(description="Build dynamic matchday feed")
+    parser.add_argument(
+        "--matchday", type=int, default=1, help="Numero di giornata (default: 1)"
+    )
+    args, _ = parser.parse_known_args(argv)
+    return args.matchday
+
+
 if __name__ == "__main__":
-    main()
+    main(matchday=_parse_cli_matchday(sys.argv[1:]))

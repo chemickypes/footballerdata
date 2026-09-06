@@ -68,6 +68,17 @@ class PlayerMatcher:
         if global_fuzzy:
             return self.names[self.all_norm.index(global_fuzzy[0])]
 
+        # Ultimo fallback: nessun team noto (es. fonti terze come api-football che
+        # forniscono solo il nome giocatore) e il dataset usa nomi abbreviati stile
+        # fantacalcio ("Cognome I."), per cui il solo cognome del giocatore in query
+        # e' spesso piu vicino al nome completo del dataset di quanto lo sia l'intero
+        # nome della query.
+        last_name_global_fuzzy = difflib.get_close_matches(
+            normalize_name(last_name), self.all_norm, n=1, cutoff=0.70
+        )
+        if last_name_global_fuzzy:
+            return self.names[self.all_norm.index(last_name_global_fuzzy[0])]
+
         return None
 
 

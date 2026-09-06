@@ -138,6 +138,34 @@ def test_get_fixtures_returns_empty_list_on_failure(mock_fetch, mock_config):
 
 @patch("pipeline.dynamic.api_football_client.config")
 @patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+def test_get_fixtures_status_filter_uses_last_instead_of_next(mock_fetch, mock_config):
+    mock_config.API_FOOTBALL_KEY = "test_key"
+    mock_config.API_FOOTBALL_LEAGUE_ID = 135
+    mock_config.API_FOOTBALL_SEASON = 2026
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "response": [
+            {
+                "fixture": {"id": 222, "date": "2026-09-13T18:45:00+00:00"},
+                "teams": {"home": {"name": "Roma"}, "away": {"name": "Lazio"}},
+            }
+        ]
+    }
+    mock_fetch.return_value = mock_resp
+
+    fixtures = afc.get_fixtures(status_filter="FT")
+    assert len(fixtures) == 1
+    assert fixtures[0]["fixture_id"] == 222
+
+    _, kwargs = mock_fetch.call_args
+    assert kwargs["params"]["status"] == "FT"
+    assert kwargs["params"]["last"] == 10
+    assert "next" not in kwargs["params"]
+
+
+@patch("pipeline.dynamic.api_football_client.config")
+@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
 def test_get_fixture_player_ratings_parses_response(mock_fetch, mock_config):
     mock_config.API_FOOTBALL_KEY = "test_key"
     mock_config.API_FOOTBALL_LEAGUE_ID = 135
@@ -598,6 +626,81 @@ def test_build_players_payload_marks_infortunato_status():
     payload = build_feed.build_players_payload(dataset_df, [], statuses, {}, [])
     assert payload["ata_hien_d"]["status"] == "INFORTUNATO"
     assert payload["ata_hien_d"]["titular_prob"] == 0.0
+
+
+def test_build_players_payload_matches_ewma_state_via_fuzzy_name_space():
+    """ewma_state e' keyed sui nomi completi api-football, il dataset usa nomi
+    fantacalcio-style abbreviati: la riconciliazione deve avvenire via PlayerMatcher."""
+    dataset_df = pd.DataFrame({"player": ["Martinez L."], "team": ["INT"], "role": ["A"]})
+    ewma_state = {"Lautaro Martinez": 7.8}
+
+    payload = build_feed.build_players_payload(dataset_df, [], {}, ewma_state, [])
+    assert payload["int_martinez_l._a"]["ewma_form"] == 7.8
+
+
+def test_build_players_payload_matches_status_card_via_fuzzy_name_space():
+    """Le card infortuni/squalifiche di fantacalcio.it possono avere un formato nome
+    diverso da quello del dataset: anche qui la riconciliazione passa da PlayerMatcher."""
+    dataset_df = pd.DataFrame({"player": ["De Ketelaere"], "team": ["ATA"], "role": ["A"]})
+    statuses = {"De Ketelaere C.": "SQUALIFICATO"}
+
+    payload = build_feed.build_players_payload(dataset_df, [], statuses, {}, [])
+    assert payload["ata_de_ketelaere_a"]["status"] == "SQUALIFICATO"
+    assert payload["ata_de_ketelaere_a"]["titular_prob"] == 0.0
+
+
+@patch("pipeline.dynamic.build_feed.scrape_results.update_form_from_fixtures")
+@patch("pipeline.dynamic.build_feed.api_football_client.get_fixtures")
+def test_update_ewma_from_concluded_fixtures_invokes_update(mock_get_fixtures, mock_update):
+    mock_get_fixtures.return_value = [
+        {"fixture_id": 111, "date": "2026-09-13T18:45:00+00:00", "home_team": "Roma", "away_team": "Lazio"}
+    ]
+
+    build_feed.update_ewma_from_concluded_fixtures()
+
+    mock_get_fixtures.assert_called_once_with(status_filter="FT")
+    mock_update.assert_called_once_with([111])
+
+
+@patch("pipeline.dynamic.build_feed.scrape_results.update_form_from_fixtures")
+@patch("pipeline.dynamic.build_feed.api_football_client.get_fixtures")
+def test_update_ewma_from_concluded_fixtures_skips_when_no_fixtures(mock_get_fixtures, mock_update):
+    mock_get_fixtures.return_value = []
+
+    build_feed.update_ewma_from_concluded_fixtures()
+
+    mock_update.assert_not_called()
+
+
+@patch("pipeline.dynamic.build_feed.scrape_results.update_form_from_fixtures")
+@patch("pipeline.dynamic.build_feed.api_football_client.get_fixtures")
+def test_update_ewma_from_concluded_fixtures_is_exception_safe(mock_get_fixtures, mock_update):
+    mock_get_fixtures.side_effect = RuntimeError("boom")
+
+    build_feed.update_ewma_from_concluded_fixtures()  # non deve propagare l'eccezione
+
+    mock_update.assert_not_called()
+
+
+@patch("pipeline.dynamic.build_feed.update_ewma_from_concluded_fixtures")
+@patch("pipeline.dynamic.build_feed.scrape_lineups.scrape_probable_lineups")
+@patch("pipeline.dynamic.build_feed.scrape_status.scrape_all_statuses")
+@patch("pipeline.dynamic.build_feed.scrape_results.load_ewma_state")
+@patch("pipeline.dynamic.build_feed.scrape_odds.build_odds_feed")
+def test_build_feed_payload_calls_ewma_update_before_loading_state(
+    mock_odds, mock_ewma, mock_status, mock_lineups, mock_update_ewma
+):
+    """build_feed_payload deve invocare l'aggiornamento EWMA prima di leggere lo stato,
+    cosi' che il feed rifletta il turno concluso piu' recente."""
+    mock_lineups.return_value = []
+    mock_status.return_value = {}
+    mock_ewma.return_value = {}
+    mock_odds.return_value = []
+
+    dataset_df = pd.DataFrame({"player": ["Test Player"], "team": ["ROM"], "role": ["C"]})
+    build_feed.build_feed_payload(dataset_df, matchday=1, season="2026/2027")
+
+    mock_update_ewma.assert_called_once()
 
 
 def test_build_feed_payload_has_required_top_level_keys():
