@@ -341,3 +341,34 @@ def test_get_fixture_player_ratings_handles_missing_player_name(mock_fetch, mock
     ratings = afc.get_fixture_player_ratings(111)
     assert len(ratings) == 1
     assert ratings["Valid Player"] == 7.9
+
+
+from pipeline.dynamic import scrape_odds
+
+
+def test_devig_probabilities_removes_bookmaker_margin():
+    # Quote con aggio: 1.90 / 3.60 / 4.20 (somma probabilita implicite > 1)
+    odds = [("Home", 1.90), ("Draw", 3.60), ("Away", 4.20)]
+    probs = scrape_odds.devig_probabilities(odds)
+    total = sum(probs.values())
+    assert abs(total - 1.0) < 1e-6
+    # L'esito piu probabile (quota piu bassa) deve avere probabilita maggiore
+    assert probs["Home"] > probs["Draw"] > probs["Away"]
+
+
+def test_devig_probabilities_empty_input_returns_empty_dict():
+    assert scrape_odds.devig_probabilities([]) == {}
+
+
+@patch("pipeline.dynamic.scrape_odds.get_odds")
+@patch("pipeline.dynamic.scrape_odds.get_fixtures")
+def test_build_odds_feed_marks_unavailable_odds(mock_fixtures, mock_odds):
+    mock_fixtures.return_value = [
+        {"fixture_id": 1, "home_team": "Inter", "away_team": "Monza", "date": "2026-09-20T18:45:00+00:00"}
+    ]
+    mock_odds.return_value = {}  # nessuna quota disponibile per questa fixture
+
+    feed = scrape_odds.build_odds_feed()
+    assert len(feed) == 1
+    assert feed[0]["odds_available"] is False
+    assert feed[0]["home_win_prob"] is None
