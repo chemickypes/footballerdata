@@ -5,6 +5,7 @@ Rimuove l'aggio del banco dalle quote 1X2 / Over-Under per ricavare le
 probabilita implicite pure, secondo P(evento) = (1/Q) / (1 + A) con
 A = somma(1/Qk) - 1.
 """
+import math
 import os
 import sys
 
@@ -53,7 +54,6 @@ def build_odds_feed():
         # inversa (log-odds lineare); usata solo come proxy quantitativo dichiarato.
         expected_total_goals = None
         if over_prob is not None and 0 < over_prob < 1:
-            import math
             expected_total_goals = 2.5 - math.log((1 - over_prob) / over_prob)
 
         feed.append({
