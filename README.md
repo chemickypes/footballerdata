@@ -304,6 +304,21 @@ python run_pipeline.py --from 8
 
 ---
 
+## Feed Dinamico Infrasettimanale (opzionale)
+
+Per abilitare l'aggiornamento automatico di probabili formazioni, quote e forma
+recente durante la stagione:
+
+1. Crea una chiave gratuita/a pagamento su [api-football.com](https://www.api-football.com/).
+2. In locale: aggiungi `API_FOOTBALL_KEY=<la-tua-chiave>` al file `.env` (già in `.gitignore`, non verrà mai committato).
+3. Su GitHub: vai su Settings → Secrets and variables → Actions e crea il secret `API_FOOTBALL_KEY` con lo stesso valore.
+4. Il workflow `.github/workflows/dynamic_feed.yml` genera `data/current_matchday.json` e lo pubblica sulla branch `data-feed` secondo il cron configurato (Gio 18:00, Ven 12:00/19:00, Sab 11:00 UTC), oppure puoi lanciarlo manualmente da GitHub Actions ("Run workflow").
+5. L'app consuma il feed tramite `pipeline/dynamic/client.py`, con cache di 15 minuti e fallback automatico su `data/fallback_matchday.json` se il feed remoto non è raggiungibile.
+
+**Non condividere mai la tua chiave API in chat, issue o commit pubblici.**
+
+---
+
 ## Generated Artifacts
 
 1. **`data/analisi_fantacalcio_completa.xlsx`**: Styled multi-tab Excel workbook with positional sheets (Goalkeepers, Defenders, Midfielders, Forwards), ML expected points, VORP pricing, and auction strategy column legend.

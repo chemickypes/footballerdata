@@ -1,0 +1,53 @@
+name: Dynamic Matchday Feed
+
+on:
+  schedule:
+    - cron: '0 18 * * 4'   # Giovedi 18:00 UTC
+    - cron: '0 12 * * 5'   # Venerdi 12:00 UTC
+    - cron: '0 19 * * 5'   # Venerdi 19:00 UTC
+    - cron: '0 11 * * 6'   # Sabato 11:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build-feed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build dynamic matchday feed
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+        run: python -m pipeline.dynamic.build_feed
+
+      - name: Publish to data-feed branch
+        run: |
+          git config user.name "fanta-lab-bot"
+          git config user.email "actions@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin data-feed; then
+            git fetch origin data-feed
+            git checkout data-feed
+          else
+            git checkout --orphan data-feed
+            git rm -rf . > /dev/null 2>&1 || true
+          fi
+
+          mkdir -p data
+          git checkout main -- data/current_matchday.json
+          git add data/current_matchday.json
+          git commit -m "chore: update current_matchday.json [skip ci]" || echo "Nessuna modifica al feed"
+          git push origin data-feed
