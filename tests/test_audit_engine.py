@@ -81,3 +81,17 @@ def test_compute_audit_handles_empty_roster_without_crashing():
     result = compute_audit(teams, POOL, tracking_history=[])
     assert result[0]["expected_points"] == 0.0
     assert result[0]["risk_capital_cr"] == 0
+
+
+def test_compute_audit_no_miglior_colpo_badge_when_best_surplus_negative():
+    """Verify that Miglior Colpo VORP badge is NOT awarded when best player has negative surplus."""
+    teams = [{
+        "id": 1, "name": "Squadra 1", "budget": 500,
+        "roster": [{"player": "Krstovic", "role": "A", "price": 30}],
+    }]
+
+    result = compute_audit(teams, POOL, tracking_history=[])
+
+    entry = result[0]
+    assert not any("Miglior Colpo VORP" in b for b in entry["badges"])
+    assert any("Peggior Overpay" in b for b in entry["badges"])

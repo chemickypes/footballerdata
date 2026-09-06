@@ -98,7 +98,7 @@ def compute_audit(teams, player_pool_df, tracking_history):
         for team, entry in zip(teams, entries):
             badges = []
             best, worst = _best_worst_surplus(team, player_pool_df)
-            if best:
+            if best and best[1] > 0:
                 badges.append(f"Miglior Colpo VORP: {best[0]} (+{best[1]:.1f} cr)")
             if worst and worst[1] < 0:
                 badges.append(f"Peggior Overpay: {worst[0]} ({worst[1]:.1f} cr)")
