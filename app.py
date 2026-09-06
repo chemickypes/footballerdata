@@ -3208,6 +3208,15 @@ HTML_TEMPLATE = """
                     <i class="fa-solid fa-robot icon-float" style="color:#a855f7; width:20px; font-size:1.1rem;"></i>
                     <span>Chiedi a {{ bot_name }}</span>
                 </button>
+                <button class="sidebar-nav-btn" id="sideNav-lineup" onclick="switchTab('lineup')">
+                    <i class="fa-solid fa-list-check"></i> Formazione
+                </button>
+                <button class="sidebar-nav-btn" id="sideNav-audit" onclick="switchTab('audit')">
+                    <i class="fa-solid fa-ranking-star"></i> Classifica Lega
+                </button>
+                <button class="sidebar-nav-btn" id="sideNav-trades" onclick="switchTab('trades')">
+                    <i class="fa-solid fa-right-left"></i> Scambi
+                </button>
 
                 <div style="height:1px; background:var(--border); margin:6px 0;"></div>
                 <div style="font-size:0.65rem; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; padding-left:8px; margin-bottom:2px;">STRUMENTI & LEGA</div>
@@ -3690,6 +3699,42 @@ HTML_TEMPLATE = """
         </div>
 
         <div id="tab-strategy" class="tab-content" style="display:none;"></div>
+
+        <div id="tab-lineup" class="tab-content" style="display:none;">
+            <div class="card" style="padding:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="margin:0;">Formazione Consigliata</h3>
+                    <button class="btn btn-primary" style="width:auto; padding:8px 16px;" onclick="loadLineupSolver()">Calcola</button>
+                </div>
+                <div id="lineupSolverResult">
+                    <p style="color:var(--text-muted);">Premi "Calcola" per generare la formazione ottimale della giornata.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-audit" class="tab-content" style="display:none;">
+            <div class="card" style="padding:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="margin:0;">Classifica Lega Post-Asta</h3>
+                    <button class="btn btn-primary" style="width:auto; padding:8px 16px;" onclick="loadAuditRankings()">Aggiorna</button>
+                </div>
+                <div id="auditRankingsResult">
+                    <p style="color:var(--text-muted);">Premi "Aggiorna" per calcolare la classifica di lega.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-trades" class="tab-content" style="display:none;">
+            <div class="card" style="padding:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="margin:0;">Scambi Win-Win Suggeriti</h3>
+                    <button class="btn btn-primary" style="width:auto; padding:8px 16px;" onclick="loadWinWinTrades()">Cerca Scambi</button>
+                </div>
+                <div id="winWinTradesResult">
+                    <p style="color:var(--text-muted);">Premi "Cerca Scambi" per trovare scambi vantaggiosi per entrambe le parti (max 3 vs 3 giocatori).</p>
+                </div>
+            </div>
+        </div>
 
         <!-- TAB 5: TABELLONE ROSE & FINANZE -->
         <div id="tab-rosters" class="tab-content">
@@ -4446,6 +4491,15 @@ HTML_TEMPLATE = """
         <button class="nav-item" id="botNav-ai" onclick="switchTab('ai')">
             <i class="fa-solid fa-robot icon-float"></i>
             <div>FantaAI</div>
+        </button>
+        <button class="nav-item" id="botNav-lineup" onclick="switchTab('lineup')">
+            <i class="fa-solid fa-list-check"></i><span>Formazione</span>
+        </button>
+        <button class="nav-item" id="botNav-audit" onclick="switchTab('audit')">
+            <i class="fa-solid fa-ranking-star"></i><span>Classifica</span>
+        </button>
+        <button class="nav-item" id="botNav-trades" onclick="switchTab('trades')">
+            <i class="fa-solid fa-right-left"></i><span>Scambi</span>
         </button>
     </nav>
 
@@ -5419,6 +5473,72 @@ HTML_TEMPLATE = """
             }
             if (tabId === 'rosters') renderRosterTab();
             if (tabId === 'listone') renderListone();
+        }
+
+        async function loadLineupSolver() {
+            const container = document.getElementById('lineupSolverResult');
+            container.innerHTML = '<p style="color:var(--text-muted);">Caricamento...</p>';
+            try {
+                const resp = await fetch('/api/lineup/solve', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({})
+                });
+                const data = await resp.json();
+                if (!data.success) {
+                    container.innerHTML = `<div style="color:var(--danger, #f87171); padding:10px; border:1px solid var(--border); border-radius:8px;">⚠️ ${data.message || 'Errore sconosciuto'}</div>`;
+                    return;
+                }
+                let html = `<p><b>Modulo:</b> ${data.formation} — <b>Totale xPts:</b> ${data.total_xpts}</p>`;
+                html += '<h4>Titolari</h4><ul>';
+                data.starters.forEach(p => { html += `<li>${p.player} (${p.role}) — ${p.xpts} xPts</li>`; });
+                html += '</ul><h4>Panchina</h4><ul>';
+                data.bench.forEach(p => { html += `<li>${p.player} (${p.role}) — ${p.xpts} xPts</li>`; });
+                html += '</ul>';
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = '<div style="color:var(--danger, #f87171);">Errore di rete durante il calcolo della formazione.</div>';
+            }
+        }
+
+        async function loadAuditRankings() {
+            const container = document.getElementById('auditRankingsResult');
+            container.innerHTML = '<p style="color:var(--text-muted);">Caricamento...</p>';
+            try {
+                const resp = await fetch('/api/audit/rankings');
+                const data = await resp.json();
+                if (!data.success) {
+                    container.innerHTML = '<div style="color:var(--danger, #f87171);">Errore nel calcolo della classifica.</div>';
+                    return;
+                }
+                let html = '<table style="width:100%; border-collapse:collapse;"><tr><th>Squadra</th><th>Punti Attesi</th><th>Capitale a Rischio</th><th>Badge</th></tr>';
+                data.rankings.forEach(r => {
+                    html += `<tr><td>${r.team_name}</td><td>${r.expected_points}</td><td>${r.risk_capital_cr} cr (${r.risk_capital_pct}%)</td><td>${r.badges.join(', ')}</td></tr>`;
+                });
+                html += '</table>';
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = '<div style="color:var(--danger, #f87171);">Errore di rete durante il calcolo della classifica.</div>';
+            }
+        }
+
+        async function loadWinWinTrades() {
+            const container = document.getElementById('winWinTradesResult');
+            container.innerHTML = '<p style="color:var(--text-muted);">Ricerca in corso...</p>';
+            try {
+                const resp = await fetch('/api/trades/winwin');
+                const data = await resp.json();
+                if (!data.success || data.trades.length === 0) {
+                    container.innerHTML = '<p style="color:var(--text-muted);">Nessuno scambio vantaggioso trovato al momento.</p>';
+                    return;
+                }
+                let html = '<ul>';
+                data.trades.forEach(t => {
+                    html += `<li>Cedi [${t.players_out.join(', ')}] a ${t.opponent_team_name} per [${t.players_in.join(', ')}] — Tuo delta: ${t.my_delta}, Suo delta: ${t.opponent_delta}</li>`;
+                });
+                html += '</ul>';
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = '<div style="color:var(--danger, #f87171);">Errore di rete durante la ricerca degli scambi.</div>';
+            }
         }
 
         function setRoleFilter(role) {
