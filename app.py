@@ -12,6 +12,13 @@ import re
 import pandas as pd
 import requests
 from flask import Flask, jsonify, request, render_template_string, send_from_directory
+import config
+
+from modules.common.data_provider import get_dynamic_overlay
+from modules.lineup.lineup_solver import solve_lineup
+from modules.valuation.audit_engine import compute_audit
+from modules.valuation.season_tracking import load_tracking_history
+from modules.trades.trade_analyzer import evaluate_trade, find_winwin_trades
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
@@ -8122,6 +8129,92 @@ HTML_TEMPLATE = """
 </body>
 </html>
 """
+
+@app.route("/api/lineup/solve", methods=["POST"])
+def api_lineup_solve():
+    data = request.json or {}
+    state = load_state()
+    team_id = data.get("team_id")
+
+    if team_id is None:
+        team = next((t for t in state["teams"] if t.get("is_me")), state["teams"][0] if state["teams"] else None)
+    else:
+        team = next((t for t in state["teams"] if t["id"] == int(team_id)), None)
+
+    if not team:
+        return jsonify({"success": False, "error": "team_not_found", "message": "Squadra non trovata"}), 404
+
+    overlay = get_dynamic_overlay()
+    result = solve_lineup(team.get("roster", []), overlay)
+
+    status_code = 200 if result["success"] else 503
+    return jsonify(result), status_code
+
+
+@app.route("/api/audit/rankings", methods=["GET"])
+def api_audit_rankings():
+    state = load_state()
+    df = load_dataset()
+    tracking_history = load_tracking_history(config.SEASON_TRACKING_JSONL)
+
+    rankings = compute_audit(state["teams"], df, tracking_history)
+    return jsonify({"success": True, "rankings": rankings})
+
+
+@app.route("/api/trades/evaluate", methods=["POST"])
+def api_trades_evaluate():
+    data = request.json or {}
+    team_id_a = data.get("team_id_a")
+    team_id_b = data.get("team_id_b")
+    players_out = data.get("players_out", [])
+    players_in = data.get("players_in", [])
+
+    if len(players_out) + len(players_in) > 6:
+        return jsonify({"success": False, "error": "too_many_players",
+                         "message": "Massimo 6 giocatori totali coinvolti nello scambio"}), 400
+
+    state = load_state()
+    team_a = next((t for t in state["teams"] if t["id"] == int(team_id_a)), None)
+    team_b = next((t for t in state["teams"] if t["id"] == int(team_id_b)), None)
+    if not team_a or not team_b:
+        return jsonify({"success": False, "error": "team_not_found", "message": "Squadra non trovata"}), 404
+
+    df = load_dataset()
+    overlay = get_dynamic_overlay()
+
+    result = evaluate_trade(team_a.get("roster", []), players_out, team_b.get("roster", []), players_in, df, overlay)
+    if "error" in result:
+        return jsonify({"success": False, **result}), 400
+
+    return jsonify({"success": True, **result})
+
+
+@app.route("/api/trades/winwin", methods=["GET"])
+def api_trades_winwin():
+    team_id = request.args.get("team_id")
+    state = load_state()
+
+    if team_id is None:
+        my_team = next((t for t in state["teams"] if t.get("is_me")), None)
+    else:
+        my_team = next((t for t in state["teams"] if t["id"] == int(team_id)), None)
+
+    if not my_team:
+        return jsonify({"success": False, "error": "team_not_found", "message": "Squadra non trovata"}), 404
+
+    df = load_dataset()
+    all_trades = []
+    for opponent in state["teams"]:
+        if opponent["id"] == my_team["id"]:
+            continue
+        trades = find_winwin_trades(my_team.get("roster", []), opponent.get("roster", []), df, max_per_side=3, top_n=10)
+        for t in trades:
+            t["opponent_team_id"] = opponent["id"]
+            t["opponent_team_name"] = opponent.get("name", "")
+        all_trades.extend(trades)
+
+    all_trades.sort(key=lambda t: t["combined_delta"], reverse=True)
+    return jsonify({"success": True, "trades": all_trades[:10]})
 
 @app.route("/")
 def index():
