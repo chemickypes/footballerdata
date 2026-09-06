@@ -372,3 +372,53 @@ def test_build_odds_feed_marks_unavailable_odds(mock_fixtures, mock_odds):
     assert len(feed) == 1
     assert feed[0]["odds_available"] is False
     assert feed[0]["home_win_prob"] is None
+
+
+from pipeline.dynamic import scrape_lineups
+
+SAMPLE_LINEUP_HTML = """
+<li class="match" data-match-id="17981" data-match-hash="JUV-MIL">
+  <div class="team team-home" data-team-formation="4-2-3-1">
+    <ul class="team-lineup" data-formation="4231">
+      <li class="player"><a class="player-name player-link" href="/serie-a/squadre/juventus/perin/123">
+        <span>Perin</span></a></li>
+      <li class="separator"></li>
+      <li class="player"><a class="player-name player-link" href="/serie-a/squadre/juventus/kalulu/456">
+        <span>Kalulu</span></a></li>
+      <li class="separator"></li>
+    </ul>
+  </div>
+  <div class="team team-away" data-team-formation="4-3-3">
+    <ul class="team-lineup" data-formation="433">
+      <li class="player"><a class="player-name player-link" href="/serie-a/squadre/milan/maignan/789">
+        <span>Maignan</span></a></li>
+    </ul>
+  </div>
+</li>
+"""
+
+
+def test_expected_minutes_full_starter():
+    assert scrape_lineups.expected_minutes(1.0, is_bench_candidate=False) == 70.0
+
+
+def test_expected_minutes_bench_candidate():
+    # titular_prob basso e in panchina: xMin = 0*70 + (1-0)*20*1 = 20
+    assert scrape_lineups.expected_minutes(0.0, is_bench_candidate=True) == 20.0
+
+
+def test_parse_probable_lineups_extracts_players_with_team_side():
+    players = scrape_lineups.parse_probable_lineups(SAMPLE_LINEUP_HTML)
+    names = [p["player_name"] for p in players]
+    assert "Perin" in names
+    assert "Kalulu" in names
+    assert "Maignan" in names
+    perin = next(p for p in players if p["player_name"] == "Perin")
+    assert perin["match_id"] == "17981"
+    assert perin["side"] == "home"
+
+
+@patch("pipeline.dynamic.scrape_lineups.fetch_with_retry")
+def test_scrape_probable_lineups_returns_empty_list_on_fetch_failure(mock_fetch):
+    mock_fetch.return_value = None
+    assert scrape_lineups.scrape_probable_lineups() == []
