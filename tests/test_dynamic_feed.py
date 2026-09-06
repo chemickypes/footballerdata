@@ -93,3 +93,75 @@ def test_fetch_with_retry_all_attempts_fail(mock_get, mock_sleep):
     res = fetch_with_retry("http://example.com", max_retries=3)
     assert res is None
     assert mock_get.call_count == 3
+
+
+from pipeline.dynamic import api_football_client as afc
+
+
+@patch("pipeline.dynamic.api_football_client.config")
+@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+def test_get_fixtures_parses_response(mock_fetch, mock_config):
+    mock_config.API_FOOTBALL_KEY = "test_key"
+    mock_config.API_FOOTBALL_LEAGUE_ID = 135
+    mock_config.API_FOOTBALL_SEASON = 2026
+    
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "response": [
+            {
+                "fixture": {"id": 111, "date": "2026-09-20T18:45:00+00:00"},
+                "teams": {
+                    "home": {"name": "Inter"},
+                    "away": {"name": "Monza"},
+                },
+            }
+        ]
+    }
+    mock_fetch.return_value = mock_resp
+
+    fixtures = afc.get_fixtures()
+    assert len(fixtures) == 1
+    assert fixtures[0]["home_team"] == "Inter"
+    assert fixtures[0]["away_team"] == "Monza"
+    assert fixtures[0]["fixture_id"] == 111
+
+
+@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+def test_get_fixtures_returns_empty_list_on_failure(mock_fetch):
+    mock_fetch.return_value = None
+    assert afc.get_fixtures() == []
+
+
+@patch("pipeline.dynamic.api_football_client.config")
+@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+def test_get_fixture_player_ratings_parses_response(mock_fetch, mock_config):
+    mock_config.API_FOOTBALL_KEY = "test_key"
+    mock_config.API_FOOTBALL_LEAGUE_ID = 135
+    mock_config.API_FOOTBALL_SEASON = 2026
+    
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "response": [
+            {
+                "players": [
+                    {
+                        "player": {"name": "Lautaro Martinez"},
+                        "statistics": [{"games": {"rating": "7.8"}}],
+                    }
+                ]
+            },
+            {
+                "players": [
+                    {
+                        "player": {"name": "Yann Bisseck"},
+                        "statistics": [{"games": {"rating": None}}],
+                    }
+                ]
+            },
+        ]
+    }
+    mock_fetch.return_value = mock_resp
+
+    ratings = afc.get_fixture_player_ratings(111)
+    assert ratings["Lautaro Martinez"] == 7.8
+    assert "Yann Bisseck" not in ratings  # rating nullo -> escluso

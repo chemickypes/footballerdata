@@ -148,3 +148,15 @@ HEADERS = {
 
 RATE_LIMIT_SEC = 1.5             # Pausa tra richieste scraping
 TM_MAX_WORKERS = 6               # Thread paralleli Transfermarkt
+
+# ──────────────────────────────────────────────────────────────────────
+# FEED DINAMICO INFRASETTIMANALE (Pilastro 3) — api-football.com
+# ──────────────────────────────────────────────────────────────────────
+API_FOOTBALL_KEY = os.environ.get("API_FOOTBALL_KEY", "")
+API_FOOTBALL_LEAGUE_ID = 135  # Serie A su api-football.com
+API_FOOTBALL_SEASON = 2026    # Anno di inizio stagione (2026-27)
+
+CURRENT_MATCHDAY_JSON = os.path.join(DATA_DIR, "current_matchday.json")
+FALLBACK_MATCHDAY_JSON = os.path.join(DATA_DIR, "fallback_matchday.json")
+EWMA_STATE_JSON = os.path.join(DATA_DIR, "ewma_state.json")
+MIN_VALID_PLAYERS_IN_FEED = 450
