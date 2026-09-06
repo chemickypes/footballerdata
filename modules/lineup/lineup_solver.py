@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import Bounds, LinearConstraint, milp
 
-from modules.common.data_provider import compute_weekly_xpts, is_overlay_real
+from modules.common.data_provider import compute_weekly_xpts, is_overlay_real, get_player_status
 
 EXCLUDED_STATUSES = {"INFORTUNATO", "SQUALIFICATO"}
 FORMATIONS = {
@@ -59,8 +59,11 @@ def solve_lineup(roster, overlay):
         return {"success": False, "error": "no_feasible_formation", "message": "Rosa vuota: nessuna formazione calcolabile."}
     df = pd.DataFrame(roster).fillna({"team": ""})
     df, _ = compute_weekly_xpts(df, overlay)
-    if "status" in df.columns:
-        df = df[~df["status"].isin(EXCLUDED_STATUSES)].reset_index(drop=True)
+    df["status"] = [
+        get_player_status(overlay, row.get("team", ""), row.get("player", ""), row.get("role", ""))
+        for _, row in df.iterrows()
+    ]
+    df = df[~df["status"].isin(EXCLUDED_STATUSES)].reset_index(drop=True)
     best = None
     for formation_name, (n_p, n_d, n_c, n_a) in FORMATIONS.items():
         selected = _solve_single_formation(df, n_p, n_d, n_c, n_a)
