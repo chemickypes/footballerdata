@@ -8,6 +8,7 @@ data/*.xlsx
 !data/.gitkeep
 !data/dataset_finale*.csv
 !data/Quotazioni_Fantacalcio_Stagione_2026_27_latest.xlsx
+!data/fallback_matchday.json
 
 # Excel output files
 *.xlsx

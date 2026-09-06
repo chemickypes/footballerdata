@@ -3,6 +3,7 @@
 Unit tests for pipeline/dynamic/* — feed dinamico infrasettimanale (Pilastro 3).
 No live network calls: all HTTP is mocked via unittest.mock.patch.
 """
+import json
 import os
 import sys
 from unittest.mock import patch, MagicMock
@@ -683,3 +684,141 @@ def test_main_raises_when_insufficient_players(
     
     assert "Feed dinamico incompleto" in str(exc_info.value)
     assert "giocatori validi" in str(exc_info.value)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# CLIENT TESTS — Singleton MatchdayFeedClient with cache and fallback
+# ──────────────────────────────────────────────────────────────────────
+
+from pipeline.dynamic.client import MatchdayFeedClient
+
+
+def test_client_returns_fallback_when_fetch_fails(tmp_path):
+    fallback_path = tmp_path / "fallback_matchday.json"
+    fallback_payload = {"matchday": 0, "season": "2026/2027", "fixtures": [], "players": {}}
+    fallback_path.write_text(json.dumps(fallback_payload), encoding="utf-8")
+
+    with patch("pipeline.dynamic.client.requests.get", side_effect=Exception("network down")):
+        client = MatchdayFeedClient(
+            feed_url="https://example.invalid/current_matchday.json",
+            fallback_path=str(fallback_path),
+        )
+        feed = client.get_feed()
+    assert feed == fallback_payload
+
+
+def test_client_caches_within_ttl(tmp_path):
+    fallback_path = tmp_path / "fallback_matchday.json"
+    fallback_path.write_text(json.dumps({"matchday": 0, "fixtures": [], "players": {}}), encoding="utf-8")
+
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"matchday": 5, "fixtures": [], "players": {}}
+    mock_response.status_code = 200
+
+    with patch("pipeline.dynamic.client.requests.get", return_value=mock_response) as mock_get:
+        client = MatchdayFeedClient(
+            feed_url="https://example.invalid/current_matchday.json",
+            ttl_seconds=900,
+            fallback_path=str(fallback_path),
+        )
+        first = client.get_feed()
+        second = client.get_feed()
+        assert first["matchday"] == 5
+        assert second["matchday"] == 5
+        assert mock_get.call_count == 1  # secondo fetch servito dalla cache
+
+
+def test_client_retries_after_fallback_on_next_call(tmp_path):
+    """Verify that after a fallback, the next call retries the HTTP fetch."""
+    fallback_path = tmp_path / "fallback_matchday.json"
+    fallback_payload = {"matchday": 0, "season": "2026/2027", "fixtures": [], "players": {}}
+    fallback_path.write_text(json.dumps(fallback_payload), encoding="utf-8")
+
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"matchday": 5, "fixtures": [], "players": {}}
+    mock_response.status_code = 200
+
+    call_count = [0]
+    
+    def side_effect(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            raise Exception("network down")
+        return mock_response
+
+    with patch("pipeline.dynamic.client.requests.get", side_effect=side_effect) as mock_get:
+        client = MatchdayFeedClient(
+            feed_url="https://example.invalid/current_matchday.json",
+            ttl_seconds=900,
+            fallback_path=str(fallback_path),
+        )
+        # First call: fetch fails, returns fallback
+        first = client.get_feed()
+        assert first == fallback_payload
+        
+        # Second call: fetch succeeds, returns fresh data (not cached from previous)
+        second = client.get_feed()
+        assert second["matchday"] == 5
+        assert mock_get.call_count == 2  # Both calls attempted HTTP fetch
+
+
+def test_client_expires_cache_after_ttl(tmp_path):
+    """Verify that cache expires after TTL and a new fetch is attempted."""
+    fallback_path = tmp_path / "fallback_matchday.json"
+    fallback_path.write_text(json.dumps({"matchday": 0, "fixtures": [], "players": {}}), encoding="utf-8")
+
+    mock_response_1 = MagicMock()
+    mock_response_1.json.return_value = {"matchday": 5, "fixtures": [], "players": {}}
+    mock_response_1.status_code = 200
+
+    mock_response_2 = MagicMock()
+    mock_response_2.json.return_value = {"matchday": 6, "fixtures": [], "players": {}}
+    mock_response_2.status_code = 200
+
+    responses = [mock_response_1, mock_response_2]
+    response_iter = iter(responses)
+
+    def get_response(*args, **kwargs):
+        return next(response_iter)
+
+    with patch("pipeline.dynamic.client.requests.get", side_effect=get_response) as mock_get:
+        with patch("pipeline.dynamic.client.time.time") as mock_time:
+            times = [0.0, 1.0, 1001.0]  # First call at 0, second at 1s, third at 1001s (>TTL)
+            time_iter = iter(times)
+            mock_time.side_effect = lambda: next(time_iter)
+            
+            client = MatchdayFeedClient(
+                feed_url="https://example.invalid/current_matchday.json",
+                ttl_seconds=900,
+                fallback_path=str(fallback_path),
+            )
+            
+            # First call: fetch, cache matchday 5
+            first = client.get_feed()
+            assert first["matchday"] == 5
+            
+            # Second call at 1s (within TTL): returns cache (matchday 5)
+            second = client.get_feed()
+            assert second["matchday"] == 5
+            
+            # Third call at 1001s (TTL expired): fetch again, get matchday 6
+            third = client.get_feed()
+            assert third["matchday"] == 6
+            
+            assert mock_get.call_count == 2  # First and third calls fetched
+
+
+def test_client_singleton_get_default_client():
+    """Verify that get_default_client() returns the same singleton instance."""
+    from pipeline.dynamic.client import get_default_client, _default_client, _default_client_lock
+    
+    # Reset singleton for test
+    import pipeline.dynamic.client as client_module
+    with client_module._default_client_lock:
+        client_module._default_client = None
+    
+    client1 = get_default_client()
+    client2 = get_default_client()
+    
+    # Should be the same object
+    assert client1 is client2
