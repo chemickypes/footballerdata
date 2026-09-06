@@ -1,9 +1,9 @@
+import math
 import os
 import sys
+from unittest.mock import MagicMock
 
-import math
 import pandas as pd
-import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -72,3 +72,37 @@ def test_get_player_status_returns_feed_status():
         "players": {"inter_lautaro_martinez_a": {"status": "INFORTUNATO"}},
     }
     assert get_player_status(overlay, "Inter", "Lautaro Martinez", "A") == "INFORTUNATO"
+
+
+def test_get_dynamic_overlay_returns_none_when_client_raises():
+    """get_dynamic_overlay() must never raise: any exception (network error,
+    malformed JSON, etc.) must result in None being returned."""
+    mock_client = MagicMock()
+    mock_client.get_feed.side_effect = Exception("Network error")
+    result = get_dynamic_overlay(client=mock_client)
+    assert result is None
+
+
+def test_get_dynamic_overlay_returns_populated_feed():
+    """get_dynamic_overlay() returns the feed dict when it contains real data
+    (matchday > 0 and non-empty players)."""
+    populated_feed = {
+        "matchday": 4,
+        "season": "2026/2027",
+        "fixtures": [],
+        "players": {"inter_lautaro_martinez_a": {"name": "Lautaro Martinez", "xpts": 6.85}},
+    }
+    mock_client = MagicMock()
+    mock_client.get_feed.return_value = populated_feed
+    result = get_dynamic_overlay(client=mock_client)
+    assert result == populated_feed
+
+
+def test_get_dynamic_overlay_returns_none_for_placeholder_feed():
+    """get_dynamic_overlay() returns None for the placeholder feed
+    (matchday=0 and empty players dict)."""
+    placeholder_feed = {"matchday": 0, "season": "2026/2027", "fixtures": [], "players": {}}
+    mock_client = MagicMock()
+    mock_client.get_feed.return_value = placeholder_feed
+    result = get_dynamic_overlay(client=mock_client)
+    assert result is None
