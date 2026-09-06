@@ -38,6 +38,13 @@ jobs:
           git config user.name "fanta-lab-bot"
           git config user.email "actions@users.noreply.github.com"
 
+          # Preserva il feed appena generato prima di cambiare branch: il file e'
+          # gitignored e vive solo nel working tree corrente, non su main ne' su
+          # data-feed, quindi va copiato fuori dal checkout prima del git checkout.
+          STAGE_DIR="${RUNNER_TEMP}/dynamic-feed-stage"
+          mkdir -p "$STAGE_DIR"
+          cp data/current_matchday.json "$STAGE_DIR/current_matchday.json"
+
           if git ls-remote --exit-code --heads origin data-feed; then
             git fetch origin data-feed
             git checkout data-feed
@@ -47,7 +54,7 @@ jobs:
           fi
 
           mkdir -p data
-          git checkout main -- data/current_matchday.json
-          git add data/current_matchday.json
+          cp "$STAGE_DIR/current_matchday.json" data/current_matchday.json
+          git add -f data/current_matchday.json
           git commit -m "chore: update current_matchday.json [skip ci]" || echo "Nessuna modifica al feed"
           git push origin data-feed
