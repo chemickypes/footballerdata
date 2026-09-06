@@ -58,3 +58,4 @@ static/*avatar*
 # Logs
 *.log
 .vercel
+.worktrees/
