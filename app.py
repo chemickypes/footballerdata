@@ -12,7 +12,7 @@ import re
 import pandas as pd
 import requests
 from flask import Flask, jsonify, request, render_template_string, send_from_directory
-import config
+from core import config
 
 from modules.common.data_provider import get_dynamic_overlay
 from modules.lineup.lineup_solver import solve_lineup

@@ -11,7 +11,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import config
+from core import config
 from pipeline.dynamic.api_football_client import get_fixture_player_ratings
 
 EWMA_ALPHA = 0.35

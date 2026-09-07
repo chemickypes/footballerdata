@@ -22,7 +22,7 @@ import numpy as np
 from scipy.optimize import milp, LinearConstraint, Bounds
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import config
+from core import config
 
 warnings.filterwarnings("ignore")
 

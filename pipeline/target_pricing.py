@@ -32,7 +32,7 @@ from typing import Any
 import openpyxl
 import pandas as pd
 
-import config
+from core import config
 
 MIN_QI = 2
 REGULAR_APPEARANCES_LO = 25

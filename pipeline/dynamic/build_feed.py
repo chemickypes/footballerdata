@@ -15,7 +15,7 @@ import sys
 import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import config
+from core import config
 from pipeline.dynamic import api_football_client, scrape_lineups, scrape_odds, scrape_results, scrape_status
 from pipeline.dynamic.utils import PlayerMatcher, normalize_name
 

@@ -15,7 +15,7 @@ import sys
 from bs4 import BeautifulSoup
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import config
+from core import config
 from pipeline.dynamic.utils import fetch_with_retry
 
 LINEUPS_URL = "https://www.fantacalcio.it/probabili-formazioni-serie-a"
