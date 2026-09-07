@@ -3446,6 +3446,9 @@ HTML_TEMPLATE = """
         body.app-locked {
             overflow: hidden;
         }
+        body.app-locked .maestro-ambient {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
@@ -4959,6 +4962,8 @@ HTML_TEMPLATE = """
             const host = document.getElementById(containerId);
             const map = window.MAESTRO_SPRITES[pose] || window.MAESTRO_SPRITES.neutral;
             if (!host || !map) return;
+            const rows = map.length;
+            const cols = map[0].length;
             let rects = '';
             map.forEach((row, y) => {
                 row.split('').forEach((token, x) => {
@@ -4967,7 +4972,7 @@ HTML_TEMPLATE = """
                     rects += `<rect x="${x}" y="${y}" width="1.03" height="1.03" fill="${fill}" />`;
                 });
             });
-            host.innerHTML = `<svg viewBox="0 0 22 33" width="${22 * scale}" height="${33 * scale}" shape-rendering="crispEdges" style="display:block">${rects}</svg>`;
+            host.innerHTML = `<svg viewBox="0 0 ${cols} ${rows}" width="${cols * scale}" height="${rows * scale}" shape-rendering="crispEdges" style="display:block">${rects}</svg>`;
         }
 
         let maestroCurrentPose = 'neutral';
