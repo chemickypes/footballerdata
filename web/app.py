@@ -4048,9 +4048,9 @@ HTML_TEMPLATE = """
             </div>
         </div>
 
-        <div id="tab-strategy" class="tab-content" style="display:none;"></div>
+        <div id="tab-strategy" class="tab-content"></div>
 
-        <div id="tab-lineup" class="tab-content" style="display:none;">
+        <div id="tab-lineup" class="tab-content">
             <div class="card" style="padding:16px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="margin:0;">Formazione Consigliata</h3>
@@ -4062,7 +4062,7 @@ HTML_TEMPLATE = """
             </div>
         </div>
 
-        <div id="tab-audit" class="tab-content" style="display:none;">
+        <div id="tab-audit" class="tab-content">
             <div class="card" style="padding:16px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="margin:0;">Classifica Lega Post-Asta</h3>
@@ -4074,7 +4074,7 @@ HTML_TEMPLATE = """
             </div>
         </div>
 
-        <div id="tab-trades" class="tab-content" style="display:none;">
+        <div id="tab-trades" class="tab-content">
             <div class="card" style="padding:16px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="margin:0;">Scambi Win-Win Suggeriti</h3>
@@ -5024,7 +5024,7 @@ HTML_TEMPLATE = """
                 audit: { pose: 'neutral', text: 'Una buona officina misura prima di giudicare.' },
                 trades: { pose: 'greeting', text: 'Ogni scambio va pesato come un ingranaggio.' },
                 targets: { pose: 'greeting', text: 'Fissa i tuoi obiettivi prima che il mercato corra.' }
-            }[tabId] || { pose: 'neutral', text: 'Bentornato nell\'officina.' };
+            }[tabId] || { pose: 'neutral', text: "Bentornato nell'officina." };
             setMaestroPose(state.pose);
             if (bubble) bubble.textContent = state.text;
         }
