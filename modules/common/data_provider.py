@@ -1,7 +1,7 @@
 """
 Shared data layer for the Pilastro 4 analytics modules (lineup solver, audit
 engine, trade analyzer). Isolates dataset loading and dynamic-feed access so
-downstream modules never talk to pipeline.dynamic.client directly.
+downstream modules never talk to core.ingestion.dynamic.client directly.
 """
 import math
 import sys
@@ -9,8 +9,8 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from pipeline.dynamic.client import get_default_client
-from pipeline.dynamic.utils import normalize_name
+from core.ingestion.dynamic.client import get_default_client
+from core.ingestion.dynamic.utils import normalize_name
 
 
 def is_overlay_real(feed):
@@ -38,7 +38,7 @@ def _team_slug(team_value):
 
 
 def _player_key(team_value, player_name, role):
-    """Mirrors pipeline.dynamic.build_feed._player_key exactly (team_player_role
+    """Mirrors core.ingestion.dynamic.build_feed._player_key exactly (team_player_role
     format) so overlay lookups match the keys produced by the feed builder."""
     return f"{_team_slug(team_value)}_{normalize_name(player_name).replace(' ', '_')}_{str(role).lower()}"
 

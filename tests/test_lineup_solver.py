@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from pipeline.dynamic.utils import normalize_name
+from core.ingestion.dynamic.utils import normalize_name
 from modules.lineup.lineup_solver import solve_lineup, FORMATIONS
 
 SAMPLE_ROSTER = [

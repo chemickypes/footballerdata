@@ -31,7 +31,7 @@ jobs:
       - name: Build dynamic matchday feed
         env:
           API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
-        run: python -m pipeline.dynamic.build_feed
+        run: python -m core.ingestion.dynamic.build_feed
 
       - name: Publish to data-feed branch
         run: |

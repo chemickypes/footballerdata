@@ -10,7 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core import config
-from pipeline.dynamic.utils import fetch_with_retry
+from core.ingestion.dynamic.utils import fetch_with_retry
 
 API_FOOTBALL_BASE = "https://v3.football.api-sports.io"
 

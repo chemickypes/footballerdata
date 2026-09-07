@@ -10,7 +10,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from pipeline.dynamic.api_football_client import get_fixtures, get_odds
+from core.ingestion.dynamic.api_football_client import get_fixtures, get_odds
 
 
 def devig_probabilities(odds):

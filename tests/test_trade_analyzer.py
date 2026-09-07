@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from modules.trades.trade_analyzer import evaluate_trade, find_winwin_trades, _value_evaluation
-from pipeline.dynamic.utils import normalize_name
+from core.ingestion.dynamic.utils import normalize_name
 
 def _key(team, name, role): return f"{normalize_name(team).replace(' ', '_')}_{normalize_name(name).replace(' ', '_')}_{role.lower()}"
 def _overlay(roster, xpts):

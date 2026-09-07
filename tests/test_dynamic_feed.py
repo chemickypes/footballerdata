@@ -14,7 +14,7 @@ import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from pipeline.dynamic.utils import normalize_name, PlayerMatcher, fetch_with_retry
+from core.ingestion.dynamic.utils import normalize_name, PlayerMatcher, fetch_with_retry
 
 
 def test_normalize_name_strips_accents_and_case():
@@ -60,7 +60,7 @@ def test_player_matcher_returns_none_when_no_candidate():
     assert matcher.match("Totally Unrelated Name", "ROM") is None
 
 
-@patch("pipeline.dynamic.utils.requests.get")
+@patch("core.ingestion.dynamic.utils.requests.get")
 def test_fetch_with_retry_success(mock_get):
     mock_resp = MagicMock()
     mock_resp.status_code = 200
@@ -71,8 +71,8 @@ def test_fetch_with_retry_success(mock_get):
     assert mock_get.call_count == 1
 
 
-@patch("pipeline.dynamic.utils.time.sleep")
-@patch("pipeline.dynamic.utils.requests.get")
+@patch("core.ingestion.dynamic.utils.time.sleep")
+@patch("core.ingestion.dynamic.utils.requests.get")
 def test_fetch_with_retry_retry_then_success(mock_get, mock_sleep):
     fail_resp = MagicMock()
     fail_resp.status_code = 500
@@ -87,8 +87,8 @@ def test_fetch_with_retry_retry_then_success(mock_get, mock_sleep):
     assert mock_get.call_count == 2
 
 
-@patch("pipeline.dynamic.utils.time.sleep")
-@patch("pipeline.dynamic.utils.requests.get")
+@patch("core.ingestion.dynamic.utils.time.sleep")
+@patch("core.ingestion.dynamic.utils.requests.get")
 def test_fetch_with_retry_all_attempts_fail(mock_get, mock_sleep):
     mock_get.side_effect = requests.exceptions.Timeout("Timed out")
 
@@ -97,11 +97,11 @@ def test_fetch_with_retry_all_attempts_fail(mock_get, mock_sleep):
     assert mock_get.call_count == 3
 
 
-from pipeline.dynamic import api_football_client as afc
+from core.ingestion.dynamic import api_football_client as afc
 
 
-@patch("pipeline.dynamic.api_football_client.config")
-@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+@patch("core.ingestion.dynamic.api_football_client.config")
+@patch("core.ingestion.dynamic.api_football_client.fetch_with_retry")
 def test_get_fixtures_parses_response(mock_fetch, mock_config):
     mock_config.API_FOOTBALL_KEY = "test_key"
     mock_config.API_FOOTBALL_LEAGUE_ID = 135
@@ -128,16 +128,16 @@ def test_get_fixtures_parses_response(mock_fetch, mock_config):
     assert fixtures[0]["fixture_id"] == 111
 
 
-@patch("pipeline.dynamic.api_football_client.config")
-@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+@patch("core.ingestion.dynamic.api_football_client.config")
+@patch("core.ingestion.dynamic.api_football_client.fetch_with_retry")
 def test_get_fixtures_returns_empty_list_on_failure(mock_fetch, mock_config):
     mock_config.API_FOOTBALL_KEY = "test_key"
     mock_fetch.return_value = None
     assert afc.get_fixtures() == []
 
 
-@patch("pipeline.dynamic.api_football_client.config")
-@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+@patch("core.ingestion.dynamic.api_football_client.config")
+@patch("core.ingestion.dynamic.api_football_client.fetch_with_retry")
 def test_get_fixtures_status_filter_uses_last_instead_of_next(mock_fetch, mock_config):
     mock_config.API_FOOTBALL_KEY = "test_key"
     mock_config.API_FOOTBALL_LEAGUE_ID = 135
@@ -164,8 +164,8 @@ def test_get_fixtures_status_filter_uses_last_instead_of_next(mock_fetch, mock_c
     assert "next" not in kwargs["params"]
 
 
-@patch("pipeline.dynamic.api_football_client.config")
-@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+@patch("core.ingestion.dynamic.api_football_client.config")
+@patch("core.ingestion.dynamic.api_football_client.fetch_with_retry")
 def test_get_fixture_player_ratings_parses_response(mock_fetch, mock_config):
     mock_config.API_FOOTBALL_KEY = "test_key"
     mock_config.API_FOOTBALL_LEAGUE_ID = 135
@@ -202,8 +202,8 @@ def test_get_fixture_player_ratings_parses_response(mock_fetch, mock_config):
 # Regression tests for exception safety
 
 
-@patch("pipeline.dynamic.api_football_client.config")
-@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+@patch("core.ingestion.dynamic.api_football_client.config")
+@patch("core.ingestion.dynamic.api_football_client.fetch_with_retry")
 def test_get_fixtures_handles_json_decode_error(mock_fetch, mock_config):
     """Test that get_fixtures returns [] when resp.json() raises JSONDecodeError."""
     import json
@@ -216,8 +216,8 @@ def test_get_fixtures_handles_json_decode_error(mock_fetch, mock_config):
     assert fixtures == []
 
 
-@patch("pipeline.dynamic.api_football_client.config")
-@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+@patch("core.ingestion.dynamic.api_football_client.config")
+@patch("core.ingestion.dynamic.api_football_client.fetch_with_retry")
 def test_get_fixtures_handles_missing_nested_keys(mock_fetch, mock_config):
     """Test that get_fixtures skips items with missing required nested fields."""
     mock_config.API_FOOTBALL_KEY = "test_key"
@@ -250,8 +250,8 @@ def test_get_fixtures_handles_missing_nested_keys(mock_fetch, mock_config):
     assert fixtures[0]["fixture_id"] == 333
 
 
-@patch("pipeline.dynamic.api_football_client.config")
-@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+@patch("core.ingestion.dynamic.api_football_client.config")
+@patch("core.ingestion.dynamic.api_football_client.fetch_with_retry")
 def test_get_odds_handles_json_decode_error(mock_fetch, mock_config):
     """Test that get_odds returns {} when resp.json() raises JSONDecodeError."""
     import json
@@ -264,8 +264,8 @@ def test_get_odds_handles_json_decode_error(mock_fetch, mock_config):
     assert odds == {}
 
 
-@patch("pipeline.dynamic.api_football_client.config")
-@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+@patch("core.ingestion.dynamic.api_football_client.config")
+@patch("core.ingestion.dynamic.api_football_client.fetch_with_retry")
 def test_get_odds_handles_missing_bet_name(mock_fetch, mock_config):
     """Test that get_odds skips bets with missing 'name' field."""
     mock_config.API_FOOTBALL_KEY = "test_key"
@@ -301,8 +301,8 @@ def test_get_odds_handles_missing_bet_name(mock_fetch, mock_config):
     assert len(odds) == 1  # only 1X2 market
 
 
-@patch("pipeline.dynamic.api_football_client.config")
-@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+@patch("core.ingestion.dynamic.api_football_client.config")
+@patch("core.ingestion.dynamic.api_football_client.fetch_with_retry")
 def test_get_fixture_player_ratings_handles_json_decode_error(mock_fetch, mock_config):
     """Test that get_fixture_player_ratings returns {} when resp.json() raises JSONDecodeError."""
     import json
@@ -315,8 +315,8 @@ def test_get_fixture_player_ratings_handles_json_decode_error(mock_fetch, mock_c
     assert ratings == {}
 
 
-@patch("pipeline.dynamic.api_football_client.config")
-@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+@patch("core.ingestion.dynamic.api_football_client.config")
+@patch("core.ingestion.dynamic.api_football_client.fetch_with_retry")
 def test_get_fixture_player_ratings_handles_empty_statistics_list(mock_fetch, mock_config):
     """Test that get_fixture_player_ratings handles empty statistics list gracefully."""
     mock_config.API_FOOTBALL_KEY = "test_key"
@@ -344,8 +344,8 @@ def test_get_fixture_player_ratings_handles_empty_statistics_list(mock_fetch, mo
     assert ratings["Player Two"] == 7.5
 
 
-@patch("pipeline.dynamic.api_football_client.config")
-@patch("pipeline.dynamic.api_football_client.fetch_with_retry")
+@patch("core.ingestion.dynamic.api_football_client.config")
+@patch("core.ingestion.dynamic.api_football_client.fetch_with_retry")
 def test_get_fixture_player_ratings_handles_missing_player_name(mock_fetch, mock_config):
     """Test that get_fixture_player_ratings skips players with missing name."""
     mock_config.API_FOOTBALL_KEY = "test_key"
@@ -373,7 +373,7 @@ def test_get_fixture_player_ratings_handles_missing_player_name(mock_fetch, mock
     assert ratings["Valid Player"] == 7.9
 
 
-from pipeline.dynamic import scrape_odds
+from core.ingestion.dynamic import scrape_odds
 
 
 def test_devig_probabilities_removes_bookmaker_margin():
@@ -390,8 +390,8 @@ def test_devig_probabilities_empty_input_returns_empty_dict():
     assert scrape_odds.devig_probabilities([]) == {}
 
 
-@patch("pipeline.dynamic.scrape_odds.get_odds")
-@patch("pipeline.dynamic.scrape_odds.get_fixtures")
+@patch("core.ingestion.dynamic.scrape_odds.get_odds")
+@patch("core.ingestion.dynamic.scrape_odds.get_fixtures")
 def test_build_odds_feed_marks_unavailable_odds(mock_fixtures, mock_odds):
     mock_fixtures.return_value = [
         {"fixture_id": 1, "home_team": "Inter", "away_team": "Monza", "date": "2026-09-20T18:45:00+00:00"}
@@ -404,7 +404,7 @@ def test_build_odds_feed_marks_unavailable_odds(mock_fixtures, mock_odds):
     assert feed[0]["home_win_prob"] is None
 
 
-from pipeline.dynamic import scrape_lineups
+from core.ingestion.dynamic import scrape_lineups
 
 SAMPLE_LINEUP_HTML = """
 <li class="match" data-match-id="17981" data-match-hash="JUV-MIL">
@@ -448,13 +448,13 @@ def test_parse_probable_lineups_extracts_players_with_team_side():
     assert perin["side"] == "home"
 
 
-@patch("pipeline.dynamic.scrape_lineups.fetch_with_retry")
+@patch("core.ingestion.dynamic.scrape_lineups.fetch_with_retry")
 def test_scrape_probable_lineups_returns_empty_list_on_fetch_failure(mock_fetch):
     mock_fetch.return_value = None
     assert scrape_lineups.scrape_probable_lineups() == []
 
 
-from pipeline.dynamic import scrape_status
+from core.ingestion.dynamic import scrape_status
 
 SAMPLE_STATUS_HTML = """
 <div id="team-1" class="card team-card">
@@ -484,7 +484,7 @@ def test_parse_status_cards_empty_html_returns_empty_dict():
     assert scrape_status.parse_status_cards("<html></html>", "SQUALIFICATO") == {}
 
 
-@patch("pipeline.dynamic.scrape_status.fetch_with_retry")
+@patch("core.ingestion.dynamic.scrape_status.fetch_with_retry")
 def test_scrape_all_statuses_merges_both_sources(mock_fetch):
     injuries_resp = MagicMock()
     injuries_resp.text = SAMPLE_STATUS_HTML
@@ -502,7 +502,7 @@ def test_scrape_all_statuses_merges_both_sources(mock_fetch):
     assert statuses["Orsolini"] == "SQUALIFICATO"
 
 
-@patch("pipeline.dynamic.scrape_status.fetch_with_retry")
+@patch("core.ingestion.dynamic.scrape_status.fetch_with_retry")
 def test_scrape_all_statuses_returns_injury_data_if_suspensions_fails(mock_fetch):
     """Regression test: if suspensions page parsing fails, injury data must still be returned."""
     injuries_resp = MagicMock()
@@ -520,7 +520,7 @@ def test_scrape_all_statuses_returns_injury_data_if_suspensions_fails(mock_fetch
     assert "Orsolini" not in statuses  # suspensions data was lost due to parsing failure
 
 
-@patch("pipeline.dynamic.scrape_status.fetch_with_retry")
+@patch("core.ingestion.dynamic.scrape_status.fetch_with_retry")
 def test_scrape_all_statuses_returns_suspensions_data_if_injuries_fails(mock_fetch):
     """Regression test: if injuries page parsing fails, suspensions data must still be returned."""
     injuries_resp = MagicMock()
@@ -544,7 +544,7 @@ def test_scrape_all_statuses_returns_suspensions_data_if_injuries_fails(mock_fet
 
 # Tests for scrape_results.py
 
-from pipeline.dynamic import scrape_results
+from core.ingestion.dynamic import scrape_results
 
 
 def test_update_ewma_first_observation_returns_rating_itself():
@@ -570,7 +570,7 @@ def test_save_then_load_ewma_state_roundtrip(tmp_path, monkeypatch):
     assert scrape_results.load_ewma_state() == {"Lautaro Martinez": 7.4}
 
 
-@patch("pipeline.dynamic.scrape_results.get_fixture_player_ratings")
+@patch("core.ingestion.dynamic.scrape_results.get_fixture_player_ratings")
 def test_update_form_from_fixtures_merges_new_ratings(mock_ratings, tmp_path, monkeypatch):
     state_path = tmp_path / "ewma_state.json"
     monkeypatch.setattr(scrape_results.config, "EWMA_STATE_JSON", str(state_path))
@@ -584,7 +584,7 @@ def test_update_form_from_fixtures_merges_new_ratings(mock_ratings, tmp_path, mo
 
 # Tests for build_feed.py
 
-from pipeline.dynamic import build_feed
+from core.ingestion.dynamic import build_feed
 
 
 def test_compute_xpts_matches_capitolato_formula():
@@ -649,8 +649,8 @@ def test_build_players_payload_matches_status_card_via_fuzzy_name_space():
     assert payload["ata_de_ketelaere_a"]["titular_prob"] == 0.0
 
 
-@patch("pipeline.dynamic.build_feed.scrape_results.update_form_from_fixtures")
-@patch("pipeline.dynamic.build_feed.api_football_client.get_fixtures")
+@patch("core.ingestion.dynamic.build_feed.scrape_results.update_form_from_fixtures")
+@patch("core.ingestion.dynamic.build_feed.api_football_client.get_fixtures")
 def test_update_ewma_from_concluded_fixtures_invokes_update(mock_get_fixtures, mock_update):
     mock_get_fixtures.return_value = [
         {"fixture_id": 111, "date": "2026-09-13T18:45:00+00:00", "home_team": "Roma", "away_team": "Lazio"}
@@ -662,8 +662,8 @@ def test_update_ewma_from_concluded_fixtures_invokes_update(mock_get_fixtures, m
     mock_update.assert_called_once_with([111])
 
 
-@patch("pipeline.dynamic.build_feed.scrape_results.update_form_from_fixtures")
-@patch("pipeline.dynamic.build_feed.api_football_client.get_fixtures")
+@patch("core.ingestion.dynamic.build_feed.scrape_results.update_form_from_fixtures")
+@patch("core.ingestion.dynamic.build_feed.api_football_client.get_fixtures")
 def test_update_ewma_from_concluded_fixtures_skips_when_no_fixtures(mock_get_fixtures, mock_update):
     mock_get_fixtures.return_value = []
 
@@ -672,8 +672,8 @@ def test_update_ewma_from_concluded_fixtures_skips_when_no_fixtures(mock_get_fix
     mock_update.assert_not_called()
 
 
-@patch("pipeline.dynamic.build_feed.scrape_results.update_form_from_fixtures")
-@patch("pipeline.dynamic.build_feed.api_football_client.get_fixtures")
+@patch("core.ingestion.dynamic.build_feed.scrape_results.update_form_from_fixtures")
+@patch("core.ingestion.dynamic.build_feed.api_football_client.get_fixtures")
 def test_update_ewma_from_concluded_fixtures_is_exception_safe(mock_get_fixtures, mock_update):
     mock_get_fixtures.side_effect = RuntimeError("boom")
 
@@ -682,11 +682,11 @@ def test_update_ewma_from_concluded_fixtures_is_exception_safe(mock_get_fixtures
     mock_update.assert_not_called()
 
 
-@patch("pipeline.dynamic.build_feed.update_ewma_from_concluded_fixtures")
-@patch("pipeline.dynamic.build_feed.scrape_lineups.scrape_probable_lineups")
-@patch("pipeline.dynamic.build_feed.scrape_status.scrape_all_statuses")
-@patch("pipeline.dynamic.build_feed.scrape_results.load_ewma_state")
-@patch("pipeline.dynamic.build_feed.scrape_odds.build_odds_feed")
+@patch("core.ingestion.dynamic.build_feed.update_ewma_from_concluded_fixtures")
+@patch("core.ingestion.dynamic.build_feed.scrape_lineups.scrape_probable_lineups")
+@patch("core.ingestion.dynamic.build_feed.scrape_status.scrape_all_statuses")
+@patch("core.ingestion.dynamic.build_feed.scrape_results.load_ewma_state")
+@patch("core.ingestion.dynamic.build_feed.scrape_odds.build_odds_feed")
 def test_build_feed_payload_calls_ewma_update_before_loading_state(
     mock_odds, mock_ewma, mock_status, mock_lineups, mock_update_ewma
 ):
@@ -711,10 +711,10 @@ def test_build_feed_payload_has_required_top_level_keys():
     assert payload["season"] == "2026/2027"
 
 
-@patch("pipeline.dynamic.build_feed.scrape_lineups.scrape_probable_lineups")
-@patch("pipeline.dynamic.build_feed.scrape_status.scrape_all_statuses")
-@patch("pipeline.dynamic.build_feed.scrape_results.load_ewma_state")
-@patch("pipeline.dynamic.build_feed.scrape_odds.build_odds_feed")
+@patch("core.ingestion.dynamic.build_feed.scrape_lineups.scrape_probable_lineups")
+@patch("core.ingestion.dynamic.build_feed.scrape_status.scrape_all_statuses")
+@patch("core.ingestion.dynamic.build_feed.scrape_results.load_ewma_state")
+@patch("core.ingestion.dynamic.build_feed.scrape_odds.build_odds_feed")
 def test_build_feed_payload_uses_mocked_scrapers(
     mock_odds, mock_ewma, mock_status, mock_lineups
 ):
@@ -755,10 +755,10 @@ def test_build_feed_payload_uses_mocked_scrapers(
     assert payload["players"]["int_lautaro_martinez_a"]["ewma_form"] == 7.2
 
 
-@patch("pipeline.dynamic.build_feed.scrape_lineups.scrape_probable_lineups")
-@patch("pipeline.dynamic.build_feed.scrape_status.scrape_all_statuses")
-@patch("pipeline.dynamic.build_feed.scrape_results.load_ewma_state")
-@patch("pipeline.dynamic.build_feed.scrape_odds.build_odds_feed")
+@patch("core.ingestion.dynamic.build_feed.scrape_lineups.scrape_probable_lineups")
+@patch("core.ingestion.dynamic.build_feed.scrape_status.scrape_all_statuses")
+@patch("core.ingestion.dynamic.build_feed.scrape_results.load_ewma_state")
+@patch("core.ingestion.dynamic.build_feed.scrape_odds.build_odds_feed")
 def test_main_raises_when_insufficient_players(
     mock_odds, mock_ewma, mock_status, mock_lineups, tmp_path, monkeypatch
 ):
@@ -793,7 +793,7 @@ def test_main_raises_when_insufficient_players(
 # CLIENT TESTS — Singleton MatchdayFeedClient with cache and fallback
 # ──────────────────────────────────────────────────────────────────────
 
-from pipeline.dynamic.client import MatchdayFeedClient
+from core.ingestion.dynamic.client import MatchdayFeedClient
 
 
 def test_client_returns_fallback_when_fetch_fails(tmp_path):
@@ -801,7 +801,7 @@ def test_client_returns_fallback_when_fetch_fails(tmp_path):
     fallback_payload = {"matchday": 0, "season": "2026/2027", "fixtures": [], "players": {}}
     fallback_path.write_text(json.dumps(fallback_payload), encoding="utf-8")
 
-    with patch("pipeline.dynamic.client.requests.get", side_effect=Exception("network down")):
+    with patch("core.ingestion.dynamic.client.requests.get", side_effect=Exception("network down")):
         client = MatchdayFeedClient(
             feed_url="https://example.invalid/current_matchday.json",
             fallback_path=str(fallback_path),
@@ -818,7 +818,7 @@ def test_client_caches_within_ttl(tmp_path):
     mock_response.json.return_value = {"matchday": 5, "fixtures": [], "players": {}}
     mock_response.status_code = 200
 
-    with patch("pipeline.dynamic.client.requests.get", return_value=mock_response) as mock_get:
+    with patch("core.ingestion.dynamic.client.requests.get", return_value=mock_response) as mock_get:
         client = MatchdayFeedClient(
             feed_url="https://example.invalid/current_matchday.json",
             ttl_seconds=900,
@@ -849,7 +849,7 @@ def test_client_retries_after_fallback_on_next_call(tmp_path):
             raise Exception("network down")
         return mock_response
 
-    with patch("pipeline.dynamic.client.requests.get", side_effect=side_effect) as mock_get:
+    with patch("core.ingestion.dynamic.client.requests.get", side_effect=side_effect) as mock_get:
         client = MatchdayFeedClient(
             feed_url="https://example.invalid/current_matchday.json",
             ttl_seconds=900,
@@ -884,8 +884,8 @@ def test_client_expires_cache_after_ttl(tmp_path):
     def get_response(*args, **kwargs):
         return next(response_iter)
 
-    with patch("pipeline.dynamic.client.requests.get", side_effect=get_response) as mock_get:
-        with patch("pipeline.dynamic.client.time.time") as mock_time:
+    with patch("core.ingestion.dynamic.client.requests.get", side_effect=get_response) as mock_get:
+        with patch("core.ingestion.dynamic.client.time.time") as mock_time:
             times = [0.0, 1.0, 1001.0]  # First call at 0, second at 1s, third at 1001s (>TTL)
             time_iter = iter(times)
             mock_time.side_effect = lambda: next(time_iter)
@@ -913,10 +913,10 @@ def test_client_expires_cache_after_ttl(tmp_path):
 
 def test_client_singleton_get_default_client():
     """Verify that get_default_client() returns the same singleton instance."""
-    from pipeline.dynamic.client import get_default_client, _default_client, _default_client_lock
+    from core.ingestion.dynamic.client import get_default_client, _default_client, _default_client_lock
     
     # Reset singleton for test
-    import pipeline.dynamic.client as client_module
+    import core.ingestion.dynamic.client as client_module
     with client_module._default_client_lock:
         client_module._default_client = None
     
