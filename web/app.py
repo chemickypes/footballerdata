@@ -1827,6 +1827,16 @@ HTML_TEMPLATE = """
             --officina-parchment: #e8d9b5;
             --officina-shadow: rgba(0, 0, 0, 0.62);
             --maestro-z: 1200;
+            --davinci-role-p: #d99b34;
+            --davinci-role-d: #5c9457;
+            --davinci-role-c: #4f89a3;
+            --davinci-role-a: #c0533f;
+            --davinci-ink: #5a4326;
+            --davinci-ink-soft: #6f5233;
+            --davinci-hatch: #7a5c38;
+            --davinci-parchment-a: #efe2c1;
+            --davinci-parchment-b: #e4d2a6;
+            --davinci-parchment-c: #c9ac74;
         }
 
         /* ══════════════════════════════════════════════════════════════════
@@ -2806,6 +2816,63 @@ HTML_TEMPLATE = """
             color: rgba(255,255,255,0.4);
             border: none;
         }
+
+        .davinci-pitch-shell {
+            position: relative;
+            width: 100%;
+            max-width: 420px;
+            margin: 0 auto;
+            filter: drop-shadow(0 8px 18px rgba(0,0,0,0.5));
+        }
+        .davinci-pitch-frame {
+            position: relative;
+            border-radius: 16px;
+            padding: 12px;
+            border: 1px solid rgba(198,154,76,0.26);
+            background: linear-gradient(180deg, #2a1e13, #1c140d);
+        }
+        .davinci-pitch-stamp {
+            position: absolute;
+            top: 10px;
+            left: 14px;
+            z-index: 3;
+            font-family: 'Cormorant Garamond', serif;
+            font-style: italic;
+            color: var(--officina-brass-dark);
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+        .davinci-legend {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 12px;
+            font-size: 0.72rem;
+            color: var(--officina-muted);
+        }
+        .davinci-legend span {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .davinci-legend i {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            display: inline-block;
+            border: 1px solid #3a2c14;
+        }
+        .davinci-token {
+            cursor: pointer;
+        }
+        .davinci-token--empty {
+            opacity: 0.56;
+        }
+        .davinci-jersey.role-P { fill: var(--davinci-role-p); }
+        .davinci-jersey.role-D { fill: var(--davinci-role-d); }
+        .davinci-jersey.role-C { fill: var(--davinci-role-c); }
+        .davinci-jersey.role-A { fill: var(--davinci-role-a); }
 
         /* Financial HUD Progress Bar */
         .hud-squad-bar {
@@ -7795,6 +7862,83 @@ HTML_TEMPLATE = """
 
             // Render Tactical 2D Stadium Pitch
             renderTacticalPitch(team, struct);
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           SHARED DA VINCI PITCH COMPONENT (parchment/sketch SVG)
+        ───────────────────────────────────────────────────────────── */
+        function getDavinciRoleColor(role) {
+            return ({
+                P: 'var(--davinci-role-p)',
+                D: 'var(--davinci-role-d)',
+                C: 'var(--davinci-role-c)',
+                A: 'var(--davinci-role-a)'
+            })[role] || 'var(--davinci-role-c)';
+        }
+
+        function getDavinciPitchSvg(options) {
+            options = options || {};
+            const seed = options.seed || 5;
+            const counts = options.counts || { A: 0, C: 0, D: 0, P: 0 };
+            const labels = options.labels || { A: [], C: [], D: [], P: [] };
+            const tokenMode = options.interactive ? 'interactive' : 'decorative';
+            const rowsY = { A: 96, C: 170, D: 300, P: 392 };
+            let tokens = '';
+            ['A', 'C', 'D', 'P'].forEach(role => {
+                const n = counts[role] || 0;
+                if (!n) return;
+                const left = 52;
+                const right = 288;
+                const span = right - left;
+                for (let i = 0; i < n; i++) {
+                    const x = n === 1 ? 170 : left + span * (i / (n - 1));
+                    const y = rowsY[role];
+                    const label = (labels[role] && labels[role][i]) || role;
+                    const className = `davinci-token ${tokenMode === 'interactive' ? '' : 'davinci-token--static'}`.trim();
+                    tokens += `
+                        <g class="${className}" data-role="${role}" data-slot="${i}" transform="translate(${x},${y})">
+                            <ellipse cx="1.5" cy="16" rx="15" ry="4" fill="#3a2c14" opacity="0.18"></ellipse>
+                            <circle class="davinci-jersey role-${role}" r="14" stroke="#3a2c14" stroke-width="1.6"></circle>
+                            <circle r="14" fill="none" stroke="#efe2c1" stroke-width="0.8" opacity="0.6"></circle>
+                            <circle r="10.5" fill="none" stroke="#efe2c1" stroke-width="0.6" opacity="0.35" stroke-dasharray="1.5 2"></circle>
+                            <text y="4" text-anchor="middle" font-size="12" font-weight="700" fill="#f3e7c8">${role}</text>
+                            <rect x="-28" y="18" width="56" height="13" rx="2" fill="#e9d9b0" stroke="#9c7d47" stroke-width="0.6" opacity="0.94"></rect>
+                            <text y="28" text-anchor="middle" font-size="9" fill="#4a3618" font-style="italic">${label}</text>
+                        </g>`;
+                }
+            });
+            return `
+                <svg viewBox="0 0 340 470" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="'Cormorant Garamond','Georgia',serif">
+                    <defs>
+                        <filter id="davinciWobble${seed}"><feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="${seed}" result="n"></feTurbulence><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"></feDisplacementMap></filter>
+                        <filter id="davinciPaper${seed}"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="f"></feTurbulence><feColorMatrix in="f" type="matrix" values="0 0 0 0 0.42 0 0 0 0 0.31 0 0 0 0 0.16 0 0 0 0.10 0"></feColorMatrix><feComposite operator="over" in2="SourceGraphic"></feComposite></filter>
+                        <radialGradient id="davinciParchment${seed}" cx="42%" cy="34%" r="85%"><stop offset="0%" stop-color="#efe2c1"></stop><stop offset="55%" stop-color="#e4d2a6"></stop><stop offset="100%" stop-color="#c9ac74"></stop></radialGradient>
+                        <linearGradient id="davinciEdge${seed}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9c7d47"></stop><stop offset="100%" stop-color="#7c5f31"></stop></linearGradient>
+                        <pattern id="davinciHatch${seed}" width="6" height="6" patternTransform="rotate(38)" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="0" y2="6" stroke="#7a5c38" stroke-width="0.7" opacity="0.45"></line></pattern>
+                    </defs>
+                    <path filter="url(#davinciPaper${seed})" fill="url(#davinciParchment${seed})" stroke="url(#davinciEdge${seed})" stroke-width="2.5" d="M14,10 L60,7 L120,11 L190,6 L250,12 L300,8 L328,16 L331,80 L326,180 L332,300 L327,400 L330,452 L280,458 L200,452 L120,460 L60,453 L12,458 L9,380 L14,260 L8,150 L11,70 Z"></path>
+                    <g filter="url(#davinciWobble${seed})" fill="none" stroke="#5a4326" stroke-width="1.6" stroke-linecap="round" opacity="0.9">
+                        <rect x="34" y="40" width="272" height="392" rx="4"></rect>
+                        <rect x="36" y="42" width="268" height="388" rx="4" stroke-width="0.7" opacity="0.5"></rect>
+                        <line x1="34" y1="236" x2="306" y2="236"></line>
+                        <circle cx="170" cy="236" r="46"></circle>
+                        <circle cx="170" cy="236" r="2.6" fill="#5a4326"></circle>
+                        <rect x="96" y="40" width="148" height="60"></rect>
+                        <rect x="130" y="40" width="80" height="26"></rect>
+                        <path d="M120,100 A40,30 0 0 0 220,100"></path>
+                        <rect x="96" y="372" width="148" height="60"></rect>
+                        <rect x="130" y="406" width="80" height="26"></rect>
+                        <path d="M120,372 A40,30 0 0 1 220,372"></path>
+                    </g>
+                    <rect x="96" y="40" width="148" height="26" fill="url(#davinciHatch${seed})" opacity="0.5"></rect>
+                    <rect x="96" y="406" width="148" height="26" fill="url(#davinciHatch${seed})" opacity="0.5"></rect>
+                    <g fill="#6f5233" font-style="italic" opacity="0.78">
+                        <text x="300" y="34" font-size="11" text-anchor="end">studio tattico</text>
+                        <text x="42" y="452" font-size="10">porta · custode</text>
+                    </g>
+                    <text x="300" y="450" font-size="10" fill="#6f5233" font-style="italic" opacity="0.55" text-anchor="end" transform="rotate(-3 300 450)">— Cod. FantaLab, f.34r</text>
+                    ${tokens}
+                </svg>`;
         }
 
         /* ─────────────────────────────────────────────────────────────
