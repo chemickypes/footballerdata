@@ -207,7 +207,41 @@ ri-deployare esplicitamente se si lavora nel frattempo su `main`.
 
 ---
 
-## 5. Cosa manca / prossimi passi consigliati
+## 5. Bugfix critico post-deploy (commit `2670409`)
+
+Dopo il primo deploy di verifica, l'utente ha segnalato: "non vedo nessun glow up
+e i tasti scambi e classifica rose non vanno". Diagnosi con Playwright headless
+(caricamento reale della pagina + cattura errori console/JS):
+
+1. **JS SyntaxError bloccante**: `updateMaestroAmbientState()` conteneva
+   `'Bentornato nell\'officina.'` — l'escape `\'` dentro una stringa Python
+   triple-quoted **non raw** viene "mangiato" dal parser Python (che lo riduce
+   a un semplice apostrofo) prima ancora che il template arrivi al browser.
+   Il JS finale conteneva quindi un apostrofo non escapato dentro una stringa
+   a apici singoli → `SyntaxError` al caricamento → **l'intero blocco
+   `<script>` falliva silenziosamente**, disabilitando tutto (splash gate,
+   mascotte, cambio tab via JS, ecc.) — da qui "non vedo nessun glow up".
+   Fix: cambiata la stringa da apici singoli a doppi (nessun escape necessario).
+2. **Tab Scambi/Classifica/Formazione morti**: `#tab-audit`, `#tab-trades`,
+   `#tab-lineup` avevano uno `style="display:none;"` inline hardcoded che vince
+   sempre su `.tab-content.active { display: block; }` (specificità inline >
+   classe). `switchTab()` toglie/aggiunge solo la classe `active`, quindi quei
+   pannelli restavano invisibili anche da "attivi". **Bug preesistente su
+   `main`** (verificato con `git show main:web/app.py`), non introdotto da
+   questo branch, ma bloccava la verifica del glow-up quindi corretto qui.
+   Fix: rimosso lo `style="display:none;"` inline da tutti e tre.
+
+Verificato con Playwright headless (locale + produzione dopo redeploy):
+zero errori console/pageerror, login PIN, splash/selezione squadra, mascotte
+Maestro, e click su Rose/Classifica/Scambi tutti confermati funzionanti via
+screenshot e asserzioni DOM (`getComputedStyle(...).display`).
+
+**Ri-deployato in produzione** (`vercel --prod`) dopo il fix — verificato live
+su `https://fanta-lab.vercel.app` con lo stesso script di test, esito positivo.
+
+---
+
+## 6. Cosa manca / prossimi passi consigliati
 
 1. **Merge del branch `ui-glowup` su `main`** — non ancora fatto. Consigliato
    usare lo skill `finishing-a-development-branch` per scegliere tra
@@ -224,7 +258,7 @@ ri-deployare esplicitamente se si lavora nel frattempo su `main`.
 
 ---
 
-## 6. File chiave per orientarsi rapidamente
+## 7. File chiave per orientarsi rapidamente
 
 - `web/app.py` — l'intera app (template Flask monolitico), unico file toccato
   da questo segmento.
