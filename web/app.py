@@ -3823,6 +3823,24 @@ HTML_TEMPLATE = """
                 </div>
             </div>
 
+            <div class="card" id="auctionDavinciCard">
+                <div class="card-header" style="margin-bottom:10px;">
+                    <div>
+                        <div class="card-title" style="display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-compass-drafting" style="color:var(--officina-brass);"></i>
+                            Tavola Tattica del Lotto
+                        </div>
+                        <div style="font-size:0.74rem; color:var(--officina-muted);">
+                            Campo Da Vinci decorativo per il lotto in corso — già predisposto per una futura preview live senza cambiare la struttura.
+                        </div>
+                    </div>
+                </div>
+                <div class="davinci-pitch-frame">
+                    <span class="davinci-pitch-stamp">tavola tattica</span>
+                    <div id="auctionDavinciPitch" class="davinci-pitch-shell" data-preview-mode="decorative"></div>
+                </div>
+            </div>
+
             <!-- MANUAL DRAFT CARD -->
             <div class="card">
                 <div class="card-header">
@@ -5807,6 +5825,7 @@ HTML_TEMPLATE = """
             renderStrategyTab();
             renderTargetsTab();
             setupSearch();
+            renderAuctionDavinciPitch();
 
             ensureMaestroAmbient();
             updateMaestroAmbientState('targets');
@@ -6031,6 +6050,7 @@ HTML_TEMPLATE = """
             }
             if (tabId === 'rosters') renderRosterTab();
             if (tabId === 'listone') renderListone();
+            if (tabId === 'draft') renderAuctionDavinciPitch();
         }
 
         async function loadLineupSolver() {
@@ -7894,7 +7914,7 @@ HTML_TEMPLATE = """
                     const x = n === 1 ? 170 : left + span * (i / (n - 1));
                     const y = rowsY[role];
                     const label = (labels[role] && labels[role][i]) || role;
-                    const className = `davinci-token ${tokenMode === 'interactive' ? '' : 'davinci-token--static'}`.trim();
+                    const className = `davinci-token ${tokenMode === 'interactive' ? '' : 'davinci-token--empty'}`.trim();
                     tokens += `
                         <g class="${className}" data-role="${role}" data-slot="${i}" transform="translate(${x},${y})">
                             <ellipse cx="1.5" cy="16" rx="15" ry="4" fill="#3a2c14" opacity="0.18"></ellipse>
@@ -7939,6 +7959,20 @@ HTML_TEMPLATE = """
                     <text x="300" y="450" font-size="10" fill="#6f5233" font-style="italic" opacity="0.55" text-anchor="end" transform="rotate(-3 300 450)">— Cod. FantaLab, f.34r</text>
                     ${tokens}
                 </svg>`;
+        }
+
+        function renderAuctionDavinciPitch(lot) {
+            const host = document.getElementById('auctionDavinciPitch');
+            if (!host || typeof getDavinciPitchSvg !== 'function') return;
+            const role = lot && lot.role ? lot.role : 'A';
+            const label = lot && lot.player ? lot.player : 'lotto in studio';
+            host.dataset.previewMode = 'decorative';
+            host.innerHTML = getDavinciPitchSvg({
+                seed: 3,
+                counts: { A: role === 'A' ? 1 : 0, C: role === 'C' ? 1 : 0, D: role === 'D' ? 1 : 0, P: role === 'P' ? 1 : 0 },
+                labels: { A: role === 'A' ? [label] : [], C: role === 'C' ? [label] : [], D: role === 'D' ? [label] : [], P: role === 'P' ? [label] : [] },
+                interactive: false
+            });
         }
 
         /* ─────────────────────────────────────────────────────────────
@@ -8757,6 +8791,8 @@ HTML_TEMPLATE = """
                     if (elPts) elPts.textContent = `${lot.pts_exp} pt`;
                     if (elFascia) elFascia.textContent = `F${lot.fascia || 3}`;
                     if (elPrice) elPrice.textContent = lot.current_price || lot.price || 1;
+
+                    renderAuctionDavinciPitch({ role: lot.role, player: lot.player_name });
 
                     if (elBidder) {
                         let bidderText = '-';
