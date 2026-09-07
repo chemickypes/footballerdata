@@ -1816,6 +1816,17 @@ HTML_TEMPLATE = """
             --role-d: #10b981;
             --role-c: #38bdf8;
             --role-a: #ff2d75;
+            --officina-brass: #c69a4c;
+            --officina-brass-dark: #8a6329;
+            --officina-gold: #f2c14e;
+            --officina-leather: #241a12;
+            --officina-leather-2: #2f2216;
+            --officina-wood: #1a130d;
+            --officina-ink: #ecdfc6;
+            --officina-muted: #a68a6a;
+            --officina-parchment: #e8d9b5;
+            --officina-shadow: rgba(0, 0, 0, 0.62);
+            --maestro-z: 1100;
         }
 
         /* ══════════════════════════════════════════════════════════════════
@@ -3154,9 +3165,153 @@ HTML_TEMPLATE = """
                 font-size: 0.7rem;
             }
         }
+
+        .splash-gate,
+        .maestro-intro {
+            position: fixed;
+            inset: 0;
+            z-index: 1200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .splash-gate__backdrop,
+        .maestro-intro__scrim {
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 28% -5%, rgba(198,154,76,0.22) 0%, transparent 55%),
+                linear-gradient(180deg, #1a130d 0%, #0e0906 100%);
+        }
+        .splash-gate__panel,
+        .maestro-intro__card {
+            position: relative;
+            width: min(960px, 100%);
+            border-radius: 18px;
+            border: 1px solid rgba(198,154,76,0.34);
+            background: linear-gradient(180deg, #2a1e13, #1d140c);
+            box-shadow: 0 28px 80px -30px var(--officina-shadow);
+            padding: 28px;
+            color: var(--officina-ink);
+        }
+        .splash-gate__eyebrow,
+        .maestro-intro__kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.74rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--officina-gold);
+            margin-bottom: 10px;
+        }
+        .splash-gate__title,
+        .maestro-intro__content h2 {
+            margin: 0 0 10px;
+            font-family: 'Outfit', sans-serif;
+            font-size: clamp(1.8rem, 4vw, 2.6rem);
+            color: #f4e7ca;
+        }
+        .splash-gate__copy,
+        .maestro-intro__content p {
+            margin: 0 0 20px;
+            max-width: 640px;
+            color: #d8c6a5;
+            line-height: 1.6;
+        }
+        .splash-team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+        }
+        .splash-team-card {
+            border: 1px solid rgba(198,154,76,0.28);
+            border-radius: 14px;
+            background: linear-gradient(180deg, #312214, #21160d);
+            color: var(--officina-ink);
+            padding: 18px 16px;
+            text-align: left;
+            cursor: pointer;
+            transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+        }
+        .splash-team-card:hover,
+        .splash-team-card:focus-visible {
+            transform: translateY(-2px);
+            border-color: rgba(242,193,78,0.58);
+            box-shadow: 0 14px 28px -22px rgba(242,193,78,0.9);
+        }
+        .splash-team-card__name {
+            display: block;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1rem;
+            font-weight: 800;
+            color: #f4e7ca;
+            margin-bottom: 4px;
+        }
+        .splash-team-card__meta {
+            display: block;
+            font-size: 0.78rem;
+            color: var(--officina-muted);
+        }
+        .maestro-intro__card {
+            display: grid;
+            grid-template-columns: 140px 1fr;
+            gap: 20px;
+            align-items: center;
+        }
+        .maestro-intro__art {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 140px;
+            border-radius: 16px;
+            background: radial-gradient(circle at 50% 30%, #3a2a19, #1b130c 75%);
+            border: 2px solid var(--officina-brass);
+        }
+        .maestro-intro__btn {
+            width: auto;
+            padding: 12px 18px;
+            border-radius: 10px;
+        }
+        @media (max-width: 680px) {
+            .maestro-intro__card {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+        }
+        body.app-locked {
+            overflow: hidden;
+        }
     </style>
 </head>
 <body>
+
+    <div id="splashIdentityGate" class="splash-gate" style="display:none;">
+        <div class="splash-gate__backdrop"></div>
+        <div class="splash-gate__panel">
+            <div class="splash-gate__eyebrow"><i class="fa-solid fa-compass-drafting"></i> Officina Vittoriana</div>
+            <h1 class="splash-gate__title">Seleziona la tua Squadra</h1>
+            <p class="splash-gate__copy">Scegli il tuo profilo locale per entrare nell'officina d'asta. Nessun account: il profilo resta salvato solo su questo browser.</p>
+            <div id="splashTeamGrid" class="splash-team-grid"></div>
+        </div>
+    </div>
+
+    <div id="maestroIntroOverlay" class="maestro-intro" style="display:none;">
+        <div class="maestro-intro__scrim"></div>
+        <div class="maestro-intro__card">
+            <div class="maestro-intro__art" id="maestroIntroSprite" aria-hidden="true"></div>
+            <div class="maestro-intro__content">
+                <div class="maestro-intro__kicker"><i class="fa-solid fa-feather"></i> Il Maestro</div>
+                <h2>Benvenuto nell'Officina</h2>
+                <p>Inventore, cartografo del calcio e tua guida d'asta: ti mostrerò dove leggere prezzo equo, surplus e formazione senza cambiare la logica della tua lega.</p>
+                <button class="btn btn-primary maestro-intro__btn" onclick="maybeShowMaestroIntro(true)">
+                    <i class="fa-solid fa-door-open" style="margin-right:6px;"></i> Entra nella dashboard
+                </button>
+            </div>
+        </div>
+    </div>
 
     <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleMobileSidebar()"></div>
 
@@ -4541,6 +4696,77 @@ HTML_TEMPLATE = """
         // Active Manager Profile (defaults to team ID 1)
         let activeProfileId = parseInt(localStorage.getItem('fanta_active_profile_id')) || 1;
 
+        let hasStoredProfile = !!localStorage.getItem('fanta_active_profile_id');
+
+        function renderApp() {
+            updateHeader();
+            updateProfileDisplay();
+            updateLiveAdvice();
+            renderTeamSelect();
+            renderRosterTab();
+            renderStrategyTab();
+            renderTargetsTab();
+            renderListone();
+        }
+
+        function renderSplashTeamGrid() {
+            const wrap = document.getElementById('splashTeamGrid');
+            if (!wrap) return;
+            const teams = (auctionState && auctionState.teams) || [];
+            wrap.innerHTML = teams.map((team, idx) => `
+                <button class="splash-team-card" onclick="completeSplashTeamSelection(${team.id})">
+                    <span class="splash-team-card__name">${team.name}</span>
+                    <span class="splash-team-card__meta">Profilo locale #${idx + 1} · entra nell'officina</span>
+                </button>
+            `).join('');
+        }
+
+        function showSplashIdentityGate() {
+            const gate = document.getElementById('splashIdentityGate');
+            if (!gate) return;
+            renderSplashTeamGrid();
+            gate.style.display = 'flex';
+            document.body.classList.add('app-locked');
+        }
+
+        function hideSplashIdentityGate() {
+            const gate = document.getElementById('splashIdentityGate');
+            if (!gate) return;
+            gate.style.display = 'none';
+            document.body.classList.remove('app-locked');
+        }
+
+        function maybeShowMaestroIntro(forceClose = false) {
+            const overlay = document.getElementById('maestroIntroOverlay');
+            if (!overlay) return;
+            if (forceClose) {
+                localStorage.setItem('fanta_maestro_intro_done', 'true');
+                overlay.style.display = 'none';
+                document.body.classList.remove('app-locked');
+                return;
+            }
+            if (localStorage.getItem('fanta_maestro_intro_done') === 'true') return;
+            overlay.style.display = 'flex';
+            document.body.classList.add('app-locked');
+        }
+
+        function completeSplashTeamSelection(teamId) {
+            activeProfileId = teamId;
+            localStorage.setItem('fanta_active_profile_id', activeProfileId);
+            hasStoredProfile = true;
+            hideSplashIdentityGate();
+            renderApp();
+            maybeShowMaestroIntro();
+        }
+
+        function maybeStartIdentityGate() {
+            if (hasStoredProfile) {
+                hideSplashIdentityGate();
+                return;
+            }
+            showSplashIdentityGate();
+        }
+
         /* ─────────────────────────────────────────────────────────────
            TOAST NOTIFICATIONS
         ───────────────────────────────────────────────────────────── */
@@ -4985,6 +5211,7 @@ HTML_TEMPLATE = """
                 }
                 activeProfileId = parseInt(auth.team_id);
                 localStorage.setItem('fanta_active_profile_id', activeProfileId);
+                hasStoredProfile = true;
                 isAdmin = !!auth.is_admin;
                 if (isAdmin) {
                     sessionStorage.setItem('fanta_is_admin', 'true');
@@ -5069,6 +5296,7 @@ HTML_TEMPLATE = """
                 localStorage.setItem('fanta_session_auth', JSON.stringify(sessionData));
                 activeProfileId = teamId;
                 localStorage.setItem('fanta_active_profile_id', activeProfileId);
+                hasStoredProfile = true;
                 isAdmin = !!data.is_admin;
                 if (isAdmin) {
                     sessionStorage.setItem('fanta_is_admin', 'true');
@@ -5264,6 +5492,8 @@ HTML_TEMPLATE = """
             renderStrategyTab();
             renderTargetsTab();
             setupSearch();
+
+            maybeStartIdentityGate();
 
             if (window.location.hash) {
                 const tabName = window.location.hash.replace('#', '');
