@@ -89,10 +89,10 @@ def demo_roster_optimization(df):
     print("  Budget = 500 Credits | 3 Goalkeepers | 8 Defenders | 8 Midfielders | 6 Forwards\n")
 
     try:
-        from pipeline.p10_roster_optimizer import optimize_roster
+        from core.ingestion.static.p10_roster_optimizer import optimize_roster
     except Exception:
         import importlib
-        mod = importlib.import_module("pipeline.10_roster_optimizer")
+        mod = importlib.import_module("core.ingestion.static.10_roster_optimizer")
         optimize_roster = mod.optimize_roster
 
     roster = optimize_roster(df, budget=500, price_col="Prezzo_Consigliato_Cr")

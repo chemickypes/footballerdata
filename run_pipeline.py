@@ -46,7 +46,7 @@ def run_step(step_num):
     print(f"{'='*70}\n")
 
     try:
-        mod = importlib.import_module(f"pipeline.{module_name}")
+        mod = importlib.import_module(f"core.ingestion.static.{module_name}")
         mod.main()
         return True
     except Exception as e:

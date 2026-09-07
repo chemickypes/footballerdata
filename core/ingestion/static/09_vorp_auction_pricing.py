@@ -120,7 +120,7 @@ def compute_vorp_and_fair_prices(df_input, n_teams=DEFAULT_N_TEAMS):
     df["vorp_points"] = vorp_list
 
     # 2. Econometric Target & Clearing Pricing Engine
-    from pipeline.target_pricing import compute_target_prices
+    from core.ingestion.static.target_pricing import compute_target_prices
 
     df = compute_target_prices(df)
     df["prezzo_fair_1000"] = df["target_price_1000"]
@@ -147,7 +147,7 @@ def main():
     if "predicted_pts_p50" not in df.columns:
         print("  Running Stage 8 quantile modeling first...")
         import importlib
-        mod08 = importlib.import_module("pipeline.08_quantile_points_model")
+        mod08 = importlib.import_module("core.ingestion.static.08_quantile_points_model")
         mod08.main()
         df = pd.read_csv(config.DATASET_FINALE_CSV)
 

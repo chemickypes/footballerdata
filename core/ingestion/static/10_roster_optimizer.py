@@ -132,8 +132,8 @@ def main():
     if "predicted_pts_p50" not in df.columns:
         print("  Running prerequisite stages 08 and 09...")
         import importlib
-        importlib.import_module("pipeline.08_quantile_points_model").main()
-        importlib.import_module("pipeline.09_vorp_auction_pricing").main()
+        importlib.import_module("core.ingestion.static.08_quantile_points_model").main()
+        importlib.import_module("core.ingestion.static.09_vorp_auction_pricing").main()
         df = pd.read_csv(config.DATASET_FINALE_CSV)
 
     # 1. Optimize on Official Quotations (Budget: 500)

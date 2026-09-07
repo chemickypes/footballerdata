@@ -22,7 +22,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core import config
 import importlib
-_mod03 = importlib.import_module("pipeline.03_update_listone")
+_mod03 = importlib.import_module("core.ingestion.static.03_update_listone")
 load_quotazioni = _mod03.load_quotazioni
 build_listone = _mod03.build_listone
 
