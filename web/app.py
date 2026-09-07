@@ -2216,31 +2216,138 @@ HTML_TEMPLATE = """
             bottom: 0;
             left: 0;
             right: 0;
-            background: var(--surface);
-            border-top: 1px solid var(--border);
             display: flex;
             height: 68px;
             z-index: 1000;
             padding-bottom: env(safe-area-inset-bottom);
+            background: linear-gradient(180deg, #241a11, #160f09);
+            border-top: 2px solid var(--officina-brass-dark);
+            box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.32);
         }
         .nav-item {
             flex: 1;
+            min-width: 0;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            color: var(--text-muted);
-            text-decoration: none;
-            font-size: 0.74rem;
-            font-weight: 600;
-            cursor: pointer;
+            gap: 4px;
             border: none;
             background: transparent;
-            gap: 4px;
-            transition: color 0.15s ease;
+            color: var(--officina-muted);
+            text-decoration: none;
+            font-size: 0.66rem;
+            font-weight: 700;
+            cursor: pointer;
+            position: relative;
+            transition: color 0.18s ease, transform 0.18s ease;
         }
-        .nav-item.active { color: var(--primary); font-weight: 700; }
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            inset: 6px 4px 8px;
+            border-radius: 12px;
+            border: 1px solid transparent;
+            background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.08));
+            pointer-events: none;
+        }
+        .nav-item__icon {
+            font-size: 1.08rem;
+            line-height: 1;
+        }
+        .nav-item__label {
+            max-width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .nav-item.active {
+            color: var(--officina-gold);
+            transform: translateY(-1px);
+        }
+        .nav-item.active::before {
+            border-color: rgba(198,154,76,0.5);
+            box-shadow: inset 0 0 0 1px rgba(242,193,78,0.2), 0 0 18px rgba(242,193,78,0.18);
+        }
+        .nav-item.active .nav-item__icon {
+            filter: drop-shadow(0 0 8px rgba(242,193,78,0.4));
+        }
+        @media (max-width: 560px) {
+            .nav-item {
+                font-size: 0.62rem;
+                gap: 3px;
+            }
+            .nav-item__icon {
+                font-size: 1rem;
+            }
+        }
         .nav-svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        .session-login-officina {
+            background: rgba(7, 5, 3, 0.88);
+            backdrop-filter: blur(12px);
+        }
+        .session-login-officina__box {
+            max-width: 440px;
+            text-align: center;
+            padding: 28px 24px;
+            border: 1px solid rgba(198,154,76,0.4);
+            box-shadow: 0 0 45px rgba(198,154,76,0.2);
+            background: linear-gradient(180deg, #2a1e13, #1d140c);
+        }
+        .session-login-officina__crest {
+            font-size: 2.2rem;
+            margin-bottom: 8px;
+            color: var(--officina-gold);
+        }
+        .session-login-officina__title {
+            justify-content: center;
+            margin-bottom: 4px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #f4e7ca;
+        }
+        .session-login-officina__copy,
+        .session-login-officina__note {
+            font-size: 0.82rem;
+            color: #d8c6a5;
+            line-height: 1.45;
+        }
+        .session-login-officina__field {
+            text-align: left;
+            margin: 0 0 14px;
+        }
+        .session-login-officina__field label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--officina-muted);
+        }
+        .session-login-officina__field select,
+        .session-login-officina__field input {
+            width: 100%;
+            margin-bottom: 0;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(198,154,76,0.22);
+            background: #0f0b08;
+            color: var(--officina-ink);
+        }
+        .session-login-officina__submit {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 6px;
+        }
+        .session-login-officina #loginErrorMsg {
+            margin-top: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #f59a7d;
+            text-align: center;
+        }
 
         /* Cards & Metrics */
         .card {
@@ -4534,34 +4641,30 @@ HTML_TEMPLATE = """
     </div>
 
     <!-- SESSION LOGIN GATE MODAL -->
-    <div id="sessionLoginModal" class="modal-backdrop" style="display:none; z-index:99999; background:rgba(3,4,8,0.92); backdrop-filter:blur(12px);">
-        <div class="modal-box" style="max-width:440px; border:1px solid rgba(56,189,248,0.4); box-shadow:0 0 45px rgba(56,189,248,0.25); text-align:center; padding:28px 24px;">
-            <div style="font-size:2.4rem; margin-bottom:6px; color:var(--gold);"><i class="fa-solid fa-trophy icon-pulse"></i></div>
-            <div class="modal-title" style="justify-content:center; margin-bottom:4px;">
-                <span style="font-size:1.35rem; font-weight:800; color:var(--text-main); font-family:'Outfit',sans-serif;">Asta Live Condivisa</span>
+    <div id="sessionLoginModal" class="modal-backdrop session-login-officina" style="display:none; z-index:99999;">
+        <div class="modal-box session-login-officina__box">
+            <div class="session-login-officina__crest"><i class="fa-solid fa-trophy icon-pulse"></i></div>
+            <div class="modal-title session-login-officina__title">
+                <span>Asta Live Condivisa</span>
             </div>
-            <div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:18px; line-height:1.4;">
+            <div class="session-login-officina__copy">
                 Tutti i partecipanti sono sincronizzati in tempo reale sulla stessa asta. Seleziona la tua squadra e inserisci il PIN di accesso.
             </div>
-
-            <div style="text-align:left; margin-bottom:14px;">
-                <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700; display:block; margin-bottom:5px;">LA TUA FANTASQUADRA:</label>
-                <select id="loginTeamSelect" style="width:100%; font-size:0.95rem; font-weight:700; padding:10px 12px; background:#0b111e; border:1px solid var(--border); color:var(--text-main); border-radius:8px; margin-bottom:0;">
+            <div class="session-login-officina__field">
+                <label>LA TUA FANTASQUADRA:</label>
+                <select id="loginTeamSelect">
                     <!-- Dynamically populated -->
                 </select>
             </div>
-
-            <div style="text-align:left; margin-bottom:16px;">
-                <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700; display:block; margin-bottom:5px;">PIN DI ACCESSO (LEGA O ADMIN):</label>
-                <input type="password" id="loginPinInput" placeholder="Inserisci PIN (es. 2026)" style="width:100%; font-size:1.1rem; letter-spacing:2px; text-align:center; font-weight:700; padding:10px 12px; background:#0b111e; border:1px solid var(--border); color:var(--text-main); border-radius:8px; margin-bottom:4px;" onkeypress="if(event.key==='Enter') submitSessionLogin()">
-                <div id="loginErrorMsg" style="display:none; color:#f87171; font-size:0.8rem; margin-top:6px; font-weight:600; text-align:center;"></div>
+            <div class="session-login-officina__field">
+                <label>PIN DI ACCESSO (LEGA O ADMIN):</label>
+                <input type="password" id="loginPinInput" placeholder="Inserisci PIN (es. 2026)" onkeypress="if(event.key==='Enter') submitSessionLogin()">
+                <div id="loginErrorMsg" style="display:none;"></div>
             </div>
-
-            <button class="btn btn-primary" style="width:100%; padding:12px; font-size:1rem; font-weight:800; border-radius:8px; margin-top:6px;" onclick="submitSessionLogin()">
+            <button class="btn btn-primary session-login-officina__submit" onclick="submitSessionLogin()">
                 <i class="fa-solid fa-bolt" style="margin-right:6px;"></i> Entra nell'Asta Live
             </button>
-
-            <div style="margin-top:16px; font-size:0.72rem; color:var(--text-muted); line-height:1.4;">
+            <div class="session-login-officina__note">
                 Con il <b>PIN Admin</b> hai accesso completo alla battuta, sniffer e reset sessione.
             </div>
         </div>
@@ -4636,33 +4739,33 @@ HTML_TEMPLATE = """
     <!-- Bottom Navigation (Mobile De-densified 5 Tabs) -->
     <nav class="bottom-nav">
         <button class="nav-item" id="botNav-draft" onclick="switchTab('draft')">
-            <i class="fa-solid fa-gavel icon-pulse"></i>
-            <div>Asta Live</div>
+            <i class="fa-solid fa-gavel icon-pulse nav-item__icon"></i>
+            <span class="nav-item__label">Asta Live</span>
         </button>
         <button class="nav-item active" id="botNav-targets" onclick="switchTab('targets')">
-            <i class="fa-solid fa-bullseye"></i>
-            <div>Target & Piano</div>
+            <i class="fa-solid fa-bullseye nav-item__icon"></i>
+            <span class="nav-item__label">Target & Piano</span>
         </button>
         <button class="nav-item" id="botNav-rosters" onclick="switchTab('rosters')">
-            <i class="fa-solid fa-users"></i>
-            <div>Rose</div>
+            <i class="fa-solid fa-users nav-item__icon"></i>
+            <span class="nav-item__label">Rose</span>
         </button>
         <button class="nav-item" id="botNav-listone" onclick="switchTab('listone')">
-            <i class="fa-solid fa-table-list"></i>
-            <div>Listone</div>
+            <i class="fa-solid fa-table-list nav-item__icon"></i>
+            <span class="nav-item__label">Listone</span>
         </button>
         <button class="nav-item" id="botNav-ai" onclick="switchTab('ai')">
-            <i class="fa-solid fa-robot icon-float"></i>
-            <div>FantaAI</div>
+            <i class="fa-solid fa-robot icon-float nav-item__icon"></i>
+            <span class="nav-item__label">FantaAI</span>
         </button>
         <button class="nav-item" id="botNav-lineup" onclick="switchTab('lineup')">
-            <i class="fa-solid fa-list-check"></i><span>Formazione</span>
+            <i class="fa-solid fa-list-check nav-item__icon"></i><span class="nav-item__label">Formazione</span>
         </button>
         <button class="nav-item" id="botNav-audit" onclick="switchTab('audit')">
-            <i class="fa-solid fa-ranking-star"></i><span>Classifica</span>
+            <i class="fa-solid fa-ranking-star nav-item__icon"></i><span class="nav-item__label">Classifica</span>
         </button>
         <button class="nav-item" id="botNav-trades" onclick="switchTab('trades')">
-            <i class="fa-solid fa-right-left"></i><span>Scambi</span>
+            <i class="fa-solid fa-right-left nav-item__icon"></i><span class="nav-item__label">Scambi</span>
         </button>
     </nav>
 
@@ -5704,6 +5807,8 @@ HTML_TEMPLATE = """
 
             const sideBtn = document.getElementById('sideNav-' + tabId);
             if (sideBtn) sideBtn.classList.add('active');
+
+            if (typeof updateMaestroAmbientState === 'function') updateMaestroAmbientState(tabId);
 
             // Close mobile drawer if open
             const sb = document.getElementById('appSidebar');
