@@ -198,7 +198,6 @@ def aggregate_player_stats(df_raw):
 SOFASCORE_ALIASES = {
     ("Nico Paz", "COM"): "Paz N.",
     ("Kenan Yıldız", "JUV"): "Yildiz",
-    ("Kenan Yildiz", "JUV"): "Yildiz",
     ("Josep Martínez", "INT"): "Martinez Jo.",
     ("Filippo Terracciano", "MIL"): "Terracciano F.",
 }
