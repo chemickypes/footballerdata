@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup · Il Maestro (mascotte) — FantaLab Officina</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  :root{
+    --wood:#1a130d; --leather:#241a12; --leather2:#2f2216;
+    --brass:#c69a4c; --brass-d:#8a6329; --gold:#f2c14e;
+    --ink:#ecdfc6; --muted:#a68a6a; --parch:#e8d9b5;
+    --ease:cubic-bezier(0.34,1.56,0.64,1);
+    /* role tints (muted for warm theme) */
+    --role-p:#d99b34; --role-d:#5c9457; --role-c:#4f89a3; --role-a:#c0533f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;padding-bottom:96px;color:var(--ink);
+    font-family:'Plus Jakarta Sans',sans-serif;
+    background:radial-gradient(circle at 28% -5%, #2c2013 0%, transparent 55%),
+               linear-gradient(180deg,#1a130d 0%,#0e0906 100%);}
+
+  /* ---- header (real app: sticky, ~56px tall) ---- */
+  header{position:sticky;top:0;z-index:100;display:flex;justify-content:space-between;align-items:center;
+    padding:9px 16px;background:linear-gradient(180deg,#2b1f13,#1b130c);
+    border-bottom:2px solid var(--brass-d);box-shadow:0 4px 16px rgba(0,0,0,0.55);}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand .cog{color:var(--brass);font-size:1.35rem}
+  .brand-title{font-family:'Outfit',sans-serif;font-weight:800;font-size:1.12rem;letter-spacing:-0.3px;
+    color:#f0e2c4;text-shadow:0 1px 0 #000}
+  .brand-tag{font-size:0.62rem;font-weight:800;color:#1b130c;background:linear-gradient(180deg,var(--gold),var(--brass-d));
+    padding:2px 7px;border-radius:4px;letter-spacing:0.5px}
+  .header-actions{display:flex;align-items:center;gap:8px}
+  .hbtn{display:flex;align-items:center;gap:6px;font-weight:700;font-size:0.82rem;cursor:pointer;
+    padding:7px 11px;border-radius:8px;background:var(--leather2);color:var(--ink);
+    border:1px solid var(--brass-d)}
+  .hbtn.guide{background:rgba(198,154,76,0.16);border-color:var(--brass);color:var(--gold)}
+  .hbtn i{color:var(--brass)}
+
+  .container{max-width:900px;margin:0 auto;padding:18px 16px}
+
+  /* ---- riveted leather panel ---- */
+  .panel{position:relative;border-radius:14px;padding:18px;margin-bottom:18px;
+    border:1px solid var(--brass-d);
+    background:
+      radial-gradient(circle at 11px 11px,#dcb161 0 2px,transparent 3px),
+      radial-gradient(circle at calc(100% - 11px) 11px,#dcb161 0 2px,transparent 3px),
+      radial-gradient(circle at 11px calc(100% - 11px),#dcb161 0 2px,transparent 3px),
+      radial-gradient(circle at calc(100% - 11px) calc(100% - 11px),#dcb161 0 2px,transparent 3px),
+      linear-gradient(180deg,#2a1e13,#1f160e);
+    box-shadow:0 10px 26px -10px rgba(0,0,0,0.7),inset 0 1px 0 rgba(255,220,150,0.06);}
+  .panel-title{font-family:'Outfit',sans-serif;font-weight:800;font-size:0.82rem;letter-spacing:1.2px;
+    text-transform:uppercase;color:var(--brass);margin:0 0 4px;display:flex;align-items:center;gap:8px}
+  .panel-sub{font-size:0.8rem;color:var(--muted);margin:0 0 16px}
+
+  /* ---- hero plaque ---- */
+  .hero{display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+  .hero-frame{flex:0 0 auto;position:relative;padding:14px;border-radius:14px;
+    background:radial-gradient(circle at 50% 30%, #3a2a19, #1b130c 75%);
+    border:2px solid var(--brass);box-shadow:inset 0 0 24px rgba(0,0,0,0.6),0 0 0 4px #1b130c,0 0 0 5px var(--brass-d)}
+  .hero-frame .gearlace{position:absolute;color:var(--brass-d);font-size:0.9rem;opacity:0.7}
+  .float{animation:float 4s ease-in-out infinite}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+  .spin{animation:spin 9s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .hero-info h2{font-family:'Outfit',sans-serif;margin:0 0 4px;font-size:1.7rem;color:#f4e7ca}
+  .hero-info .kicker{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.05rem;color:var(--gold);margin:0 0 12px}
+  .hero-info p{font-size:0.9rem;line-height:1.55;color:#d8c6a5;max-width:420px;margin:0 0 10px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{font-size:0.72rem;font-weight:700;padding:4px 10px;border-radius:20px;border:1px solid var(--brass-d);
+    background:rgba(198,154,76,0.1);color:var(--gold);display:flex;align-items:center;gap:6px}
+
+  /* ---- scale row ---- */
+  .scale-row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end}
+  .scale-cell{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+  .scale-box{background:radial-gradient(circle at 50% 35%,#26190f,#160f09);border:1px dashed var(--brass-d);
+    border-radius:10px;padding:10px;display:flex;align-items:flex-end;justify-content:center}
+  .scale-cap{font-size:0.72rem;color:var(--muted);max-width:150px;line-height:1.35}
+  .scale-cap b{color:var(--ink);display:block;font-size:0.8rem}
+
+  /* ---- ambient demo: fake data card with mascot peeking ---- */
+  .ambient-wrap{position:relative;overflow:hidden;border-radius:12px;
+    border:1px solid rgba(198,154,76,0.25);background:linear-gradient(180deg,#160f09,#120c07)}
+  .fake-tablehead,.fake-row{display:grid;grid-template-columns:1.6fr 0.7fr 0.7fr 0.8fr;gap:8px;
+    padding:9px 14px;align-items:center;font-size:0.82rem}
+  .fake-tablehead{font-family:'Outfit',sans-serif;font-size:0.66rem;letter-spacing:1px;text-transform:uppercase;
+    color:var(--brass);border-bottom:1px solid rgba(198,154,76,0.25)}
+  .fake-row{border-bottom:1px solid rgba(255,255,255,0.04)}
+  .fake-row:nth-child(even){background:rgba(255,255,255,0.015)}
+  .fake-row .nm{font-weight:700;color:#eaddc2}
+  .fake-row .rl{font-weight:800}
+  .r-P{color:var(--role-p)}.r-D{color:var(--role-d)}.r-C{color:var(--role-c)}.r-A{color:var(--role-a)}
+  .fake-row .pr{color:var(--gold);font-weight:800;text-align:right}
+  .peek{position:absolute;right:10px;bottom:-6px;opacity:0.9;pointer-events:none;
+    filter:drop-shadow(0 4px 8px rgba(0,0,0,0.55))}
+  .peek::after{content:"“Occhio al Surplus, giovane…”";position:absolute;right:96px;bottom:60px;
+    white-space:nowrap;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:0.86rem;
+    color:var(--parch);background:linear-gradient(180deg,#efe2c1,#dcc79a);color:#4a3618;
+    padding:6px 11px;border-radius:8px 8px 3px 8px;border:1px solid var(--brass-d);
+    box-shadow:0 5px 14px rgba(0,0,0,0.5)}
+
+  /* ---- ambient corner guide (fixed) ---- */
+  .corner-guide{position:fixed;right:16px;bottom:84px;z-index:200;cursor:pointer;
+    filter:drop-shadow(0 6px 12px rgba(0,0,0,0.6))}
+  .corner-guide .halo{position:absolute;inset:-8px;border-radius:50%;
+    background:radial-gradient(circle,rgba(242,193,78,0.28),transparent 70%);animation:pulse 3s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(0.9);opacity:0.5}50%{transform:scale(1.08);opacity:1}}
+  .corner-guide .badge{position:absolute;top:-4px;right:-4px;width:20px;height:20px;border-radius:50%;
+    background:var(--role-a);color:#fff;font-size:0.66rem;font-weight:800;display:flex;align-items:center;justify-content:center;
+    border:2px solid #1b130c}
+
+  /* ---- bottom nav (real app: fixed, 68px, 8 items) ---- */
+  nav.bottom-nav{position:fixed;bottom:0;left:0;right:0;height:68px;z-index:1000;display:flex;
+    background:linear-gradient(180deg,#241a11,#160f09);border-top:2px solid var(--brass-d)}
+  .nav-item{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;
+    color:var(--muted);font-size:0.66rem;font-weight:700;cursor:pointer;background:none;border:none}
+  .nav-item i{font-size:1.18rem}
+  .nav-item.active{color:var(--gold)}
+  .nav-item.active i{filter:drop-shadow(0 0 8px rgba(242,193,78,0.5))}
+
+  .note{font-size:0.72rem;color:var(--muted);font-style:italic;margin-top:6px}
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <i class="fa-solid fa-gears cog spin"></i>
+      <span class="brand-title">FantaLab</span>
+      <span class="brand-tag">OFFICINA</span>
+    </div>
+    <div class="header-actions">
+      <div class="hbtn"><i class="fa-solid fa-sliders"></i><span>Lega</span></div>
+      <div class="hbtn guide"><i class="fa-solid fa-circle-question"></i><span>Guida</span></div>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- HERO -->
+    <div class="panel">
+      <div class="panel-title"><i class="fa-solid fa-hat-wizard"></i> La Mascotte</div>
+      <div class="panel-sub">Ritratto principale — usato nell'onboarding e come firma dell'app.</div>
+      <div class="hero">
+        <div class="hero-frame">
+          <i class="fa-solid fa-gear gearlace spin" style="top:-9px;left:-9px"></i>
+          <i class="fa-solid fa-gear gearlace spin" style="bottom:-9px;right:-9px;animation-direction:reverse"></i>
+          <div id="heroSprite" class="float"></div>
+        </div>
+        <div class="hero-info">
+          <h2>Il Maestro</h2>
+          <p class="kicker">inventore, cartografo del calcio & tua guida d'asta</p>
+          <p>Un vecchio saggio à la Leonardo, con occhialoni da rétore steampunk. Compare nel tutorial per accompagnarti passo passo e riappare — in punta di pixel — ai margini delle tue attività, senza mai rubare la scena ai dati.</p>
+          <div class="chips">
+            <span class="chip"><i class="fa-solid fa-feather"></i> Da Vinci</span>
+            <span class="chip"><i class="fa-solid fa-gears"></i> Steampunk</span>
+            <span class="chip"><i class="fa-solid fa-cube"></i> Pixel-art 8-bit</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCALE -->
+    <div class="panel">
+      <div class="panel-title"><i class="fa-solid fa-ruler-combined"></i> Scala d'uso reale</div>
+      <div class="panel-sub">Le tre taglie in cui il Maestro comparirà davvero nell'interfaccia — non un'illustrazione gigante.</div>
+      <div class="scale-row">
+        <div class="scale-cell">
+          <div class="scale-box" id="s64"></div>
+          <div class="scale-cap"><b>~64px</b> icona guida nell'angolo / avatar nav</div>
+        </div>
+        <div class="scale-cell">
+          <div class="scale-box" id="s96"></div>
+          <div class="scale-cap"><b>~96px</b> avatar accanto al tooltip del tutorial</div>
+        </div>
+        <div class="scale-cell">
+          <div class="scale-box" id="s120"></div>
+          <div class="scale-cap"><b>~120px</b> ritratto hero / schermata vuota</div>
+        </div>
+      </div>
+      <div class="note">Riferimento: il bottom-nav reale è alto 68px e la colonna contenuti è larga max 900px — la mascotte resta sotto la soglia dei 120px per non sovrastare tabelle e badge.</div>
+    </div>
+
+    <!-- AMBIENT -->
+    <div class="panel">
+      <div class="panel-title"><i class="fa-solid fa-eye"></i> Presenza ambientale</div>
+      <div class="panel-sub">Durante le attività il Maestro "sbircia" da un angolo, in leggera trasparenza, con una battuta contestuale opzionale.</div>
+      <div class="ambient-wrap">
+        <div class="fake-tablehead"><span>Giocatore</span><span>Ruolo</span><span>P50</span><span>Prezzo Equo</span></div>
+        <div class="fake-row"><span class="nm">Lautaro Martinez</span><span class="rl r-A">A</span><span>7.9</span><span class="pr">312</span></div>
+        <div class="fake-row"><span class="nm">N. Barella</span><span class="rl r-C">C</span><span>6.8</span><span class="pr">198</span></div>
+        <div class="fake-row"><span class="nm">A. Bastoni</span><span class="rl r-D">D</span><span>5.9</span><span class="pr">121</span></div>
+        <div class="fake-row"><span class="nm">Y. Sommer</span><span class="rl r-P">P</span><span>5.4</span><span class="pr">44</span></div>
+        <div class="fake-row"><span class="nm">R. Leao</span><span class="rl r-A">A</span><span>7.1</span><span class="pr">205</span></div>
+        <div class="peek" id="peekSprite"></div>
+      </div>
+      <div class="note">Trasparenza ~0.9 e ancoraggio in basso a destra: la mascotte non copre mai una riga dati completa.</div>
+    </div>
+
+  </div>
+
+  <!-- fixed corner guide -->
+  <div class="corner-guide" title="Chiedi aiuto al Maestro">
+    <div class="halo"></div>
+    <div id="cornerSprite" class="float"></div>
+    <div class="badge">1</div>
+  </div>
+
+  <!-- bottom nav: 8 real items -->
+  <nav class="bottom-nav">
+    <button class="nav-item active"><i class="fa-solid fa-gavel"></i><span>Asta</span></button>
+    <button class="nav-item"><i class="fa-solid fa-users"></i><span>Rose</span></button>
+    <button class="nav-item"><i class="fa-solid fa-table-list"></i><span>Listone</span></button>
+    <button class="nav-item"><i class="fa-solid fa-flask"></i><span>FantaAI</span></button>
+    <button class="nav-item"><i class="fa-solid fa-list-check"></i><span>Formazione</span></button>
+    <button class="nav-item"><i class="fa-solid fa-ranking-star"></i><span>Classifica</span></button>
+    <button class="nav-item"><i class="fa-solid fa-right-left"></i><span>Scambi</span></button>
+    <button class="nav-item"><i class="fa-solid fa-circle-question"></i><span>Guida</span></button>
+  </nav>
+
+<script>
+/* ===== Pixel sprite "Il Maestro" — steampunk Leonardo sage bust (22px grid) ===== */
+const PALETTE={'.':null,o:'#241a12',H:'#4a3320',h:'#33230f',B:'#c69a4c',b:'#8a6329',L:'#f2c14e',
+  G:'#8fd0c8',g:'#4f9a91',S:'#e6b184',s:'#c68b5c',W:'#efe9dc',w:'#c3bcaa',R:'#5c4326',r:'#3f2c15',C:'#b5703a'};
+const MAP=[
+  "..........CC..........",".........oooo.........",".......ooHHHHHHoo......",
+  "......oHHHHHHHHHHo.....","......oHHHhhHHhHHHo....",".....oHHHHHHHHHHHHo....",
+  ".....oHHHHHHHHHHHHo....","....obBBBBBBBBBBBBbo...","....oBLBBBBBBBBBBLBo...",
+  "...oBGGgBBBBBBBBGGgBo..","...oBGGgBBBBBBBBGGgBo..","....obBBBBBBBBBBBBbo...",
+  ".....oSSSSSSSSSSSSo....",".....oSSsSSSSSSsSSo....",".....oSooSSSSSSooSo....",
+  ".....oSooSSSSSSooSo....",".....oSSSSSssSSSSSo....","......oSSSSssSSSSo.....",
+  "......oWwsSSSSswWo.....",".....oWWWWwssWWWWWo....","....oWWWWWWWWWWWWWWo...",
+  "...oWWWWWWWWWWWWWWWWo..","...oWWWWwWWWWWWwWWWWo..","...oWWWWWWWWWWWWWWWWo..",
+  "....oWWWWWWWWWWWWWWo...",".....oWWWWWwwWWWWWo....","......oWWWWWWWWWWo.....",
+  ".......oWWWWWWWWo......","...RR..oWWWWWWWWo..RR..",".RRRRRRoWWWWWWWWoRRRRRR",
+  "RRRRRRRRoWWWWWWoRRRRRRR","RRrRRRLBRRRRRRRRBLRRrRR","RRrRRRRRRRRRRRRRRRRrRRR",
+  "RRrRRRRRRRRRRRRRRRRrRRR"];
+function spriteSVG(px){
+  const rows=MAP.length,cols=22;let rects='';
+  for(let y=0;y<rows;y++){const line=MAP[y];
+    for(let x=0;x<line.length;x++){const c=PALETTE[line[x]];if(!c)continue;
+      rects+=`<rect x="${x}" y="${y}" width="1.03" height="1.03" fill="${c}"/>`;}}
+  return `<svg viewBox="0 0 ${cols} ${rows}" width="${cols*px}" height="${rows*px}" shape-rendering="crispEdges" style="display:block">${rects}</svg>`;
+}
+document.getElementById('heroSprite').innerHTML=spriteSVG(6);
+document.getElementById('s64').innerHTML=spriteSVG(2.9);   /* ~64px wide */
+document.getElementById('s96').innerHTML=spriteSVG(4.4);   /* ~96px wide */
+document.getElementById('s120').innerHTML=spriteSVG(5.5);  /* ~120px wide */
+document.getElementById('cornerSprite').innerHTML=spriteSVG(3.2);
+document.getElementById('peekSprite').innerHTML=spriteSVG(3.6);
+</script>
+</body>
+</html>

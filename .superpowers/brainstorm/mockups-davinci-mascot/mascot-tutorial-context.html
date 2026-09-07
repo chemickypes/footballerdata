@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup · Il Maestro nel Tutorial — FantaLab Officina</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,600;1,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  :root{
+    --wood:#1a130d; --leather:#241a12; --leather2:#2f2216;
+    --brass:#c69a4c; --brass-d:#8a6329; --gold:#f2c14e;
+    --ink:#ecdfc6; --muted:#a68a6a; --parch:#e8d9b5;
+    --role-p:#d99b34; --role-d:#5c9457; --role-c:#4f89a3; --role-a:#c0533f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;padding-bottom:96px;color:var(--ink);
+    font-family:'Plus Jakarta Sans',sans-serif;
+    background:radial-gradient(circle at 28% -5%, #2c2013 0%, transparent 55%),
+               linear-gradient(180deg,#1a130d 0%,#0e0906 100%);}
+  header{position:sticky;top:0;z-index:100;display:flex;justify-content:space-between;align-items:center;
+    padding:9px 16px;background:linear-gradient(180deg,#2b1f13,#1b130c);
+    border-bottom:2px solid var(--brass-d);box-shadow:0 4px 16px rgba(0,0,0,0.55);}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand .cog{color:var(--brass);font-size:1.35rem}
+  .brand-title{font-family:'Outfit',sans-serif;font-weight:800;font-size:1.12rem;color:#f0e2c4}
+  .brand-tag{font-size:0.62rem;font-weight:800;color:#1b130c;background:linear-gradient(180deg,var(--gold),var(--brass-d));
+    padding:2px 7px;border-radius:4px}
+  .header-actions{display:flex;gap:8px}
+  .hbtn{display:flex;align-items:center;gap:6px;font-weight:700;font-size:0.82rem;
+    padding:7px 11px;border-radius:8px;background:var(--leather2);color:var(--ink);border:1px solid var(--brass-d)}
+  .hbtn i{color:var(--brass)}
+  .container{max-width:900px;margin:0 auto;padding:18px 16px}
+  .card{position:relative;border-radius:12px;padding:16px;margin-bottom:16px;border:1px solid rgba(198,154,76,0.28);
+    background:linear-gradient(180deg,#221810,#180f09)}
+  .card h3{font-family:'Outfit',sans-serif;margin:0 0 10px;font-size:0.98rem;color:#f0e2c4;
+    display:flex;align-items:center;gap:8px}
+  .card h3 i{color:var(--brass)}
+  .stat-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .stat{background:rgba(198,154,76,0.07);border:1px solid rgba(198,154,76,0.18);border-radius:8px;padding:10px 12px}
+  .stat .k{font-size:0.66rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)}
+  .stat .v{font-family:'Outfit',sans-serif;font-size:1.25rem;font-weight:800;color:var(--gold)}
+  .list-row{display:grid;grid-template-columns:1.6fr .6fr .7fr .8fr;gap:8px;padding:9px 4px;font-size:0.84rem;
+    border-bottom:1px solid rgba(255,255,255,0.04);align-items:center}
+  .list-row.hd{font-family:'Outfit',sans-serif;font-size:0.64rem;text-transform:uppercase;letter-spacing:1px;color:var(--brass)}
+  .nm{font-weight:700;color:#eaddc2}.pr{color:var(--gold);font-weight:800;text-align:right}
+  .r-P{color:var(--role-p);font-weight:800}.r-D{color:var(--role-d);font-weight:800}
+  .r-C{color:var(--role-c);font-weight:800}.r-A{color:var(--role-a);font-weight:800}
+
+  nav.bottom-nav{position:fixed;bottom:0;left:0;right:0;height:68px;z-index:1000;display:flex;
+    background:linear-gradient(180deg,#241a11,#160f09);border-top:2px solid var(--brass-d)}
+  .nav-item{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;
+    color:var(--muted);font-size:0.66rem;font-weight:700;background:none;border:none;position:relative}
+  .nav-item i{font-size:1.18rem}.nav-item.active{color:var(--gold)}
+
+  /* ============ real tutorial spotlight classes (from web/static/css/tutorial.css) ============ */
+  .tour-overlay-rect{position:fixed;background:rgba(0,0,0,0.75);z-index:10000}
+  .tour-overlay-highlight{position:fixed;background:transparent;border-radius:8px;
+    box-shadow:0 0 0 3px var(--gold,#f5b642),0 0 24px 4px rgba(245,182,66,0.45);z-index:10001;pointer-events:none}
+  .tour-tooltip{position:fixed;z-index:10002;
+    background:linear-gradient(180deg,#2a1e13,#1d140c);
+    border:1px solid var(--brass-d);border-radius:12px;padding:16px 18px;max-width:320px;min-width:240px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.6);font-family:'Outfit','Plus Jakarta Sans',sans-serif;color:#f1e6cd}
+  .tour-tooltip-arrow{position:absolute;left:50%;transform:translateX(-50%);width:0;height:0;
+    border-left:9px solid transparent;border-right:9px solid transparent}
+  .tour-tooltip-arrow-bottom{bottom:-9px;border-top:9px solid #1d140c}
+  .tour-tooltip-title{font-size:1.05rem;font-weight:800;margin:0 0 8px;color:#f6e9cc}
+  .tour-tooltip-text{font-size:0.88rem;line-height:1.5;color:#cdb992;margin:0 0 14px}
+  .tour-tooltip-progress{font-size:0.72rem;font-weight:700;color:var(--brass);margin-bottom:10px;
+    letter-spacing:0.04em;text-transform:uppercase}
+  .tour-tooltip-actions{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .tour-btn{border:none;border-radius:8px;padding:7px 14px;font-size:0.82rem;font-weight:800;cursor:pointer;font-family:inherit}
+  .tour-btn-primary{background:linear-gradient(180deg,var(--gold),var(--brass-d));color:#1b130c}
+  .tour-btn-secondary{background:rgba(255,255,255,0.07);color:#f1e6cd}
+  .tour-btn-skip{position:absolute;top:10px;right:12px;background:transparent;border:none;color:var(--muted);
+    font-size:0.72rem;font-weight:700;cursor:pointer;padding:4px 6px}
+
+  /* mascot docked to the tooltip — the NEW bit */
+  .tour-mascot{position:fixed;z-index:10002;filter:drop-shadow(0 6px 12px rgba(0,0,0,0.6));
+    animation:float 4s ease-in-out infinite}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+  .tour-mascot .base{position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);width:70%;height:8px;border-radius:50%;
+    background:radial-gradient(ellipse,rgba(0,0,0,0.45),transparent 70%)}
+  .caption{max-width:900px;margin:14px auto 0;padding:0 16px;font-size:0.76rem;color:var(--muted);font-style:italic}
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand"><i class="fa-solid fa-gears cog"></i><span class="brand-title">FantaLab</span><span class="brand-tag">OFFICINA</span></div>
+    <div class="header-actions">
+      <div class="hbtn"><i class="fa-solid fa-sliders"></i><span>Lega</span></div>
+      <div class="hbtn" id="btnGuide"><i class="fa-solid fa-circle-question"></i><span>Guida</span></div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h3><i class="fa-solid fa-satellite-dish"></i> FantaLab Live Sniffer</h3>
+      <div class="stat-strip">
+        <div class="stat"><div class="k">Budget residuo</div><div class="v">418</div></div>
+        <div class="stat"><div class="k">Inflazione</div><div class="v">1.06x</div></div>
+        <div class="stat"><div class="k">Slot A liberi</div><div class="v">2</div></div>
+      </div>
+    </div>
+    <div class="card" id="listCard">
+      <h3><i class="fa-solid fa-table-list"></i> Listone</h3>
+      <div class="list-row hd"><span>Giocatore</span><span>Ruolo</span><span>P50</span><span>Prezzo Equo</span></div>
+      <div class="list-row"><span class="nm">Lautaro Martinez</span><span class="r-A">A</span><span>7.9</span><span class="pr">312</span></div>
+      <div class="list-row"><span class="nm">N. Barella</span><span class="r-C">C</span><span>6.8</span><span class="pr">198</span></div>
+      <div class="list-row"><span class="nm">A. Bastoni</span><span class="r-D">D</span><span>5.9</span><span class="pr">121</span></div>
+      <div class="list-row"><span class="nm">Y. Sommer</span><span class="r-P">P</span><span>5.4</span><span class="pr">44</span></div>
+    </div>
+    <p class="caption">Ricostruzione fedele dello spotlight reale (<code>tour-overlay-rect</code> + <code>tour-overlay-highlight</code> + <code>tour-tooltip</code> da <code>web/static/css/tutorial.css</code>). La novità è il Maestro agganciato al tooltip come "voce narrante".</p>
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="nav-item"><i class="fa-solid fa-gavel"></i><span>Asta</span></button>
+    <button class="nav-item"><i class="fa-solid fa-users"></i><span>Rose</span></button>
+    <button class="nav-item active" id="navListone"><i class="fa-solid fa-table-list"></i><span>Listone</span></button>
+    <button class="nav-item"><i class="fa-solid fa-flask"></i><span>FantaAI</span></button>
+    <button class="nav-item"><i class="fa-solid fa-list-check"></i><span>Formazione</span></button>
+    <button class="nav-item"><i class="fa-solid fa-ranking-star"></i><span>Classifica</span></button>
+    <button class="nav-item"><i class="fa-solid fa-right-left"></i><span>Scambi</span></button>
+    <button class="nav-item"><i class="fa-solid fa-circle-question"></i><span>Guida</span></button>
+  </nav>
+
+  <!-- spotlight overlay (4 rects around target) -->
+  <div class="tour-overlay-rect" id="ovTop"></div>
+  <div class="tour-overlay-rect" id="ovBottom"></div>
+  <div class="tour-overlay-rect" id="ovLeft"></div>
+  <div class="tour-overlay-rect" id="ovRight"></div>
+  <div class="tour-overlay-highlight" id="ovHi"></div>
+
+  <!-- mascot + tooltip -->
+  <div class="tour-mascot" id="tourMascot"><div id="tourMascotSprite"></div><div class="base"></div></div>
+
+  <div class="tour-tooltip" id="tourTip">
+    <button class="tour-btn-skip">Salta Tutorial ✕</button>
+    <div class="tour-tooltip-title">Colonne Listone</div>
+    <div class="tour-tooltip-text">Il <b>Prezzo Equo</b> è il massimo razionale da offrire; <b>P50</b> sono i punti attesi. Io ti avviso quando un affare vale un rilancio. — <i style="font-family:'Cormorant Garamond',serif">Il Maestro</i></div>
+    <div class="tour-tooltip-progress">Passo 3 di 7</div>
+    <div class="tour-tooltip-actions">
+      <button class="tour-btn tour-btn-secondary">Indietro</button>
+      <button class="tour-btn tour-btn-primary">Avanti</button>
+    </div>
+    <div class="tour-tooltip-arrow tour-tooltip-arrow-bottom"></div>
+  </div>
+
+<script>
+const PALETTE={'.':null,o:'#241a12',H:'#4a3320',h:'#33230f',B:'#c69a4c',b:'#8a6329',L:'#f2c14e',
+  G:'#8fd0c8',g:'#4f9a91',S:'#e6b184',s:'#c68b5c',W:'#efe9dc',w:'#c3bcaa',R:'#5c4326',r:'#3f2c15',C:'#b5703a'};
+const MAP=[
+  "..........CC..........",".........oooo.........",".......ooHHHHHHoo......",
+  "......oHHHHHHHHHHo.....","......oHHHhhHHhHHHo....",".....oHHHHHHHHHHHHo....",
+  ".....oHHHHHHHHHHHHo....","....obBBBBBBBBBBBBbo...","....oBLBBBBBBBBBBLBo...",
+  "...oBGGgBBBBBBBBGGgBo..","...oBGGgBBBBBBBBGGgBo..","....obBBBBBBBBBBBBbo...",
+  ".....oSSSSSSSSSSSSo....",".....oSSsSSSSSSsSSo....",".....oSooSSSSSSooSo....",
+  ".....oSooSSSSSSooSo....",".....oSSSSSssSSSSSo....","......oSSSSssSSSSo.....",
+  "......oWwsSSSSswWo.....",".....oWWWWwssWWWWWo....","....oWWWWWWWWWWWWWWo...",
+  "...oWWWWWWWWWWWWWWWWo..","...oWWWWwWWWWWWwWWWWo..","...oWWWWWWWWWWWWWWWWo..",
+  "....oWWWWWWWWWWWWWWo...",".....oWWWWWwwWWWWWo....","......oWWWWWWWWWWo.....",
+  ".......oWWWWWWWWo......","...RR..oWWWWWWWWo..RR..",".RRRRRRoWWWWWWWWoRRRRRR",
+  "RRRRRRRRoWWWWWWoRRRRRRR","RRrRRRLBRRRRRRRRBLRRrRR","RRrRRRRRRRRRRRRRRRRrRRR",
+  "RRrRRRRRRRRRRRRRRRRrRRR"];
+function spriteSVG(px){const rows=MAP.length,cols=22;let s='';
+  for(let y=0;y<rows;y++){const l=MAP[y];for(let x=0;x<l.length;x++){const c=PALETTE[l[x]];if(!c)continue;
+    s+=`<rect x="${x}" y="${y}" width="1.03" height="1.03" fill="${c}"/>`;}}
+  return `<svg viewBox="0 0 ${cols} ${rows}" width="${cols*px}" height="${rows*px}" shape-rendering="crispEdges" style="display:block">${s}</svg>`;}
+document.getElementById('tourMascotSprite').innerHTML=spriteSVG(4.2); /* ~92px avatar */
+
+/* position spotlight over the Listone bottom-nav item, tooltip above it, mascot beside tooltip */
+function layout(){
+  const target=document.getElementById('navListone');
+  const r=target.getBoundingClientRect();
+  const vw=innerWidth,vh=innerHeight;
+  const pad=4;
+  const hi={top:r.top-pad,left:r.left-pad,width:r.width+pad*2,height:r.height+pad*2};
+  set('ovTop',{top:0,left:0,width:vw,height:Math.max(0,hi.top)});
+  set('ovBottom',{top:hi.top+hi.height,left:0,width:vw,height:Math.max(0,vh-(hi.top+hi.height))});
+  set('ovLeft',{top:hi.top,left:0,width:Math.max(0,hi.left),height:hi.height});
+  set('ovRight',{top:hi.top,left:hi.left+hi.width,width:Math.max(0,vw-(hi.left+hi.width)),height:hi.height});
+  set('ovHi',hi);
+  const tip=document.getElementById('tourTip');
+  const tw=tip.offsetWidth,th=tip.offsetHeight;
+  let left=Math.min(Math.max(8,r.left+r.width/2-tw/2),vw-tw-8);
+  let top=r.top-th-14;
+  tip.style.left=left+'px';tip.style.top=top+'px';
+  /* mascot sits just left of / above the tooltip, "presenting" it */
+  const m=document.getElementById('tourMascot');
+  const mw=m.offsetWidth;
+  m.style.left=Math.max(8,left-mw+18)+'px';
+  m.style.top=(top-24)+'px';
+}
+function set(id,o){const e=document.getElementById(id);
+  e.style.top=o.top+'px';e.style.left=o.left+'px';e.style.width=o.width+'px';e.style.height=o.height+'px';}
+window.addEventListener('load',()=>setTimeout(layout,120));
+window.addEventListener('resize',layout);
+</script>
+</body>
+</html>

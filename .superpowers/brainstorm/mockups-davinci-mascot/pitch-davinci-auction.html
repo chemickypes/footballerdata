@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup · Campo Da Vinci (Asta) — FantaLab Officina</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  :root{
+    --leather2:#2f2216;--brass:#c69a4c;--brass-d:#8a6329;--gold:#f2c14e;
+    --ink:#ecdfc6;--muted:#a68a6a;--parch:#e8d9b5;
+    --role-p:#d99b34;--role-d:#5c9457;--role-c:#4f89a3;--role-a:#c0533f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;padding-bottom:96px;color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;
+    background:radial-gradient(circle at 28% -5%,#2c2013 0%,transparent 55%),linear-gradient(180deg,#1a130d,#0e0906);}
+  header{position:sticky;top:0;z-index:100;display:flex;justify-content:space-between;align-items:center;
+    padding:9px 16px;background:linear-gradient(180deg,#2b1f13,#1b130c);border-bottom:2px solid var(--brass-d);
+    box-shadow:0 4px 16px rgba(0,0,0,0.55)}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand .cog{color:var(--brass);font-size:1.35rem}
+  .brand-title{font-family:'Outfit',sans-serif;font-weight:800;font-size:1.12rem;color:#f0e2c4}
+  .brand-tag{font-size:0.62rem;font-weight:800;color:#1b130c;background:linear-gradient(180deg,var(--gold),var(--brass-d));padding:2px 7px;border-radius:4px}
+  .live-pill{display:flex;align-items:center;gap:6px;font-weight:800;font-size:0.8rem;color:var(--gold);
+    background:rgba(198,154,76,0.14);border:1px solid var(--brass);padding:6px 11px;border-radius:8px}
+  .live-pill .dot{width:8px;height:8px;border-radius:50%;background:#e0563f;box-shadow:0 0 8px #e0563f;animation:blink 1.4s infinite}
+  @keyframes blink{50%{opacity:0.3}}
+  .container{max-width:900px;margin:0 auto;padding:18px 16px}
+
+  .card{position:relative;border-radius:12px;padding:16px;margin-bottom:16px;border:1px solid rgba(198,154,76,0.28);
+    background:linear-gradient(180deg,#221810,#180f09)}
+  .card h3{font-family:'Outfit',sans-serif;margin:0 0 12px;font-size:0.98rem;color:#f0e2c4;display:flex;align-items:center;gap:8px}
+  .card h3 i{color:var(--brass)}
+
+  /* the decorative auction hero: parchment plate on the left, live bid controls on the right */
+  .auction-hero{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:18px;align-items:stretch}
+  @media(max-width:680px){.auction-hero{grid-template-columns:1fr}}
+  .pitch-plate{position:relative;border-radius:12px;overflow:hidden;min-height:100%;
+    display:flex;align-items:center;justify-content:center;padding:8px;
+    background:radial-gradient(circle at 50% 20%,#241a10,#140d07)}
+  .pitch-plate .stamp{position:absolute;top:10px;left:12px;font-family:'Cormorant Garamond',serif;font-style:italic;
+    color:var(--brass);font-size:0.82rem;opacity:0.85;z-index:2}
+  .bid-panel{display:flex;flex-direction:column;gap:12px;justify-content:center}
+  .lot-name{font-family:'Outfit',sans-serif;font-size:1.5rem;font-weight:800;color:#f4e7ca;line-height:1.1}
+  .lot-meta{font-size:0.82rem;color:var(--muted)}
+  .role-badge{display:inline-flex;align-items:center;gap:5px;font-weight:800;font-size:0.72rem;padding:3px 9px;border-radius:5px;
+    background:rgba(192,83,63,0.18);color:var(--role-a);border:1px solid rgba(192,83,63,0.45)}
+  .bidbox{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,0.25);border:1px solid var(--brass-d);
+    border-radius:10px;padding:10px 12px}
+  .bidbox .lab{font-size:0.68rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+  .bidbox .amt{font-family:'Outfit',sans-serif;font-size:1.9rem;font-weight:900;color:var(--gold);margin-left:auto}
+  .fairbar{height:8px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden}
+  .fairbar>span{display:block;height:100%;width:62%;background:linear-gradient(90deg,var(--brass-d),var(--gold))}
+  .btnrow{display:flex;gap:10px}
+  .btn{flex:1;min-height:46px;border:none;border-radius:9px;font-weight:800;font-size:0.95rem;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:8px}
+  .btn-primary{background:linear-gradient(180deg,var(--gold),var(--brass-d));color:#1b130c}
+  .btn-secondary{background:var(--leather2);color:var(--ink);border:1px solid var(--brass-d)}
+
+  /* verdict chips row */
+  .verdicts{display:flex;gap:10px;flex-wrap:wrap;margin-top:2px}
+  .vchip{flex:1;min-width:120px;border-radius:9px;padding:10px 12px;border:1px solid rgba(198,154,76,0.22);
+    background:rgba(198,154,76,0.06)}
+  .vchip .t{font-size:0.66rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)}
+  .vchip .n{font-family:'Outfit',sans-serif;font-weight:800;font-size:1.05rem}
+  .green{color:#7cc06a}.amber{color:var(--gold)}.red{color:#e0705c}
+
+  nav.bottom-nav{position:fixed;bottom:0;left:0;right:0;height:68px;z-index:1000;display:flex;
+    background:linear-gradient(180deg,#241a11,#160f09);border-top:2px solid var(--brass-d)}
+  .nav-item{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;
+    color:var(--muted);font-size:0.66rem;font-weight:700;background:none;border:none}
+  .nav-item i{font-size:1.18rem}.nav-item.active{color:var(--gold)}
+  .caption{font-size:0.74rem;color:var(--muted);font-style:italic;margin-top:10px}
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand"><i class="fa-solid fa-gears cog"></i><span class="brand-title">FantaLab</span><span class="brand-tag">OFFICINA</span></div>
+    <div class="live-pill"><span class="dot"></span> ASTA LIVE</div>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h3><i class="fa-solid fa-gavel"></i> Battitore — Lotto in corso</h3>
+      <div class="auction-hero">
+        <!-- DECORATIVE parchment pitch -->
+        <div class="pitch-plate">
+          <span class="stamp">tavola tattica</span>
+          <div id="pitchDeco" style="width:100%;max-width:280px"></div>
+        </div>
+        <!-- live bid controls -->
+        <div class="bid-panel">
+          <div>
+            <div class="lot-name">Lautaro Martinez</div>
+            <div class="lot-meta">Inter · <span class="role-badge"><i class="fa-solid fa-futbol"></i> Attaccante</span> · FVM 312</div>
+          </div>
+          <div class="bidbox"><span class="lab">Offerta corrente</span><span class="amt">287</span></div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:var(--muted);margin-bottom:5px">
+              <span>Prezzo Equo 312</span><span>Surplus +25</span></div>
+            <div class="fairbar"><span></span></div>
+          </div>
+          <div class="btnrow">
+            <button class="btn btn-secondary"><i class="fa-solid fa-minus"></i></button>
+            <button class="btn btn-primary"><i class="fa-solid fa-gavel"></i> Rilancia 292</button>
+            <button class="btn btn-secondary"><i class="fa-solid fa-plus"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><i class="fa-solid fa-traffic-light"></i> Verdetto Semaforico</h3>
+      <div class="verdicts">
+        <div class="vchip"><div class="t">Safe Drain</div><div class="n green">OK · 62%</div></div>
+        <div class="vchip"><div class="t">Target Match</div><div class="n amber">Medio</div></div>
+        <div class="vchip"><div class="t">Rischio Overpay</div><div class="n red">Alto oltre 305</div></div>
+        <div class="vchip"><div class="t">Budget/Slot</div><div class="n green">418 / 2A</div></div>
+      </div>
+      <p class="caption">Il campo Da Vinci qui è puramente <b>decorativo/contestuale</b>: fa da "tavola tattica" dietro il lotto, senza dati interattivi. Coerente col tema Officina — inchiostro seppia su pergamena, bordi strappati, annotazioni anatomiche.</p>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="nav-item active"><i class="fa-solid fa-gavel"></i><span>Asta</span></button>
+    <button class="nav-item"><i class="fa-solid fa-users"></i><span>Rose</span></button>
+    <button class="nav-item"><i class="fa-solid fa-table-list"></i><span>Listone</span></button>
+    <button class="nav-item"><i class="fa-solid fa-flask"></i><span>FantaAI</span></button>
+    <button class="nav-item"><i class="fa-solid fa-list-check"></i><span>Formazione</span></button>
+    <button class="nav-item"><i class="fa-solid fa-ranking-star"></i><span>Classifica</span></button>
+    <button class="nav-item"><i class="fa-solid fa-right-left"></i><span>Scambi</span></button>
+    <button class="nav-item"><i class="fa-solid fa-circle-question"></i><span>Guida</span></button>
+  </nav>
+
+<script>
+const INK='#5a4326',INK2='#6f5233',FAINT='#7a5c38';
+function pitchSVG(opts){opts=opts||{};const W=340,H=470,seed=opts.seed||2,players=opts.players||null;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="'Cormorant Garamond','Georgia',serif">
+  <defs>
+    <filter id="wob${seed}"><feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="${seed}" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+    <filter id="pap${seed}"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="f"/>
+      <feColorMatrix in="f" type="matrix" values="0 0 0 0 0.42 0 0 0 0 0.31 0 0 0 0 0.16 0 0 0 0.10 0"/>
+      <feComposite operator="over" in2="SourceGraphic"/></filter>
+    <radialGradient id="pg${seed}" cx="42%" cy="34%" r="85%"><stop offset="0%" stop-color="#efe2c1"/>
+      <stop offset="55%" stop-color="#e4d2a6"/><stop offset="100%" stop-color="#c9ac74"/></radialGradient>
+    <linearGradient id="ed${seed}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9c7d47"/>
+      <stop offset="100%" stop-color="#7c5f31"/></linearGradient>
+    <pattern id="ha${seed}" width="6" height="6" patternTransform="rotate(38)" patternUnits="userSpaceOnUse">
+      <line x1="0" y1="0" x2="0" y2="6" stroke="${FAINT}" stroke-width="0.7" opacity="0.45"/></pattern>
+  </defs>
+  <path filter="url(#pap${seed})" fill="url(#pg${seed})" stroke="url(#ed${seed})" stroke-width="2.5"
+    d="M14,10 L60,7 L120,11 L190,6 L250,12 L300,8 L328,16 L331,80 L326,180 L332,300 L327,400 L330,452 L280,458 L200,452 L120,460 L60,453 L12,458 L9,380 L14,260 L8,150 L11,70 Z"/>
+  <g filter="url(#wob${seed})" fill="none" stroke="${INK}" stroke-width="1.6" stroke-linecap="round" opacity="0.9">
+    <rect x="34" y="40" width="272" height="392" rx="4"/><rect x="36" y="42" width="268" height="388" rx="4" stroke-width="0.7" opacity="0.5"/>
+    <line x1="34" y1="236" x2="306" y2="236"/><circle cx="170" cy="236" r="46"/><circle cx="170" cy="236" r="2.6" fill="${INK}"/>
+    <rect x="96" y="40" width="148" height="60"/><rect x="130" y="40" width="80" height="26"/><path d="M120,100 A40,30 0 0 0 220,100"/>
+    <rect x="96" y="372" width="148" height="60"/><rect x="130" y="406" width="80" height="26"/><path d="M120,372 A40,30 0 0 1 220,372"/>
+    <path d="M34,50 A10,10 0 0 0 44,40"/><path d="M296,40 A10,10 0 0 0 306,50"/><path d="M34,422 A10,10 0 0 1 44,432"/><path d="M296,432 A10,10 0 0 1 306,422"/>
+  </g>
+  <rect x="96" y="40" width="148" height="26" fill="url(#ha${seed})" opacity="0.5"/>
+  <rect x="96" y="406" width="148" height="26" fill="url(#ha${seed})" opacity="0.5"/>
+  <g fill="none" stroke="${INK2}" stroke-width="0.8" opacity="0.5" filter="url(#wob${seed})">
+    <circle cx="170" cy="236" r="58" stroke-dasharray="2 4"/><line x1="170" y1="178" x2="170" y2="120"/><path d="M162,130 L170,120 L178,130"/></g>
+  <g fill="${INK2}" font-style="italic" opacity="0.78">
+    <text x="300" y="34" font-size="11" text-anchor="end">campo · studio tattico</text>
+    <text x="42" y="120" font-size="10">l'area · misura xg</text>
+    <text x="170" y="200" font-size="10" text-anchor="middle">cerchio · centro di gravità</text>
+    <text x="42" y="452" font-size="10">porta · custode</text></g>
+  <text x="300" y="450" font-size="10" fill="${INK2}" font-style="italic" opacity="0.55" text-anchor="end" transform="rotate(-3 300 450)">— Cod. FantaLab, f.34r</text>
+  ${players?renderTokens(players):''}
+  </svg>`;}
+function renderTokens(f){const rowsY={A:96,C:170,D:300,P:392},roleTint={P:'#b98a2e',D:'#4f7a4a',C:'#3f6f86',A:'#9c4436'};let out='';
+  ['A','C','D','P'].forEach(role=>{const n=f.counts[role],y=rowsY[role],left=52,right=288,span=right-left;
+    for(let i=0;i<n;i++){const x=n===1?170:left+span*(i/(n-1));const label=(f.names&&f.names[role]&&f.names[role][i])||role;const tint=roleTint[role];
+      out+=`<g transform="translate(${x},${y})"><ellipse cx="1.5" cy="16" rx="15" ry="4" fill="#3a2c14" opacity="0.18"/>
+      <circle r="14" fill="${tint}" stroke="#3a2c14" stroke-width="1.6"/><circle r="14" fill="none" stroke="#efe2c1" stroke-width="0.8" opacity="0.6"/>
+      <circle r="10.5" fill="none" stroke="#efe2c1" stroke-width="0.6" opacity="0.35" stroke-dasharray="1.5 2"/>
+      <text y="4" text-anchor="middle" font-size="12" font-weight="700" fill="#f3e7c8">${role}</text>
+      <rect x="-26" y="18" width="52" height="13" rx="2" fill="#e9d9b0" stroke="#9c7d47" stroke-width="0.6" opacity="0.92"/>
+      <text y="28" text-anchor="middle" font-size="9" fill="#4a3618" font-style="italic">${label}</text></g>`;}});
+  return out;}
+/* Auction = decorative: no player tokens, just the sketched field */
+document.getElementById('pitchDeco').innerHTML=pitchSVG({seed:3});
+</script>
+</body>
+</html>

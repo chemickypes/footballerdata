@@ -60,3 +60,9 @@ static/*avatar*
 *.log
 .vercel
 .worktrees/
+
+# Superpowers brainstorming/visual-companion scratch (server session state)
+.superpowers/brainstorm/*/state/
+.superpowers/brainstorm/.last-port
+.superpowers/brainstorm/.last-token
+.superpowers/brainstorm/[0-9]*-[0-9]*/
