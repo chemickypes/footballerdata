@@ -12,6 +12,11 @@ import re
 import pandas as pd
 import requests
 from flask import Flask, jsonify, request, render_template_string, send_from_directory
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # web/ — used for static serving only
+PROJECT_ROOT = os.path.dirname(BASE_DIR)  # repo root — used for data/config/env paths
+sys.path.insert(0, PROJECT_ROOT)
+
 from core import config
 
 from modules.common.data_provider import get_dynamic_overlay
@@ -20,14 +25,11 @@ from modules.valuation.audit_engine import compute_audit
 from modules.valuation.season_tracking import load_tracking_history
 from modules.trades.trade_analyzer import evaluate_trade, find_winwin_trades
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, BASE_DIR)
-
-DATA_PATH = os.path.join(BASE_DIR, "data", "dataset_finale.csv")
+DATA_PATH = os.path.join(PROJECT_ROOT, "data", "dataset_finale.csv")
 if not os.path.exists(DATA_PATH):
-    DATA_PATH = os.path.join(BASE_DIR, "dataset_finale.csv")
+    DATA_PATH = os.path.join(PROJECT_ROOT, "dataset_finale.csv")
 if not os.path.exists(DATA_PATH):
-    DATA_PATH = os.path.join(BASE_DIR, "examples", "dataset_sample.csv")
+    DATA_PATH = os.path.join(PROJECT_ROOT, "examples", "dataset_sample.csv")
 
 # ──────────────────────────────────────────────────────────────────────
 # DUAL-TRACK ARCHITECTURE & SERVERLESS RESILIENCE
@@ -35,7 +37,7 @@ if not os.path.exists(DATA_PATH):
 # ──────────────────────────────────────────────────────────────────────
 APP_ENV = os.environ.get("APP_ENV", "community").strip().lower()
 
-def _get_writable_path(filename, default_dir=BASE_DIR):
+def _get_writable_path(filename, default_dir=PROJECT_ROOT):
     """Provides serverless-safe writable file path with /tmp fallback."""
     target = os.path.join(default_dir, filename)
     if os.environ.get("VERCEL") == "1" or not os.access(default_dir, os.W_OK):
@@ -57,9 +59,9 @@ _IN_MEMORY_SETTINGS = None
 
 # Load Transfermarkt injuries cache for Clinical Audit Window
 _INJURIES_CACHE = {}
-_inj_path = os.path.join(BASE_DIR, "data", "tm_injuries_cache.json")
+_inj_path = os.path.join(PROJECT_ROOT, "data", "tm_injuries_cache.json")
 if not os.path.exists(_inj_path):
-    _inj_path = os.path.join(BASE_DIR, "tm_injuries_cache.json")
+    _inj_path = os.path.join(PROJECT_ROOT, "tm_injuries_cache.json")
 if os.path.exists(_inj_path):
     try:
         with open(_inj_path, "r", encoding="utf-8") as f:
@@ -68,7 +70,7 @@ if os.path.exists(_inj_path):
         pass
 
 # Load local .env if present
-ENV_PATH = os.path.join(BASE_DIR, ".env")
+ENV_PATH = os.path.join(PROJECT_ROOT, ".env")
 if os.path.exists(ENV_PATH):
     try:
         with open(ENV_PATH, "r", encoding="utf-8") as f:
@@ -90,7 +92,7 @@ DEFAULT_ROSTER_SLOTS = {"P": 3, "D": 8, "C": 8, "A": 6}
 DEFAULT_TEAMS = [{"id": i, "name": f"Squadra {i}", "is_me": i == 1} for i in range(1, 11)]
 ADMIN_PASSWORD = "fanta2026"
 
-_personal_config_path = os.path.join(BASE_DIR, "config.personal.py")
+_personal_config_path = os.path.join(PROJECT_ROOT, "core", "config.personal.py")
 IS_PERSONAL = (APP_ENV == "personal") or (os.path.exists(_personal_config_path) and APP_ENV != "community")
 
 if IS_PERSONAL:
