@@ -1826,7 +1826,7 @@ HTML_TEMPLATE = """
             --officina-muted: #a68a6a;
             --officina-parchment: #e8d9b5;
             --officina-shadow: rgba(0, 0, 0, 0.62);
-            --maestro-z: 1100;
+            --maestro-z: 1200;
         }
 
         /* ══════════════════════════════════════════════════════════════════
@@ -3170,7 +3170,7 @@ HTML_TEMPLATE = """
         .maestro-intro {
             position: fixed;
             inset: 0;
-            z-index: 1200;
+            z-index: var(--maestro-z);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -4715,7 +4715,7 @@ HTML_TEMPLATE = """
             const teams = (auctionState && auctionState.teams) || [];
             wrap.innerHTML = teams.map((team, idx) => `
                 <button class="splash-team-card" onclick="completeSplashTeamSelection(${team.id})">
-                    <span class="splash-team-card__name">${team.name}</span>
+                    <span class="splash-team-card__name">${escapeHTML(team.name)}</span>
                     <span class="splash-team-card__meta">Profilo locale #${idx + 1} · entra nell'officina</span>
                 </button>
             `).join('');
@@ -4761,6 +4761,12 @@ HTML_TEMPLATE = """
 
         function maybeStartIdentityGate() {
             if (hasStoredProfile) {
+                hideSplashIdentityGate();
+                return;
+            }
+            const loginModal = document.getElementById('sessionLoginModal');
+            if (loginModal && loginModal.style.display !== 'none') {
+                // PIN gate is currently showing; defer splash gate until it is dismissed.
                 hideSplashIdentityGate();
                 return;
             }
@@ -5314,6 +5320,11 @@ HTML_TEMPLATE = """
                 renderRosterTab();
                 renderStrategyTab();
                 renderTargetsTab();
+
+                // PIN gate has been dismissed; re-evaluate the identity (splash) gate now,
+                // since the login flow already stores fanta_active_profile_id above and
+                // hasStoredProfile is now true, so this will simply keep the splash gate hidden.
+                maybeStartIdentityGate();
 
                 showToast(`Benvenuto ${teamName}! Connesso all'Asta Live (${data.role === 'admin' ? 'Admin' : 'Partecipante'})`, 'success');
             } catch (err) {
