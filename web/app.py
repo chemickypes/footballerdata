@@ -3333,6 +3333,61 @@ HTML_TEMPLATE = """
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 14px;
         }
+        .maestro-ambient {
+            position: fixed;
+            right: 16px;
+            bottom: 84px;
+            z-index: var(--maestro-z);
+            border: none;
+            background: transparent;
+            padding: 0;
+            cursor: pointer;
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            color: inherit;
+            filter: drop-shadow(0 6px 12px rgba(0,0,0,0.6));
+        }
+        .maestro-ambient__halo {
+            position: absolute;
+            inset: -8px auto auto -8px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(242,193,78,0.28), transparent 70%);
+            animation: maestro-pulse 3s ease-in-out infinite;
+        }
+        .maestro-ambient__sprite {
+            position: relative;
+            z-index: 1;
+            display: block;
+            width: 64px;
+            height: 96px;
+        }
+        .maestro-ambient__bubble {
+            position: relative;
+            z-index: 1;
+            max-width: 180px;
+            padding: 6px 11px;
+            border-radius: 8px 8px 3px 8px;
+            border: 1px solid var(--officina-brass-dark);
+            background: linear-gradient(180deg, #efe2c1, #dcc79a);
+            color: #4a3618;
+            font-family: 'Cormorant Garamond', serif;
+            font-style: italic;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+        @keyframes maestro-pulse {
+            0%, 100% { transform: scale(0.9); opacity: 0.5; }
+            50% { transform: scale(1.08); opacity: 1; }
+        }
+        @media (max-width: 640px) {
+            .maestro-ambient__bubble {
+                display: none;
+            }
+        }
+
         .splash-team-card {
             border: 1px solid rgba(198,154,76,0.28);
             border-radius: 14px;
@@ -4877,6 +4932,80 @@ HTML_TEMPLATE = """
         }
 
         /* ─────────────────────────────────────────────────────────────
+           IL MAESTRO — SPRITE SYSTEM & PERSISTENT AMBIENT MASCOT
+        ───────────────────────────────────────────────────────────── */
+        window.MAESTRO_SPRITES = {
+            neutral: [
+                '..........CC..........','.........oooo.........','.......ooHHHHHHoo......','......oHHHHHHHHHHo.....','......oHHHhhHHhHHHo....','.....oHHHHHHHHHHHHo....','.....oHHHHHHHHHHHHo....','....obBBBBBBBBBBBBbo...','....oBLBBBBBBBBBBLBo...','...oBGGgBBBBBBBBGGgBo..','...oBGGgBBBBBBBBGGgBo..','....obBBBBBBBBBBBBbo...','.....oSSSSSSSSSSSSo....','.....oSSsSSSSSSsSSo....','.....oSooSSSSSSooSo....','.....oSooSSSSSSooSo....','.....oSSSSSssSSSSSo....','......oSSSSssSSSSo.....','......oWwsSSSSswWo.....','.....oWWWWwssWWWWWo....','....oWWWWWWWWWWWWWWo...','...oWWWWWWWWWWWWWWWWo..','...oWWWWwWWWWWWwWWWWo..','...oWWWWWWWWWWWWWWWWo..','....oWWWWWWWWWWWWWWo...','.....oWWWWWwwWWWWWo....','......oWWWWWWWWWWo.....','.......oWWWWWWWWo......','...RR..oWWWWWWWWo..RR..','.RRRRRRoWWWWWWWWoRRRRRR','RRRRRRRRoWWWWWWoRRRRRRR','RRrRRRLBRRRRRRRRBLRRrRR','RRrRRRRRRRRRRRRRRRRrRRR'
+            ],
+            greeting: [
+                '..........CC..........','.........oooo.........','.......ooHHHHHHoo......','......oHHHHHHHHHHo.....','......oHHHhhHHhHHHo....','.....oHHHHHHHHHHHHo....','.....oHHHHHHHHHHHHo....','....obBBBBBBBBBBBBbo...','....oBLBBBBBBBBBBLBo...','...oBGGgBBBBBBBBGGgBo..','...oBGGgBBBBBBBBGGgBo..','....obBBBBBBBBBBBBbo...','.....oSSSSSSSSSSSSo....','.....oSSsSSSSSSsSSo....','.....oSooSSSSSSooSo....','.....oSooSSSSSSooSo....','.....oSSSSSssSSSSSo....','......oSSSSssSSSSo.....','......oWwsSSSSswWo.....','.....oWWWWwssWWWWWo....','....oWWWWWWWWWWWWWWo...','...oWWWWWWWWWWWWWWWWo..','...oWWWWwWWWWWWwWWWWo..','...oWWWWWWWWWWWWWWWWo..','....oWWWWWWWWWWWWWWo...','.....oWWWWWwwWWWWWo....','......oWWWWWWWWWWo..B..','.......oWWWWWWWWo..BB..','...RR..oWWWWWWWWo...B..','.RRRRRRoWWWWWWWWoRRRRRR','RRRRRRRRoWWWWWWoRRRRRRR','RRrRRRLBRRRRRRRRBLRRrRR','RRrRRRRRRRRRRRRRRRRrRRR'
+            ],
+            pointing: [
+                '..........CC..........','.........oooo.........','.......ooHHHHHHoo......','......oHHHHHHHHHHo.....','......oHHHhhHHhHHHo....','.....oHHHHHHHHHHHHo....','.....oHHHHHHHHHHHHo....','....obBBBBBBBBBBBBbo...','....oBLBBBBBBBBBBLBo...','...oBGGgBBBBBBBBGGgBo..','...oBGGgBBBBBBBBGGgBo..','....obBBBBBBBBBBBBbo...','.....oSSSSSSSSSSSSo....','.....oSSsSSSSSSsSSo....','.....oSooSSSSSSooSo....','.....oSooSSSSSSooSo....','.....oSSSSSssSSSSSo....','......oSSSSssSSSSo.....','......oWwsSSSSswWo.....','.....oWWWWwssWWWWWo....','....oWWWWWWWWWWWWWWoBBB','...oWWWWWWWWWWWWWWWWo.B','...oWWWWwWWWWWWwWWWWo..','...oWWWWWWWWWWWWWWWWo..','....oWWWWWWWWWWWWWWo...','.....oWWWWWwwWWWWWo....','......oWWWWWWWWWWo.....','.......oWWWWWWWWo......','...RR..oWWWWWWWWo..RR..','.RRRRRRoWWWWWWWWoRRRRRR','RRRRRRRRoWWWWWWoRRRRRRR','RRrRRRLBRRRRRRRRBLRRrRR','RRrRRRRRRRRRRRRRRRRrRRR'
+            ],
+            thoughtful: [
+                '..........CC..........','.........oooo.........','.......ooHHHHHHoo......','......oHHHHHHHHHHo.....','......oHHHhhHHhHHHo....','.....oHHHHHHHHHHHHo....','.....oHHHHHHHHHHHHo....','....obBBBBBBBBBBBBbo...','....oBLBBBBBBBBBBLBo...','...oBGGgBBBBBBBBGGgBo..','...oBGGgBBBBBBBBGGgBo..','....obBBBBBBBBBBBBbo...','.....oSSSSSSSSSSSSo....','.....oSSsSSSSSSsSSo....','.....oSooSSSSSSooSo....','.....oSooSSSSSSooSo....','.....oSSSSSssSSSSSo....','......oSSSSssSSSSo.....','......oWwsSSSSswWo.....','.....oWWWWwssWWWWWo....','....oWWWWWWWWWWWWWWo...','...oWWWWWWWWWWWWWWWWo..','...oWWWWwWWWWWWwWWWWo..','...oWWWWWWWWWWWWWWWWo..','....oWWWWWWWWWWWWWWo...','.....oWWWWWwwWWWooo....','......oWWWWWWWWWo......','.......oWWWWWWWWo......','...RR..oWWWWWWWWo..RR..','.RRRRRRoWWWWWWWWoRRRRRR','RRRRRRRRoWWWWWWoRRRRRRR','RRrRRRLBRRRRRRRRBLRRrRR','RRrRRRRRRRRRRRRRRRRrRRR'
+            ]
+        };
+
+        const MAESTRO_PALETTE = {
+            '.': null, o: '#241a12', H: '#4a3320', h: '#33230f', B: '#c69a4c', b: '#8a6329',
+            L: '#f2c14e', G: '#8fd0c8', g: '#4f9a91', S: '#e6b184', s: '#c68b5c',
+            W: '#efe9dc', w: '#c3bcaa', R: '#5c4326', r: '#3f2c15', C: '#b5703a'
+        };
+
+        function renderMaestroSprite(containerId, pose = 'neutral', scale = 3.2) {
+            const host = document.getElementById(containerId);
+            const map = window.MAESTRO_SPRITES[pose] || window.MAESTRO_SPRITES.neutral;
+            if (!host || !map) return;
+            let rects = '';
+            map.forEach((row, y) => {
+                row.split('').forEach((token, x) => {
+                    const fill = MAESTRO_PALETTE[token];
+                    if (!fill) return;
+                    rects += `<rect x="${x}" y="${y}" width="1.03" height="1.03" fill="${fill}" />`;
+                });
+            });
+            host.innerHTML = `<svg viewBox="0 0 22 33" width="${22 * scale}" height="${33 * scale}" shape-rendering="crispEdges" style="display:block">${rects}</svg>`;
+        }
+
+        let maestroCurrentPose = 'neutral';
+
+        function setMaestroPose(pose) {
+            maestroCurrentPose = pose;
+            renderMaestroSprite('maestroAmbientSprite', pose, 2.9);
+            const introVisible = document.getElementById('maestroIntroOverlay');
+            if (introVisible) renderMaestroSprite('maestroIntroSprite', pose === 'neutral' ? 'greeting' : pose, 4.6);
+        }
+
+        function ensureMaestroAmbient() {
+            const el = document.getElementById('maestroAmbient');
+            if (!el) return;
+            el.style.display = 'flex';
+            if (!document.getElementById('maestroAmbientSprite')?.innerHTML) {
+                renderMaestroSprite('maestroAmbientSprite', maestroCurrentPose, 2.9);
+            }
+        }
+
+        function updateMaestroAmbientState(tabId) {
+            ensureMaestroAmbient();
+            const bubble = document.getElementById('maestroAmbientBubble');
+            const state = {
+                draft: { pose: 'pointing', text: 'Segui il lotto: fair price e surplus sono la bussola.' },
+                rosters: { pose: 'thoughtful', text: 'Ogni sigillo titolare resta modificabile con un tocco.' },
+                listone: { pose: 'pointing', text: 'Occhio al surplus, giovane.' },
+                ai: { pose: 'neutral', text: 'Qui gli esperimenti vanno letti con giudizio.' },
+                lineup: { pose: 'thoughtful', text: 'Il solver resta separato: la vera lavagna è nelle Rose.' },
+                audit: { pose: 'neutral', text: 'Una buona officina misura prima di giudicare.' },
+                trades: { pose: 'greeting', text: 'Ogni scambio va pesato come un ingranaggio.' },
+                targets: { pose: 'greeting', text: 'Fissa i tuoi obiettivi prima che il mercato corra.' }
+            }[tabId] || { pose: 'neutral', text: 'Bentornato nell\'officina.' };
+            setMaestroPose(state.pose);
+            if (bubble) bubble.textContent = state.text;
+        }
+
+        /* ─────────────────────────────────────────────────────────────
            TOAST NOTIFICATIONS
         ───────────────────────────────────────────────────────────── */
         function showToast(message, type = 'info', duration = 3200) {
@@ -5606,6 +5735,9 @@ HTML_TEMPLATE = """
             renderStrategyTab();
             renderTargetsTab();
             setupSearch();
+
+            ensureMaestroAmbient();
+            updateMaestroAmbientState('targets');
 
             maybeStartIdentityGate();
 
@@ -8605,6 +8737,11 @@ HTML_TEMPLATE = """
             }
         };
     </script>
+    <button id="maestroAmbient" class="maestro-ambient" type="button" style="display:none;" onclick="FantaTour && FantaTour.start && FantaTour.start()">
+        <span class="maestro-ambient__halo"></span>
+        <span id="maestroAmbientSprite" class="maestro-ambient__sprite" aria-hidden="true"></span>
+        <span id="maestroAmbientBubble" class="maestro-ambient__bubble">Occhio al surplus, giovane.</span>
+    </button>
     <script src="/static/js/tutorial.js"></script>
 </body>
 </html>
