@@ -2750,20 +2750,6 @@ HTML_TEMPLATE = """
             gap: 4px;
             flex-wrap: wrap;
         }
-        .pitch-node {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            cursor: pointer;
-            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-            max-width: 76px;
-            text-align: center;
-            padding: 4px;
-        }
-        .pitch-node:hover {
-            transform: scale(1.15);
-            z-index: 5;
-        }
         .pitch-jersey {
             width: 40px;
             height: 40px;
@@ -2783,39 +2769,6 @@ HTML_TEMPLATE = """
         .pitch-jersey.role-D { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 0 14px rgba(16, 185, 129, 0.45); }
         .pitch-jersey.role-C { background: linear-gradient(135deg, #38bdf8, #0284c7); box-shadow: 0 0 14px rgba(56, 189, 248, 0.45); }
         .pitch-jersey.role-A { background: linear-gradient(135deg, #f43f5e, #e11d48); box-shadow: 0 0 14px rgba(244, 63, 94, 0.45); }
-
-        .pitch-node-name {
-            font-size: 0.7rem;
-            font-weight: 700;
-            color: #ffffff;
-            background: rgba(0, 0, 0, 0.78);
-            padding: 2px 6px;
-            border-radius: 4px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 72px;
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        .pitch-node-price {
-            font-size: 0.65rem;
-            font-weight: 800;
-            color: #fbbf24;
-            margin-top: 1px;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-        }
-        .pitch-node-empty .pitch-jersey {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1.5px dashed rgba(255, 255, 255, 0.28);
-            color: rgba(255, 255, 255, 0.35);
-            box-shadow: none;
-        }
-        .pitch-node-empty .pitch-node-name {
-            background: rgba(0,0,0,0.4);
-            color: rgba(255,255,255,0.4);
-            border: none;
-        }
 
         .davinci-pitch-shell {
             position: relative;
@@ -3288,22 +3241,6 @@ HTML_TEMPLATE = """
                 padding: 10px 6px !important;
                 border-radius: 10px !important;
             }
-            .pitch-node {
-                min-width: 46px !important;
-            }
-            .pitch-jersey {
-                width: 28px !important;
-                height: 28px !important;
-                font-size: 0.72rem !important;
-            }
-            .pitch-node-name {
-                font-size: 0.65rem !important;
-                max-width: 56px !important;
-            }
-            .pitch-node-price {
-                font-size: 0.65rem !important;
-            }
-
             /* Department Grid */
             .dept-grid {
                 gap: 6px !important;
@@ -4876,7 +4813,7 @@ HTML_TEMPLATE = """
         </div>
     </div>
 
-    <!-- Bottom Navigation (Mobile De-densified 5 Tabs) -->
+    <!-- Bottom Navigation (Officina Vittoriana, 8 Tabs) -->
     <nav class="bottom-nav">
         <button class="nav-item" id="botNav-draft" onclick="switchTab('draft')">
             <i class="fa-solid fa-gavel icon-pulse nav-item__icon"></i>
@@ -7910,7 +7847,8 @@ HTML_TEMPLATE = """
                 for (let i = 0; i < n; i++) {
                     const x = n === 1 ? 170 : left + span * (i / (n - 1));
                     const y = rowsY[role];
-                    const label = (labels[role] && labels[role][i]) || role;
+                    const rawLabel = (labels[role] && labels[role][i]) || role;
+                    const label = typeof escapeHTML === 'function' ? escapeHTML(rawLabel) : rawLabel;
                     const className = `davinci-token ${tokenMode === 'interactive' ? '' : 'davinci-token--empty'}`.trim();
                     tokens += `
                         <g class="${className}" data-role="${role}" data-slot="${i}" transform="translate(${x},${y})">
