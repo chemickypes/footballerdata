@@ -1329,7 +1329,7 @@ def api_undo():
 def api_ai_status():
     """Returns AI Copilot diagnostic status and active engine."""
     try:
-        from copilot import get_copilot_diagnostics
+        from core.copilot import get_copilot_diagnostics
         diag = get_copilot_diagnostics()
         return jsonify(diag)
     except Exception as e:
@@ -1340,7 +1340,7 @@ def api_ai_status():
 def api_ai_test():
     """Live diagnostic ping to each configured AI provider with HTTP status codes."""
     try:
-        from copilot import test_all_providers
+        from core.copilot import test_all_providers
         return jsonify(test_all_providers())
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1409,7 +1409,7 @@ def api_ai_query():
     # 1. MODULAR COPILOT INTEGRATION (Ollama / OpenAI / Gemini)
     # ─────────────────────────────────────────────────────────────
     try:
-        from copilot import get_copilot_response
+        from core.copilot import get_copilot_response
         league_settings = load_league_settings()
         budget_total = state.get("budget_total", league_settings.get("budget", DEFAULT_BUDGET))
         roster_structure = state.get("roster_structure", league_settings.get("roster_slots", DEFAULT_ROSTER_SLOTS))
