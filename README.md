@@ -13,7 +13,7 @@ A modular, data-driven pipeline for data extraction, probabilistic machine learn
 
 ---
 
-##  Spinoff: Live Auction Command Center & AI Copilot (`app.py`)
+##  Spinoff: Live Auction Command Center & AI Copilot (`web/app.py`)
 
 While the scientific pipeline computes optimal baselines in peace, fantasy drafts happen in the chaotic reality of high-pressure bidding rooms. The **Live Command Center Spinoff** translates theoretical models into real-time execution:
 
@@ -28,7 +28,7 @@ While the scientific pipeline computes optimal baselines in peace, fantasy draft
 ### Quickstart & Model-Agnostic LLM Setup
 ```bash
 # 1. Run Web Command Center (Port 5050)
-python3 app.py
+python3 web/app.py
 
 # 2. (Optional) Connect your preferred LLM in .env:
 # Local Ollama (100% Free & Offline):
@@ -243,6 +243,23 @@ flowchart LR
 ```
 
 ---
+
+## Struttura del Progetto / Project Structure
+
+- [core/](core/README.md) — configurazione centrale, ingestion e copilot provider.
+- [core/ingestion/](core/ingestion/README.md) — pipeline statica e feed dinamico.
+- [core/models/](core/models/README.md) — documentazione dei modelli quantili e VORP.
+- [core/copilot/](core/copilot/README.md) — backend AI e diagnostica provider-agnostic.
+- [modules/common/](modules/common/README.md) — layer condiviso per overlay e dati live.
+- [modules/lineup/](modules/lineup/README.md) — solver MILP della formazione settimanale.
+- [modules/valuation/](modules/valuation/README.md) — audit post-asta e power rankings.
+- [modules/trades/](modules/trades/README.md) — analisi scambi e win-win detector.
+- [modules/auction/](modules/auction/README.md) — documentazione della logica d’asta e blueprint.
+- [web/](web/README.md) — app Flask, Command Center e UI finale.
+
+Timeline:
+- [Timeline del progetto](docs/it/TIMELINE_PROGETTO.md)
+- [Project timeline](docs/en/PROJECT_TIMELINE.md)
 
 ## Repository Structure
 
