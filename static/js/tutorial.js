@@ -6,10 +6,45 @@
 window.FantaTour = (function () {
     'use strict';
 
-    // Placeholder steps for engine verification (Task 3 replaces this with the real 7-step tour).
     var STEPS = [
-        { selector: 'body', title: 'Passo 1 (placeholder)', text: 'Testo placeholder 1.' },
-        { selector: 'body', title: 'Passo 2 (placeholder)', text: 'Testo placeholder 2.' }
+        {
+            selector: '#btnLeagueSettings',
+            title: 'Pannello Impostazioni',
+            text: 'Configura qui budget di lega, numero di squadre e slot per ruolo. Puoi modificarli in qualsiasi momento.'
+        },
+        {
+            selector: '#sideNav-strategy',
+            title: 'Blueprint Strategici',
+            text: 'Scegli tra 5 piani tattici pre-configurati (es. Trazione Anteriore, Moneyball) con soglie di spesa per ruolo calcolate sul tuo budget di lega.'
+        },
+        {
+            selector: '#tab-listone',
+            requiresTab: 'listone',
+            title: 'Colonne Listone',
+            text: 'Le colonne chiave: Prezzo Equo (il massimo razionale da offrire), P50 (punti attesi), e Surplus di Mercato (l\'affare potenziale rispetto alla quotazione).'
+        },
+        {
+            selector: '.medical-badge',
+            requiresTab: 'listone',
+            fallbackSelector: '#tab-listone',
+            title: 'Scheda Clinica',
+            text: 'Clicca il badge medico di un giocatore per aprire la sua cartella clinica: stato di rischio, giorni di infortunio, e metriche avanzate xG/xA.'
+        },
+        {
+            selector: '#sideNav-draft',
+            title: 'Modulo Asta',
+            text: 'Qui gestisci l\'asta live: assegnazione giocatori, tracciamento budget, live draft.'
+        },
+        {
+            selector: '#sideNav-lineup',
+            title: 'Formazione Settimanale',
+            text: 'Calcola la formazione ottimale della giornata in base a probabili formazioni, quote e xPts.'
+        },
+        {
+            selector: '#sideNav-audit',
+            title: 'Valutatore & Scambi',
+            text: 'Analizza la classifica di lega post-asta e valuta scambi vantaggiosi con gli altri manager nella sezione Scambi.'
+        }
     ];
 
     var STORAGE_KEY = 'fanta_tour_done';
@@ -136,22 +171,28 @@ window.FantaTour = (function () {
         _clearOverlay();
         if (index < 0 || index >= STEPS.length) return;
         var step = STEPS[index];
-        var targetEl = document.querySelector(step.selector);
-        if (!targetEl) {
-            console.warn('[FantaTour] Target not found for step ' + index + ' (selector: ' + step.selector + '), skipping.');
-            if (index < currentIndex || currentIndex === -1) {
-                currentIndex = index;
-                _advanceSkippingMissing(1);
-            } else {
-                currentIndex = index;
-                _advanceSkippingMissing(-1);
-            }
-            return;
+        var direction = (index >= currentIndex) ? 1 : -1;
+
+        if (step.requiresTab && typeof window.switchTab === 'function') {
+            window.switchTab(step.requiresTab);
         }
-        currentIndex = index;
-        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        _renderOverlay(targetEl);
-        _positionTooltip(targetEl, step);
+
+        setTimeout(function () {
+            var targetEl = document.querySelector(step.selector);
+            if (!targetEl && step.fallbackSelector) {
+                targetEl = document.querySelector(step.fallbackSelector);
+            }
+            if (!targetEl) {
+                console.warn('[FantaTour] Target not found for step ' + index + ' (selector: ' + step.selector + '), skipping.');
+                currentIndex = index;
+                _advanceSkippingMissing(direction);
+                return;
+            }
+            currentIndex = index;
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            _renderOverlay(targetEl);
+            _positionTooltip(targetEl, step);
+        }, step.requiresTab ? 120 : 0);
     }
 
     function _advanceSkippingMissing(direction) {
