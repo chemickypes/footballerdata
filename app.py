@@ -1790,6 +1790,7 @@ HTML_TEMPLATE = """
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/tutorial.css">
     <style>
         :root {
             --bg: #030408;
@@ -3298,6 +3299,11 @@ HTML_TEMPLATE = """
                     <button id="btnLeagueSettings" class="profile-btn hide-mobile" onclick="openLeagueSettingsModal()" title="Configura Budget, Slot e Squadre">
                         <i class="fa-solid fa-gear"></i>
                         <span>Lega</span>
+                    </button>
+
+                    <button id="guideNavBtn" class="profile-btn hide-mobile" onclick="FantaTour.start()" title="Avvia il tour guidato">
+                        <i class="fa-solid fa-circle-question"></i>
+                        <span>Guida</span>
                     </button>
 
                     <button id="btnAdminResetSession" class="profile-btn hide-mobile" onclick="openResetSessionModal()" style="display:none; border:1px solid #ef4444; background:rgba(239,68,68,0.15); color:#fca5a5; font-weight:700;" title="Azzera asta e avvia nuova sessione condivisa">
@@ -8244,8 +8250,14 @@ HTML_TEMPLATE = """
             showToast(`Pre-impostato ${name} (${price} cr) nel battitore!`, 'success');
         }
 
-        window.onload = init;
+        window.onload = function () {
+            init();
+            if (typeof FantaTour !== 'undefined') {
+                FantaTour.maybeAutoStart();
+            }
+        };
     </script>
+    <script src="/static/js/tutorial.js"></script>
 </body>
 </html>
 """
