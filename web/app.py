@@ -4233,19 +4233,16 @@ HTML_TEMPLATE = """
                         <button onclick="resetPitchLineup()" class="btn-secondary" style="width:auto; padding:2px 8px; font-size:0.7rem; margin-bottom:0;" title="Reimposta titolari automatici in base al rendimento">Auto-Fill</button>
                     </div>
                     
-                    <div class="pitch-board" id="pitchBoard">
-                        <div class="pitch-penalty-top"></div>
-                        <div class="pitch-midline"></div>
-                        <div class="pitch-penalty-bottom"></div>
-
-                        <!-- Attacco (A) -->
-                        <div class="pitch-row pitch-row-a" id="pitchRowA"></div>
-                        <!-- Centrocampo (C) -->
-                        <div class="pitch-row pitch-row-c" id="pitchRowC"></div>
-                        <!-- Difesa (D) -->
-                        <div class="pitch-row pitch-row-d" id="pitchRowD"></div>
-                        <!-- Portiere (P) -->
-                        <div class="pitch-row pitch-row-p" id="pitchRowP"></div>
+                    <div class="davinci-pitch-frame">
+                        <span class="davinci-pitch-stamp">f.34r · lo schieramento</span>
+                        <div id="pitchBoardDavinci" class="davinci-pitch-shell"></div>
+                    </div>
+                    <div class="davinci-legend">
+                        <span><i style="background:var(--davinci-role-p);"></i> Portiere</span>
+                        <span><i style="background:var(--davinci-role-d);"></i> Difesa</span>
+                        <span><i style="background:var(--davinci-role-c);"></i> Centrocampo</span>
+                        <span><i style="background:var(--davinci-role-a);"></i> Attacco</span>
+                        <span style="color:var(--officina-brass);"><i class="fa-solid fa-hand-pointer" style="border:none; width:auto; height:auto;"></i> Tocca un sigillo per cambiare titolare</span>
                     </div>
                 </div>
 
@@ -8088,6 +8085,15 @@ HTML_TEMPLATE = """
             return { lineup: result, counts };
         }
 
+        function getDavinciPitchLabels(lineup) {
+            return {
+                A: (lineup.A || []).map(slot => slot && slot.player ? ((slot.player.player || '').length > 9 ? slot.player.player.substring(0, 8) + '…' : slot.player.player) : '+ Scegli'),
+                C: (lineup.C || []).map(slot => slot && slot.player ? ((slot.player.player || '').length > 9 ? slot.player.player.substring(0, 8) + '…' : slot.player.player) : '+ Scegli'),
+                D: (lineup.D || []).map(slot => slot && slot.player ? ((slot.player.player || '').length > 9 ? slot.player.player.substring(0, 8) + '…' : slot.player.player) : '+ Scegli'),
+                P: (lineup.P || []).map(slot => slot && slot.player ? ((slot.player.player || '').length > 9 ? slot.player.player.substring(0, 8) + '…' : slot.player.player) : '+ Scegli')
+            };
+        }
+
         function renderTacticalPitch(team, struct) {
             const formation = getActivePitchFormation();
             const formSelect = document.getElementById('pitchFormationSelect');
@@ -8155,54 +8161,29 @@ HTML_TEMPLATE = """
             const hudFieldedCost = document.getElementById('hudFieldedCost');
             if (hudFieldedCost) hudFieldedCost.textContent = `${sumCost} cr`;
 
-            // Function to handle clicking on a pitch node safely
-            window.onPitchNodeClicked = function(el) {
-                const role = el.getAttribute('data-role');
-                const slot = parseInt(el.getAttribute('data-slot'), 10);
-                const playerRaw = el.getAttribute('data-player');
-                const player = (playerRaw && playerRaw.length > 0) ? decodeURIComponent(playerRaw) : null;
-                const formation = el.getAttribute('data-formation');
-                openPitchPlayerPickerModal(role, slot, player, formation);
-            };
-
-            // Render each row on the 2D Pitch
-            const renderPitchRow = (role, containerId) => {
-                const container = document.getElementById(containerId);
-                if (!container) return;
-                const slots = lineup[role] || [];
-                let html = '';
-
-                slots.forEach((s, idx) => {
-                    if (!s.isEmpty && s.player) {
-                        const p = s.player;
-                        const shortName = p.player.length > 9 ? p.player.substring(0, 8) + '…' : p.player;
-                        const pFm = p.mfv || p.mfv_hist || '6.0';
-                        const encPlayer = encodeURIComponent(p.player);
-                        html += `
-                            <div class="pitch-node" data-role="${role}" data-slot="${idx}" data-player="${encPlayer}" data-formation="${formation}" onclick="onPitchNodeClicked(this)" title="${p.player} (${p.team}) - ${p.price} cr - FM: ${pFm} (Clicca per cambiare titolare)">
-                                <div class="pitch-jersey role-${role}">${role}</div>
-                                <div class="pitch-node-name">${shortName}</div>
-                                <div class="pitch-node-price">${p.price} cr <small style="color:#34d399;">(${pFm})</small></div>
-                            </div>
-                        `;
-                    } else {
-                        html += `
-                            <div class="pitch-node pitch-node-empty" data-role="${role}" data-slot="${idx}" data-player="" data-formation="${formation}" onclick="onPitchNodeClicked(this)" title="Clicca per scegliere un calciatore in questo slot">
-                                <div class="pitch-jersey">+</div>
-                                <div class="pitch-node-name">+ Scegli</div>
-                                <div class="pitch-node-price" style="color:var(--text-muted); font-size:0.65rem;">${role} #${idx + 1}</div>
-                            </div>
-                        `;
-                    }
+            const pitchHost = document.getElementById('pitchBoardDavinci');
+            if (pitchHost) {
+                const labels = getDavinciPitchLabels(lineup);
+                pitchHost.innerHTML = getDavinciPitchSvg({
+                    seed: 5,
+                    counts: counts,
+                    labels: labels,
+                    interactive: true
                 });
 
-                container.innerHTML = html;
-            };
-
-            renderPitchRow('A', 'pitchRowA');
-            renderPitchRow('C', 'pitchRowC');
-            renderPitchRow('D', 'pitchRowD');
-            renderPitchRow('P', 'pitchRowP');
+                ['A', 'C', 'D', 'P'].forEach(role => {
+                    const slots = lineup[role] || [];
+                    pitchHost.querySelectorAll(`.davinci-token[data-role="${role}"]`).forEach((node, idx) => {
+                        const slot = slots[idx];
+                        if (!slot || slot.isEmpty || !slot.player) {
+                            node.classList.add('davinci-token--empty');
+                        }
+                        node.addEventListener('click', function () {
+                            openPitchPlayerPickerModal(role, idx, slot && slot.player ? slot.player.player : null, formation);
+                        });
+                    });
+                });
+            }
         }
 
         let currentPitchPicker = { role: null, slotIndex: null, currentAssigned: null, formation: null };
