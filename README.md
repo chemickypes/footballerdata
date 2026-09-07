@@ -1,7 +1,7 @@
 # Spectre - FantaMoneyball — Quantitative Fantasy Football & League Analytics Framework
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm--Noncommercial--1.0.0-blue.svg)](LICENSE)
 [![Optimization: MILP](https://img.shields.io/badge/optimizer-SciPy%20MILP%20Knapsack-purple.svg)](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.milp.html)
 [![ML: Quantile Regression](https://img.shields.io/badge/ML-Scikit--Learn%20Quantile%20GBR-yellow.svg)](https://scikit-learn.org/)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Donate-yellow.svg?logo=buy-me-a-coffee)](https://buymeacoffee.com/blueskies360)
@@ -251,7 +251,7 @@ fanta-lab/
 ├── config.py                          # Global configuration, scoring weights, team mappings
 ├── run_pipeline.py                    # Unified CLI entry point with step argument parser
 ├── requirements.txt                   # Minimal Python dependencies (pandas, scikit-learn, scipy)
-├── LICENSE                            # MIT Open Source License
+├── LICENSE                            # PolyForm Noncommercial 1.0.0 License
 ├── pipeline/
 │   ├── 01_scrape_historical.py        # Stage 1: Multi-season historical data scraper
 │   ├── 03_update_listone.py           # Stage 2: Official player price sheet ingestion
@@ -353,6 +353,6 @@ If `Spectre - FantaMoneyball` prevented an emotional 2:00 AM panic buy, saved yo
 ## Contributing & License
 
 Contributions, feature proposals, and model extensions are welcome via Pull Requests and Issues.
-Distributed under the **MIT License**. See [LICENSE](LICENSE) for full legal text.
+Distributed under the **PolyForm Noncommercial License 1.0.0**. Noncommercial use, research, and personal projects are freely permitted; commercial use requires a separate license from the copyright holder. See [LICENSE](LICENSE) for full legal text.
 
 Maintained by [SpectreLabo](https://github.com/spectrelabo).
