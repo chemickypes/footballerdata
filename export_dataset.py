@@ -11,7 +11,7 @@ Uso:
 import argparse
 import os
 import pandas as pd
-import config
+from core import config
 
 
 def export_budget_dataset(budget: int):
