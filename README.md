@@ -330,7 +330,7 @@ recente durante la stagione:
 2. In locale: aggiungi `API_FOOTBALL_KEY=<la-tua-chiave>` al file `.env` (già in `.gitignore`, non verrà mai committato).
 3. Su GitHub: vai su Settings → Secrets and variables → Actions e crea il secret `API_FOOTBALL_KEY` con lo stesso valore.
 4. Il workflow `.github/workflows/dynamic_feed.yml` genera `data/current_matchday.json` e lo pubblica sulla branch `data-feed` secondo il cron configurato (Gio 18:00, Ven 12:00/19:00, Sab 11:00 UTC), oppure puoi lanciarlo manualmente da GitHub Actions ("Run workflow").
-5. L'app consuma il feed tramite `pipeline/dynamic/client.py`, con cache di 15 minuti e fallback automatico su `data/fallback_matchday.json` se il feed remoto non è raggiungibile.
+5. L'app consuma il feed tramite `core/ingestion/dynamic/client.py`, con cache di 15 minuti e fallback automatico su `data/fallback_matchday.json` se il feed remoto non è raggiungibile.
 
 **Non condividere mai la tua chiave API in chat, issue o commit pubblici.**
 
