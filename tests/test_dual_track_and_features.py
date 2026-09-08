@@ -210,6 +210,17 @@ def main():
     check("app.js contiene 'renderTrajectorySVG'", "renderTrajectorySVG" in r_hist_drawer.text)
     check("Drawer HTML contiene 'pdTrajectory'", "pdTrajectory" in html)
 
+    # ── 13. Attributi Giocatore (Transfermarkt) ───────────────────────
+    print("\n▸ 13. Profilo & Contratto — attributi TM in /api/players")
+    check("Calciatore include 'age'", "age" in sample, f"age={sample.get('age')}")
+    check("Calciatore include 'market_value_eur'", "market_value_eur" in sample, f"mv={sample.get('market_value_eur')}")
+    n_age = sum(1 for p in players if p.get("age"))
+    n_mv = sum(1 for p in players if p.get("market_value_eur"))
+    check("Età compilata per la maggioranza (> 400)", n_age > 400, f"n={n_age}")
+    check("Valore mercato compilato per la maggioranza (> 400)", n_mv > 400, f"n={n_mv}")
+    check("app.js contiene 'pdMarketValue'", "pdMarketValue" in app_js)
+    check("Drawer HTML contiene 'Profilo & Contratto'", "Profilo &amp; Contratto" in html)
+
     # ── SUMMARY ───────────────────────────────────────────────────────
     print("\n" + "=" * 72)
     passed = sum(1 for _, s, _ in results if s == PASS)

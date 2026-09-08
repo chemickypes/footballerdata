@@ -234,6 +234,14 @@ function openPlayerDetailDrawer(playerName) {
     document.getElementById('pdStarts').textContent = p.starts_2627 || 0;
     document.getElementById('pdMinutes').textContent = (p.minutes_2627 || 0).toLocaleString();
 
+    // Attributes / contract (Transfermarkt)
+    const fmtMV = v => v == null ? 'N/D' : (v >= 1e6 ? `€${(v / 1e6).toFixed(v % 1e6 === 0 ? 0 : 1)}M` : `€${Math.round(v / 1e3)}K`);
+    document.getElementById('pdAge').textContent = p.age != null ? p.age : 'N/D';
+    document.getElementById('pdHeight').textContent = p.height_cm != null ? `${p.height_cm} cm` : 'N/D';
+    document.getElementById('pdFoot').textContent = p.foot || 'N/D';
+    document.getElementById('pdMarketValue').textContent = fmtMV(p.market_value_eur);
+    document.getElementById('pdContract').textContent = p.contract_until || 'N/D';
+
     // Show drawer with slide animation
     const drawer = document.getElementById('playerDetailDrawer');
     if (drawer) {

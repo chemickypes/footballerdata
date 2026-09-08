@@ -188,6 +188,11 @@ def api_players():
             "is_starter_2627": bool(row.get("is_starter_2627", False)),
             "starts_2627": int(row.get("starts_2627", 0)),
             "minutes_2627": int(row.get("minutes_2627", 0)),
+            "age": int(row["age"]) if "age" in row.index and pd.notna(row.get("age")) else None,
+            "height_cm": int(row["height_cm"]) if "height_cm" in row.index and pd.notna(row.get("height_cm")) else None,
+            "foot": str(row["foot"]) if "foot" in row.index and pd.notna(row.get("foot")) else None,
+            "market_value_eur": int(row["market_value_eur"]) if "market_value_eur" in row.index and pd.notna(row.get("market_value_eur")) else None,
+            "contract_until": str(row["contract_until"]) if "contract_until" in row.index and pd.notna(row.get("contract_until")) else None,
             "xg_3y": float(row.get("xg_media_3y", 0)) if pd.notna(row.get("xg_media_3y")) else None,
             "xa_3y": float(row.get("xa_media_3y", 0)) if pd.notna(row.get("xa_media_3y")) else None,
             "medical": {

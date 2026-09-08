@@ -59,6 +59,7 @@ Ordered stages (note: CLI step 7 = Excel export, runs last):
 | 4 | `04_scrape_understat.py` | Understat API (Serie A) | xG/xA/npxG/shots per-90 aggregations |
 | 4b | `04b_scrape_lineups.py` | Sofascore API (NOT in CLI, run manually) | `starts/sub_apps/minutes/is_starter/starter_pct` for 2026/27 first matchdays |
 | 5 | `05_scrape_injuries.py` | Transfermarkt (multithreaded) | `giorni/n_infortuni_3y`, severity, malus + `data/tm_injuries_cache.json` |
+| 5b | `05b_scrape_attributes.py` | Transfermarkt profiles (NOT in CLI, run manually) | `age/height_cm/foot/market_value_eur/contract_until` + `data/tm_attributes_cache.json` (incremental) |
 | 6 | `06_build_dataset.py` | Merges all above via 4-tier fuzzy name matching (`MANUAL_FUZZY_MAP` in config) | **`data/dataset_finale.csv`** + `score_composito` |
 | 8 | `08_quantile_points_model.py` | Trains 3 GradientBoosting quantile regressors (P10/P50/P90) on lagged historical seasons; **target = season rating-volume `pg × mv` (fantasy-neutral, retargeted in Step 4b)** | Adds `predicted_contrib_p10/p50/p90`, `contrib_volatility_spread`. Models NOT persisted |
 | 9 | `09_vorp_auction_pricing.py` + `target_pricing.py` | Replacement-level math + econometric price regression | Adds `vorp_points`, `target/clearing/fair prices`, `surplus_value_cr` |
@@ -67,7 +68,7 @@ Ordered stages (note: CLI step 7 = Excel export, runs last):
 
 ### dataset_finale.csv schema (57 columns, 533 players)
 
-Column groups: identity (player, role, role_mantra, team) → auction prices (cols 5-12) → historical aggregates (13-24) → Understat xG/xA (25-31) → team indices (32-33) → injuries (34-37) → Sofascore lineups (38-42) → composite scores (43-44) → ML quantile projections (45-48: predicted_contrib_p*, contrib_volatility_spread) → VORP/pricing (49-57). Full header in the CSV itself.
+Column groups: identity (player, role, role_mantra, team) → auction prices (cols 5-12) → historical aggregates (13-24) → Understat xG/xA (25-31) → team indices (32-33) → injuries (34-37) → Sofascore lineups (38-42) → composite scores (43-44) → ML quantile projections (predicted_contrib_p*, contrib_volatility_spread) → VORP/pricing → TM attributes (age/height_cm/foot/market_value_eur/contract_until). Full header in the CSV itself.
 
 ### Key hardcoded Fantacalcio assumptions
 
@@ -152,7 +153,7 @@ Optional `.env` keys: `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY` (copilot), `API_F
 - **Step 4a (DONE)**: backend split — `web/app.py` (720 lines) → entrypoint (~75) + `web/config.py` (paths/.env/persona/injuries/pricing defaults) + `web/data.py` (`load_dataset` + fasce) + `web/pricing.py` (VORP/fair-price) + `web/players_api.py` (Blueprint `/api/players`) + `web/ai_api.py` (Blueprint `/api/ai_*`); `web/__init__.py` bootstraps `sys.path` for script/package/Vercel import modes. Also fixed: `core/copilot/__init__.py` broken absolute imports (`from copilot.*` → relative) so the LLM copilot path actually engages; smoke-script helper renamed `test()` → `check()` (was breaking pytest collection). Unit tests 64/64, smoke 78/78.
 - **Step 4b (DONE)**: ML retargeting — stage 8 target `pg × mfv` (fantasy pts) → `pg × mv` (season rating-volume); features drop fantasy-derived `mfv`, add rating-consistency `std_mv`; columns renamed `predicted_contrib_p10/p50/p90` + `contrib_volatility_spread`; stage 9 VORP rebased on new P50 and made price-preserving (target/clearing/fair prices are ML-independent and are no longer recomputed when already present — protects observed clearing prices now that Asta.xlsx/quotazioni cache are absent); web payload `pts_exp/floor/ceil/spread` → `contrib_*`; UI labels de-fantasy-ized ("Contributo Atteso", profile threshold recalibrated to spread median 150); fixed latent `.str.upper()` bug in stage 8 player_id fallback; storico rebuilt via stage 1 scrape (11 seasons, 7291 rows; football-data.co.uk unreachable — team indices empty, stage-6-only input). OOT validation on 2025-26: 80% CI coverage 75.4%, P50 MAE 49.4 rating-pts.
 - **Step 4c — Part A (DONE)**: per-season trajectory — `export_player_history.py` -> `data/player_history.json` (2502 players / 7023 season rows from the stage-1 storico, 78% of current dataset covered; misses = youth/new signings with no Serie A history); `/api/player_history` endpoint; drawer SVG chart (mv line + pg labels + native tooltips); smoke 87/87. Also fixed 4b leftovers in app.js (spread threshold 135 -> 150 aligned with backend, quantile bar scale 350 -> 250).
-- **Step 4c — Part B (IN PROGRESS)**: Transfermarkt player attributes (age/height/foot/market value/contract).
+- **Step 4c — Part B (DONE)**: Transfermarkt attributes — new `05b_scrape_attributes.py` (search+team-match resolution like stage 5, threaded with retry/UA-rotation, incremental cache, standalone-capable bootstrap); dataset +62 columns (age, height_cm, foot, market_value_eur, contract_until; 530/533 profiles resolved); payload flat keys + drawer section "Profilo & Contratto"; smoke 93/93. Known gap: foot missing for a handful of players (TM page variance).
 
 ### EXPAND (the fork's actual goal — more player data)
 Candidate new sources/metrics to discuss before implementing:
