@@ -27,7 +27,12 @@ core/
 modules/
   common/data_provider.py    # Shared data layer for overlay (live feed) access
 web/
-  app.py                    # Flask backend (~720 lines): routes, dataset loading, VORP/fair-price math
+  app.py                    # Flask entrypoint (~75 lines): app assembly, index route, blueprint registration, main()
+  config.py                 # Paths, .env loading, persona, injuries cache, pricing defaults (~100 lines)
+  data.py                   # load_dataset() + fascia tiering (~40 lines)
+  pricing.py                # get_dynamic_fair_prices() VORP/fair-price quality scoring (~80 lines)
+  players_api.py            # Blueprint: /api/players payload builder (~185 lines)
+  ai_api.py                 # Blueprint: /api/ai_{status,test,query} — LLM copilot + local reasoner (~295 lines)
   templates/index.html      # Jinja template (~450 lines): page structure, bot persona vars
   static/css/main.css       # Theme stylesheet (~970 lines, purged of dead selectors)
   static/css/tutorial.css   # Guided-tour styles
@@ -73,9 +78,15 @@ Column groups: identity (player, role, role_mantra, team) → auction prices (co
 
 ## Web App (web/) — structure
 
-Standard Flask layout (after the Step 3 extraction — no more monolithic template string):
+Standard Flask layout: split backend (Step 4a) + extracted frontend (Step 3):
 
-- `web/app.py` (~720 lines) — pure Python: config, `load_dataset()` (fascia tiering), `get_dynamic_fair_prices()` (VORP/fair-price quality scores), routes `/`, `/api/players`, `/api/ai_{status,test,query}`
+- `web/app.py` (~75 lines) — entrypoint: Flask app, cache headers, `/` index route, blueprint registration, `main()`
+- `web/config.py` (~100 lines) — paths, `.env` loading, `APP_ENV`/`IS_PERSONAL`, bot persona, `INJURIES_CACHE`, pricing defaults (`DEFAULT_BUDGET`/`DEFAULT_ROSTER_SLOTS`/`DEFAULT_N_TEAMS`)
+- `web/data.py` (~40 lines) — `load_dataset()` + fascia tiering
+- `web/pricing.py` (~80 lines) — `get_dynamic_fair_prices()` VORP/fair-price quality scoring (in-memory cache)
+- `web/players_api.py` (~185 lines) — Blueprint `/api/players`: full player payload (prices, VORP, medical, understat, quantiles)
+- `web/ai_api.py` (~295 lines) — Blueprint `/api/ai_{status,test,query}`: LLM copilot integration + local rule-based reasoner
+- `web/__init__.py` — puts repo root on `sys.path` so `web.*` and `core.*` imports work in script/package/Vercel modes
 - `web/templates/index.html` (~450 lines) — Jinja template; vars: `bot_name`, `bot_subtitle`, `bot_avatar_text`, `bot_avatar_image`, `bot_badge`, `bot_greeting`, `is_personal`
 - `web/static/css/main.css` (~970 lines) — "Officina Vittoriana" dark theme, purged of dead selectors
 - `web/static/js/app.js` (~880 lines) — listone render + filters/sort, Player Detail Drawer, AI chat, boot splash/maestro mascot
@@ -89,7 +100,7 @@ Standard Flask layout (after the Step 3 extraction — no more monolithic templa
 - **Copilot (KEPT)**: `/api/ai_status`, `/api/ai_test`, `/api/ai_query` — player deep-dive/comparison/recommendations only (squad_diagnostic branch removed). Local rule-based fallback reasoner needs no LLM key.
 - **REMOVED (404)**: `/api/settings`, `/api/state`, `/api/sync_state`, `/api/assign`, `/api/undo`, `/api/favorite`, `/api/reset`, `/api/live/snapshot`, `/api/auth_admin`, `/api/auth/login`, `/api/session/reset`, `/api/lineup/solve`, `/api/audit/rankings`, `/api/trades/*`
 
-Frontend keepers: `tab-listone` + `renderListone()` + filters/sorts; **Player Detail Drawer** `openPlayerDetailDrawer()` — price/value, Finestra Medica (injury history), Understat volumes, quantile profile, starter/minutes. The app boots via a static `auctionState` JS stub; no polling, no gates. The fantasy tabs (draft/targets/strategy/rosters/lineup/audit/trades) are still in the HTML but inert — Step 2 removes them.
+Frontend keepers: `tab-listone` + `renderListone()` + filters/sorts; **Player Detail Drawer** `openPlayerDetailDrawer()` — price/value, Finestra Medica (injury history), Understat volumes, quantile profile, starter/minutes. No polling, no gates, no `auctionState`.
 
 ## Commands
 
@@ -109,7 +120,7 @@ python run_pipeline.py --from 8     # ML stages onward
 # Demo (no scraping needed)
 python demo.py
 
-# Tests (89 pass; test_dual_track_and_features.py needs the web app running on :5050)
+# Tests (64 unit tests pass; test_dual_track_and_features.py is an HTTP smoke script needing the web app on :5050)
 python -m pytest tests/ -x -q
 ```
 
@@ -136,7 +147,8 @@ Optional `.env` keys: `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY` (copilot), `API_F
 - **Step 1 (DONE)**: backend strip of `web/app.py` — removed all league/auction/auth/live/lineup/audit/trades routes, Redis helpers, auction state, TACTICAL_PRESETS, market inflation; decoupled `/api/players` (no is_assigned/is_favorite/market_index; fixed pricing defaults: budget 1000, slots 3/8/8/6, 10 teams for VORP baselines); `/api/ai_query` reduced to player Q&A (squad_diagnostic branch removed); frontend keeps booting via a static `auctionState` stub (no polling, no identity/session gates). Deleted `modules/{lineup,valuation,trades,auction}`, `live_bridge/` and their tests; smoke test `tests/test_dual_track_and_features.py` pruned to kept surface (72 checks, incl. removed-endpoints-404 + node --check).
 - **Step 2 (DONE)**: frontend strip — removed tabs draft/targets/strategy/rosters/lineup/audit/trades, all their modals (target/pitch-picker/profile/custom-tactic/league-settings/inflation/admin/session), identity gates, admin/session JS, FantaLab sniffer JS, target/profile/preset systems, market-badge JS, draft helpers (search/assign/undo/recent); sidebar/bottom-nav reduced to Listone + AI; listone is the default active tab; `tutorial.js` pruned to 3 steps; AI quick-chips retargeted to player queries; branding → footballerdata. `web/app.py` now ~3.8k lines (from 9.1k). Known leftover: ~1.7k lines of inline CSS still contain dead selectors for removed UI (inert; cleanup happens in Step 3 when CSS moves to its own file).
 - **Step 3 (DONE)**: frontend extraction — `HTML_TEMPLATE` string deleted; frontend now lives in `web/templates/index.html` (Jinja), `web/static/css/main.css` (1733 → 968 lines: 130 dead rules + 145 dead selectors + 8 dead keyframes purged), `web/static/js/app.js` (dead `showToast`/toast UI removed). `web/app.py` is pure Python (~720 lines, from 9116 pre-pivot) using `render_template()` + Flask built-in static serving. Smoke test updated to check external assets (78/78).
-- **Step 4 (NEXT)**: split remaining Python backend; pipeline retargeting (ML target away from fantasy points); new data sources (FBref etc.).
+- **Step 4a (DONE)**: backend split — `web/app.py` (720 lines) → entrypoint (~75) + `web/config.py` (paths/.env/persona/injuries/pricing defaults) + `web/data.py` (`load_dataset` + fasce) + `web/pricing.py` (VORP/fair-price) + `web/players_api.py` (Blueprint `/api/players`) + `web/ai_api.py` (Blueprint `/api/ai_*`); `web/__init__.py` bootstraps `sys.path` for script/package/Vercel import modes. Also fixed: `core/copilot/__init__.py` broken absolute imports (`from copilot.*` → relative) so the LLM copilot path actually engages; smoke-script helper renamed `test()` → `check()` (was breaking pytest collection). Unit tests 64/64, smoke 78/78.
+- **Step 4b (NEXT)**: pipeline retargeting (ML target away from fantasy points); new data sources (FBref etc.).
 
 ### EXPAND (the fork's actual goal — more player data)
 Candidate new sources/metrics to discuss before implementing:
