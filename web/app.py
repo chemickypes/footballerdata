@@ -3421,6 +3421,49 @@ HTML_TEMPLATE = """
             font-size: 0.78rem;
             color: var(--officina-muted);
         }
+        #appBootSplash {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            background:
+                radial-gradient(circle at 50% 20%, rgba(198,154,76,0.20) 0%, transparent 60%),
+                linear-gradient(180deg, #1a130d 0%, #0e0906 100%);
+            transition: opacity 0.4s ease;
+        }
+        #appBootSplash.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .boot-splash__logo {
+            font-family: 'Outfit', sans-serif;
+            font-size: clamp(1.6rem, 5vw, 2.4rem);
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            color: var(--officina-gold);
+            text-shadow: 0 0 24px rgba(242,193,78,0.35);
+        }
+        .boot-splash__spinner {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: 3px solid rgba(198,154,76,0.25);
+            border-top-color: var(--officina-gold);
+            animation: boot-splash-spin 0.9s linear infinite;
+        }
+        @keyframes boot-splash-spin {
+            to { transform: rotate(360deg); }
+        }
+        .boot-splash__version {
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: var(--officina-muted);
+        }
         .maestro-intro__card {
             display: grid;
             grid-template-columns: 140px 1fr;
@@ -3456,6 +3499,12 @@ HTML_TEMPLATE = """
     </style>
 </head>
 <body>
+
+    <div id="appBootSplash">
+        <div class="boot-splash__logo">La FantaOfficina</div>
+        <div class="boot-splash__spinner" aria-hidden="true"></div>
+        <div class="boot-splash__version">v.1.00</div>
+    </div>
 
     <div id="splashIdentityGate" class="splash-gate" style="display:none;">
         <div class="splash-gate__backdrop"></div>
@@ -4939,6 +4988,21 @@ HTML_TEMPLATE = """
             maybeShowMaestroIntro();
         }
 
+        function runBootSplash(onComplete) {
+            const splash = document.getElementById('appBootSplash');
+            if (!splash) {
+                onComplete();
+                return;
+            }
+            setTimeout(() => {
+                splash.classList.add('fade-out');
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                    onComplete();
+                }, 400); // matches the 0.4s CSS transition above
+            }, 1200);
+        }
+
         function maybeStartIdentityGate() {
             if (hasStoredProfile) {
                 hideSplashIdentityGate();
@@ -5764,7 +5828,7 @@ HTML_TEMPLATE = """
             ensureMaestroAmbient();
             updateMaestroAmbientState('targets');
 
-            maybeStartIdentityGate();
+            runBootSplash(() => maybeStartIdentityGate());
 
             if (window.location.hash) {
                 const tabName = window.location.hash.replace('#', '');
