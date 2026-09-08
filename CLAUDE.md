@@ -1,0 +1,141 @@
+# CLAUDE.md — Project Guide
+
+## What This Repo Is (Fork Context)
+
+This repo (`footballerdata`) is a **fork of [spectrelabo/fantaofficina](https://github.com/spectrelabo/fantaofficina)** ("La FantaOfficina"), a Serie A fantasy-football (Fantacalcio) analytics framework: data scraping → ML projections → VORP auction pricing → MILP roster optimization → a Flask "Live Auction Command Center" web app.
+
+**The fork's mission is different**: transform this into a **player data & statistics explorer**. We only care about *info and stats about players* (ratings, xG/xA, injuries, minutes, projections, profiles). We do **NOT** care about:
+- League management ("Lega" settings, multi-team state, admin/battitore)
+- Team/squad management (rose, formations/lineup solver, trades, post-auction audit)
+- The live draft engine and FantaLab bridge
+- Auction *mechanics*: budgets, bidding, stop-loss, tactical presets, roster slots
+
+**Deliberate exception — credits & VORP are KEPT**: although born in the fantacalcio economy, `vorp_points`, `prezzo_fair_*`, `target/clearing_price_*`, `Prezzo_Consigliato_Cr` (official list price) and `FVM_1000` work as **general player quality scores** (a good player = a high score, regardless of fantasy play). VORP = value over a replacement-level player at the same role; fair price = VORP rescaled to credits. Caveats when reading them as quality: VORP baselines are **role-relative** (cross-role comparison is skewed, e.g. keepers are compressed); fair prices are budget-dependent rescalings (500 vs 1000 variants differ only by a factor); `surplus_value_cr` (fair − official price) is a *market-undervaluation* signal, not pure quality.
+
+The pivot has NOT started yet — the code below describes the current (upstream) state, with a keep/remove map at the end.
+
+## Repo Layout (current state)
+
+```
+core/
+  config.py                  # Central config: paths, seasons, team maps, scoring weights
+  config_defaults.py         # League defaults (budget 500, roster 3P/8D/8C/6A, 10 teams, admin pwd)
+  ingestion/static/          # The data pipeline (numbered stages, see below)
+  ingestion/dynamic/         # Weekly live matchday feed (api-football + fantacalcio.it odds/lineups)
+  copilot/                   # LLM chat layer (Ollama/OpenAI/Gemini/Groq providers, prompt RAG)
+  models/                    # Docs only (no code)
+modules/
+  common/data_provider.py    # Shared data layer for overlay (live feed) access
+web/app.py                   # Flask app (~7.9k lines): player-stats routes + entire
+                             # HTML/CSS/JS frontend as one inline HTML_TEMPLATE string
+data/                        # Generated artifacts (dataset_finale.csv etc.)
+dataset_finale.csv           # Root copy of the master dataset (533 players, 57 cols)
+run_pipeline.py              # CLI: --step N / --from N over ordered stages [1,3,4,5,6,8,9,10,7]
+demo.py                      # Zero-config terminal demo (hype-trap, volatility, MILP, lookup)
+export_dataset.py            # Exports dataset_finale_{500,1000}.csv with unified prezzo_fair
+tests/                       # pytest suites + 1 HTTP smoke script (test_dual_track_and_features.py)
+docs/                        # Architecture docs (pipeline, scoring, live command center, UI handoff)
+```
+
+## Data Pipeline (core/ingestion/static/)
+
+Ordered stages (note: CLI step 7 = Excel export, runs last):
+
+| Step | File | Source | Output |
+|---|---|---|---|
+| 1 | `01_scrape_historical.py` | fantacalcio.it (11 seasons) + football-data.co.uk | `data/storico_giocatori_{raw,aggregato}.csv`, team indices. Cols: mv/mfv 3y weighted means, std, trend, availability, per-game rates |
+| 3 | `03_update_listone.py` | Local Excel `data/Quotazioni_Fantacalcio_Stagione_2026_27_latest.xlsx` (manual download) | Active roster + official prices (Qt.A), roles P/D/C/A. NOTE: `NN_*`, `Prob_*`, `Clean_Sheet_%` columns are placeholder constants, never filled |
+| 4 | `04_scrape_understat.py` | Understat API (Serie A) | xG/xA/npxG/shots per-90 aggregations |
+| 4b | `04b_scrape_lineups.py` | Sofascore API (NOT in CLI, run manually) | `starts/sub_apps/minutes/is_starter/starter_pct` for 2026/27 first matchdays |
+| 5 | `05_scrape_injuries.py` | Transfermarkt (multithreaded) | `giorni/n_infortuni_3y`, severity, malus + `data/tm_injuries_cache.json` |
+| 6 | `06_build_dataset.py` | Merges all above via 4-tier fuzzy name matching (`MANUAL_FUZZY_MAP` in config) | **`data/dataset_finale.csv`** + `score_composito` |
+| 8 | `08_quantile_points_model.py` | Trains 3 GradientBoosting quantile regressors (P10/P50/P90) on lagged historical seasons | Adds `predicted_pts_p10/p50/p90`, `pts_volatility_spread`. Models NOT persisted |
+| 9 | `09_vorp_auction_pricing.py` + `target_pricing.py` | Replacement-level math + econometric price regression | Adds `vorp_points`, `target/clearing/fair prices`, `surplus_value_cr` |
+| 10 | `10_roster_optimizer.py` | scipy MILP knapsack | Prints optimal 25-player squad (no file output) |
+| 7 | `07_generate_excel.py` | `dataset_finale.csv` | `data/analisi_fantacalcio_completa.xlsx` multi-tab workbook |
+
+### dataset_finale.csv schema (57 columns, 533 players)
+
+Column groups: identity (player, role, role_mantra, team) → auction prices (cols 5-12) → historical aggregates (13-24) → Understat xG/xA (25-31) → team indices (32-33) → injuries (34-37) → Sofascore lineups (38-42) → composite scores (43-44) → ML quantile projections (45-48) → VORP/pricing (49-57). Full header in the CSV itself.
+
+### Key hardcoded Fantacalcio assumptions
+
+- Budgets 500/1000 credits; 25-player roster 3P/8D/8C/6A (but 09 uses 4/9/9/7 — inconsistent); 10-team league
+- Role codes P/D/C/A + `role_mantra`; MFV/fantavoto (rating + fantasy bonus/malus) everywhere, incl. ML target `pg × mfv`
+- Injury "malus" designed to discount fantasy auction value
+- `score_composito` weights include fantavote/bonus-probability terms (`SCORE_WEIGHTS` in `core/config.py`)
+- Quotazioni xlsx filename hardcoded to season 2026_27; Serie-A-only team maps
+
+## Web App (web/app.py) — critical structure
+
+**Monolith**: one Python file, ~9.1k lines. Flask routes (lines 1-1780) + the ENTIRE frontend as `HTML_TEMPLATE = """..."""` (lines 1784-8993: inline CSS ~1796-3530, body 3532-4942, inline JS ~4944-8985). No Jinja files on disk. Dark "Officina Vittoriana" steampunk theme; Italian UI throughout.
+
+9 tabs: `draft` (Asta Live), `targets` (Target & Piano), `strategy` (empty legacy), `rosters` (Rose & Finanze), `listone` (player list — **the stats core**), `ai` (copilot chat "Il Maestro"), `lineup`, `audit` (Classifica Lega), `trades`.
+
+### Route map (after Step 1 backend strip)
+
+- **Player stats (KEPT)**: `/api/players` — loads `dataset_finale.csv`, richest payload: prices, score, P10/P50/P90, spread, VORP, bonus range, injury audit, Understat metrics, quantile profile, starter status. Decoupled from auction state; pricing computed with fixed defaults (budget 1000, slots 3/8/8/6, 10 teams) via `get_dynamic_fair_prices()`.
+- **Copilot (KEPT)**: `/api/ai_status`, `/api/ai_test`, `/api/ai_query` — player deep-dive/comparison/recommendations only (squad_diagnostic branch removed). Local rule-based fallback reasoner needs no LLM key.
+- **REMOVED (404)**: `/api/settings`, `/api/state`, `/api/sync_state`, `/api/assign`, `/api/undo`, `/api/favorite`, `/api/reset`, `/api/live/snapshot`, `/api/auth_admin`, `/api/auth/login`, `/api/session/reset`, `/api/lineup/solve`, `/api/audit/rankings`, `/api/trades/*`
+
+Frontend keepers: `tab-listone` + `renderListone()` + filters/sorts; **Player Detail Drawer** `openPlayerDetailDrawer()` — price/value, Finestra Medica (injury history), Understat volumes, quantile profile, starter/minutes. The app boots via a static `auctionState` JS stub; no polling, no gates. The fantasy tabs (draft/targets/strategy/rosters/lineup/audit/trades) are still in the HTML but inert — Step 2 removes them.
+
+## Commands
+
+```bash
+# Setup
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+
+# Web app (port 5050)
+python3 web/app.py
+
+# Pipeline
+python run_pipeline.py              # full run
+python run_pipeline.py --step 6     # single stage
+python run_pipeline.py --from 8     # ML stages onward
+
+# Demo (no scraping needed)
+python demo.py
+
+# Tests (89 pass; test_dual_track_and_features.py needs the web app running on :5050)
+python -m pytest tests/ -x -q
+```
+
+Optional `.env` keys: `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY` (copilot), `API_FOOTBALL_KEY` (dynamic feed), `ADMIN_PASSWORD`. CI: only `.github/workflows/dynamic_feed.yml` (scheduled matchday feed → `data-feed` branch). Deploys to Vercel via `vercel.json` → `web/app.py`.
+
+## Refactor Plan: Player-Stats-Only Pivot
+
+### KEEP (player data core)
+- Pipeline stages **1, 4, 4b, 5** (historical ratings, Understat, Sofascore lineups, injuries) — generic player analytics
+- Stage **6** (dataset build/fuzzy matching) — keep, strip fantasy scoring columns
+- Stage **9** (VORP + fair pricing) — **KEEP, reinterpreted as quality scoring** (see "Deliberate exception" above). Keeps `vorp_points`, `prezzo_fair_*`, `target/clearing_price_*` in the dataset; the web UI keeps showing them as quality/value columns
+- ML stage **8** concept — quantile projections are generic, but retarget away from `pg × mfv` (fantasy points) to e.g. mv/goals/assists/xG projections
+- Web: `/api/players`, tab-listone, Player Detail Drawer, filters/sort/search, copilot (player Q&A only)
+- `core/ingestion/dynamic/` — live status/lineups/form feed is genuinely useful player info
+- Tests for kept components; docs update
+
+### REMOVE (fantasy/league/team)
+- ~~Stages 10/7~~ — still pending decision (Excel export could become a stats-only export)
+- ~~`modules/lineup`, `modules/valuation`, `modules/trades`, `modules/auction`, `live_bridge/`~~ — **DONE (removed)**
+- Web: ~~league settings, shared auction state (Redis/JSON), assign/undo, admin auth, FantaLab sniffer, market inflation, TACTICAL_PRESETS~~ — **DONE (backend removed in Step 1)**; the frontend tabs/UI (targets/strategy/rosters/lineup/audit/trades/draft, modals, admin JS, sniffer JS) are still present but inert — removal is Step 2
+- `core/config_defaults.py` league constants; `ADMIN_*`/`LEAGUE_PIN` auth — done for the web app; config_defaults.py itself still exists (used by pipeline stages 9/10)
+
+### Pivot progress
+- **Step 1 (DONE)**: backend strip of `web/app.py` — removed all league/auction/auth/live/lineup/audit/trades routes, Redis helpers, auction state, TACTICAL_PRESETS, market inflation; decoupled `/api/players` (no is_assigned/is_favorite/market_index; fixed pricing defaults: budget 1000, slots 3/8/8/6, 10 teams for VORP baselines); `/api/ai_query` reduced to player Q&A (squad_diagnostic branch removed); frontend keeps booting via a static `auctionState` stub (no polling, no identity/session gates). Deleted `modules/{lineup,valuation,trades,auction}`, `live_bridge/` and their tests; smoke test `tests/test_dual_track_and_features.py` pruned to kept surface (72 checks, incl. removed-endpoints-404 + node --check).
+- **Step 2 (NEXT)**: frontend strip — remove tabs draft/targets/strategy/rosters/lineup/audit/trades from HTML+JS, their modals, admin/session JS, FantaLab sniffer JS, target/profile systems; prune tutorial.js steps; update header/sidebar/bottom-nav to listone+ai only.
+- **Step 3**: extract frontend from the Python string into `web/static/` + template files (kills the monolith fragility).
+- **Step 4**: split remaining Python backend; pipeline retargeting (ML target away from fantasy points); new data sources (FBref etc.).
+
+### EXPAND (the fork's actual goal — more player data)
+Candidate new sources/metrics to discuss before implementing:
+- FBref (full stats: passing, defending, possession, per-90 splits, percentiles)
+- Sofascore/Transfermarkt player attributes (age, height, foot, market value, contract)
+- Per-season history in the UI (player trajectory charts), not just 3y aggregates
+- More leagues beyond Serie A (requires dropping Serie-A-only team maps)
+
+### Watch out
+- `web/app.py` is one giant string template — a stray unescaped `'` inside the Python triple-quoted string silently breaks the whole JS block (has happened before, see `docs/HANDOFF_UI_GLOWUP.md`)
+- `/api/players` currently reads auction state, favorites, market inflation — decouple first
+- `scripts/generate_value_maps.py` has a hardcoded dev-machine output path
+- Upstream merge history: production served the `ui-glowup` branch which is merged into main here (b7221ec)

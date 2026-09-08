@@ -1,29 +1,20 @@
 #!/usr/bin/env python3
 """
-fanta-lab — La FantaOfficina: Modern Quantitative Auction & Live Draft Platform for Fantacalcio Serie A
-Clean, professional interface with local profile isolation, custom targets, Il Maestro AI query assistant, and Admin-gated Live Draft.
+footballerdata — Player Data & Statistics Explorer (Serie A)
+Web UI: player list (listone) with filters/sort, Player Detail Drawer, AI copilot Q&A.
+Fork of La FantaOfficina; the fantasy auction/league/team engine has been removed.
 """
 
 import os
 import sys
 import json
-import time
 import re
 import pandas as pd
-import requests
 from flask import Flask, jsonify, request, render_template_string, send_from_directory
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # web/ — used for static serving only
 PROJECT_ROOT = os.path.dirname(BASE_DIR)  # repo root — used for data/config/env paths
 sys.path.insert(0, PROJECT_ROOT)
-
-from core import config
-
-from modules.common.data_provider import get_dynamic_overlay
-from modules.lineup.lineup_solver import solve_lineup
-from modules.valuation.audit_engine import compute_audit
-from modules.valuation.season_tracking import load_tracking_history
-from modules.trades.trade_analyzer import evaluate_trade, find_winwin_trades
 
 DATA_PATH = os.path.join(PROJECT_ROOT, "data", "dataset_finale.csv")
 if not os.path.exists(DATA_PATH):
@@ -32,30 +23,9 @@ if not os.path.exists(DATA_PATH):
     DATA_PATH = os.path.join(PROJECT_ROOT, "examples", "dataset_sample.csv")
 
 # ──────────────────────────────────────────────────────────────────────
-# DUAL-TRACK ARCHITECTURE & SERVERLESS RESILIENCE
-# APP_ENV: 'personal' (private production) vs 'community' (public open-source)
+# ENVIRONMENT
 # ──────────────────────────────────────────────────────────────────────
 APP_ENV = os.environ.get("APP_ENV", "community").strip().lower()
-
-def _get_writable_path(filename, default_dir=PROJECT_ROOT):
-    """Provides serverless-safe writable file path with /tmp fallback."""
-    target = os.path.join(default_dir, filename)
-    if os.environ.get("VERCEL") == "1" or not os.access(default_dir, os.W_OK):
-        tmp_target = os.path.join("/tmp", filename)
-        if not os.path.exists(tmp_target) and os.path.exists(target):
-            try:
-                import shutil
-                shutil.copyfile(target, tmp_target)
-            except Exception:
-                pass
-        return tmp_target
-    return target
-
-STATE_PATH = _get_writable_path("auction_state.json")
-SETTINGS_PATH = _get_writable_path("league_settings.json")
-
-_IN_MEMORY_STATE = None
-_IN_MEMORY_SETTINGS = None
 
 # Load Transfermarkt injuries cache for Clinical Audit Window
 _INJURIES_CACHE = {}
@@ -83,51 +53,16 @@ if os.path.exists(ENV_PATH):
         pass
 
 # ──────────────────────────────────────────────────────────────────────
-# CASCADING CONFIGURATION LOADER
-# Open-Source defaults: 500 cr, 3-8-8-6, Squadra 1..10
+# FIXED PRICING DEFAULTS
+# Used only to calibrate VORP baselines / fair-price quality scores.
 # ──────────────────────────────────────────────────────────────────────
 
 DEFAULT_BUDGET = 1000
 DEFAULT_ROSTER_SLOTS = {"P": 3, "D": 8, "C": 8, "A": 6}
-DEFAULT_TEAMS = [{"id": i, "name": f"Squadra {i}", "is_me": i == 1} for i in range(1, 11)]
-ADMIN_PASSWORD = "fanta2026"
+DEFAULT_N_TEAMS = 10
 
 _personal_config_path = os.path.join(PROJECT_ROOT, "core", "config.personal.py")
-IS_PERSONAL = (APP_ENV == "personal") or (os.path.exists(_personal_config_path) and APP_ENV != "community")
-
-if IS_PERSONAL:
-    # Load personal configuration (file-based or environment variables)
-    if os.path.exists(_personal_config_path):
-        try:
-            import importlib.util
-            _spec = importlib.util.spec_from_file_location("config_personal", _personal_config_path)
-            _personal = importlib.util.module_from_spec(_spec)
-            _spec.loader.exec_module(_personal)
-            DEFAULT_BUDGET = getattr(_personal, "DEFAULT_BUDGET", DEFAULT_BUDGET)
-            DEFAULT_ROSTER_SLOTS = getattr(_personal, "DEFAULT_ROSTER_SLOTS", DEFAULT_ROSTER_SLOTS)
-            DEFAULT_TEAMS = getattr(_personal, "DEFAULT_TEAMS", DEFAULT_TEAMS)
-            ADMIN_PASSWORD = getattr(_personal, "ADMIN_PASSWORD", ADMIN_PASSWORD)
-        except Exception:
-            pass
-
-    if os.environ.get("PERSONAL_BUDGET"):
-        try: DEFAULT_BUDGET = int(os.environ.get("PERSONAL_BUDGET"))
-        except Exception: pass
-    if os.environ.get("PERSONAL_SLOTS_JSON"):
-        try: DEFAULT_ROSTER_SLOTS = json.loads(os.environ.get("PERSONAL_SLOTS_JSON"))
-        except Exception: pass
-    if os.environ.get("PERSONAL_TEAMS_JSON"):
-        try: DEFAULT_TEAMS = json.loads(os.environ.get("PERSONAL_TEAMS_JSON"))
-        except Exception: pass
-    elif os.environ.get("PERSONAL_TEAMS"):
-        names = [n.strip() for n in os.environ.get("PERSONAL_TEAMS").split(",") if n.strip()]
-        if names:
-            DEFAULT_TEAMS = [{"id": i+1, "name": name, "is_me": i == 0} for i, name in enumerate(names)]
-
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", ADMIN_PASSWORD)
-ADMIN_PIN = os.environ.get("ADMIN_PIN", "7777")
-LEAGUE_PIN = os.environ.get("LEAGUE_PIN", "2026")
-TOTAL_ROSTER_SIZE = sum(DEFAULT_ROSTER_SLOTS.values())
+IS_PERSONAL = (APP_ENV == "personal")
 
 # ──────────────────────────────────────────────────────────────────────
 # BOT IDENTITY & PERSONA
@@ -142,17 +77,21 @@ BOT_GREETING = (
 )
 BOT_AVATAR_IMAGE = ""
 
-if IS_PERSONAL:
-    if os.path.exists(_personal_config_path):
-        try:
-            BOT_NAME = getattr(_personal, "BOT_NAME", BOT_NAME)
-            BOT_SUBTITLE = getattr(_personal, "BOT_SUBTITLE", BOT_SUBTITLE)
-            BOT_AVATAR_TEXT = getattr(_personal, "BOT_AVATAR_TEXT", BOT_AVATAR_TEXT)
-            BOT_BADGE = getattr(_personal, "BOT_BADGE", BOT_BADGE)
-            BOT_GREETING = getattr(_personal, "BOT_GREETING", BOT_GREETING)
-        except Exception:
-            pass
+if IS_PERSONAL and os.path.exists(_personal_config_path):
+    try:
+        import importlib.util
+        _spec = importlib.util.spec_from_file_location("config_personal", _personal_config_path)
+        _personal = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(_personal)
+        BOT_NAME = getattr(_personal, "BOT_NAME", BOT_NAME)
+        BOT_SUBTITLE = getattr(_personal, "BOT_SUBTITLE", BOT_SUBTITLE)
+        BOT_AVATAR_TEXT = getattr(_personal, "BOT_AVATAR_TEXT", BOT_AVATAR_TEXT)
+        BOT_BADGE = getattr(_personal, "BOT_BADGE", BOT_BADGE)
+        BOT_GREETING = getattr(_personal, "BOT_GREETING", BOT_GREETING)
+    except Exception:
+        pass
 
+if IS_PERSONAL:
     _local_avatar_path = os.path.join(BASE_DIR, "static", "personal_avatar.jpg")
     if os.path.exists(_local_avatar_path):
         try:
@@ -178,251 +117,6 @@ def add_cache_headers(response):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
-
-
-# ──────────────────────────────────────────────────────────────────────
-# TACTICAL STRATEGY BLUEPRINTS (SCALA SLOT PRESETS)
-# ──────────────────────────────────────────────────────────────────────
-
-TACTICAL_PRESETS = {
-    "trazione_anteriore": {
-        "id": "trazione_anteriore",
-        "name": "Trazione Anteriore (Top Bomber)",
-        "badge": "ATT 65%",
-        "description": "Investi il 65% in attacco (360-450 cr per 1 Top Bomber primario come Malen o Lautaro). Difesa a basso costo e centrocampo di regolaristi.",
-        "split_pct": {"P": 0.07, "D": 0.09, "C": 0.19, "A": 0.65},
-        "split": {"P": "70 cr (7%)", "D": "90 cr (9%)", "C": "190 cr (19%)", "A": "650 cr (65%)"},
-        "slots": {
-            "A": [
-                {"slot": 1, "name": "1° Slot: Top Bomber Assoluto (20+ Gol)", "target_budget": "360-450 cr", "max_limit": 470, "fascia": 1},
-                {"slot": 2, "name": "2° Slot: Secondo Attaccante / Spalla", "target_budget": "100-140 cr", "max_limit": 150, "fascia": 2},
-                {"slot": 3, "name": "3° Slot: Titolare Terzo Slot", "target_budget": "40-60 cr", "max_limit": 70, "fascia": 2},
-                {"slot": 4, "name": "4° Slot: Opportunità / Titolare", "target_budget": "10-25 cr", "max_limit": 30, "fascia": 3},
-                {"slot": 5, "name": "5° Slot: Copertura Reparto", "target_budget": "3-10 cr", "max_limit": 12, "fascia": 3},
-                {"slot": 6, "name": "6° Slot: Profilo a 1 cr", "target_budget": "1 cr", "max_limit": 3, "fascia": 4},
-                {"slot": 7, "name": "7° Slot: Chiusura Reparto", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ],
-            "C": [
-                {"slot": 1, "name": "1° Slot: Centrocampista Top / Semi-Top", "target_budget": "60-90 cr", "max_limit": 100, "fascia": 1},
-                {"slot": 2, "name": "2° Slot: Titolare Affidabile", "target_budget": "35-55 cr", "max_limit": 60, "fascia": 2},
-                {"slot": 3, "name": "3° Slot: Regolarista", "target_budget": "20-35 cr", "max_limit": 40, "fascia": 2},
-                {"slot": 4, "name": "4° Slot: Titolare Low-Cost", "target_budget": "10-20 cr", "max_limit": 25, "fascia": 3},
-                {"slot": 5, "name": "5° Slot: Titolare Squadra Media", "target_budget": "5-12 cr", "max_limit": 15, "fascia": 3},
-                {"slot": 6, "name": "6° Slot: Copertura", "target_budget": "2-6 cr", "max_limit": 8, "fascia": 3},
-                {"slot": 7, "name": "7° Slot: Scommessa", "target_budget": "1-3 cr", "max_limit": 4, "fascia": 4},
-                {"slot": 8, "name": "8° Slot: Riserva", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-                {"slot": 9, "name": "9° Slot: Chiusura", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ],
-            "D": [
-                {"slot": 1, "name": "1° Slot: Top Difensore Modificatore", "target_budget": "25-40 cr", "max_limit": 45, "fascia": 1},
-                {"slot": 2, "name": "2° Slot: Titolare Sicuro", "target_budget": "15-25 cr", "max_limit": 30, "fascia": 2},
-                {"slot": 3, "name": "3° Slot: Titolare Squadra Media", "target_budget": "10-18 cr", "max_limit": 20, "fascia": 2},
-                {"slot": 4, "name": "4° Slot: Regolarista", "target_budget": "5-12 cr", "max_limit": 15, "fascia": 3},
-                {"slot": 5, "name": "5° Slot: Terzino Low Cost", "target_budget": "3-8 cr", "max_limit": 10, "fascia": 3},
-                {"slot": 6, "name": "6° Slot: Titolare Provincia", "target_budget": "1-5 cr", "max_limit": 6, "fascia": 3},
-                {"slot": 7, "name": "7° Slot: Copertura", "target_budget": "1 cr", "max_limit": 3, "fascia": 4},
-                {"slot": 8, "name": "8° Slot: Riserva", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-                {"slot": 9, "name": "9° Slot: Chiusura", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ],
-            "P": [
-                {"slot": 1, "name": "1° Portiere: Top Titolare", "target_budget": "40-70 cr", "max_limit": 75, "fascia": 1},
-                {"slot": 2, "name": "2° Portiere: Riserva Blocco", "target_budget": "1-5 cr", "max_limit": 10, "fascia": 4},
-                {"slot": 3, "name": "3° Portiere: Terzo Portiere", "target_budget": "1 cr", "max_limit": 3, "fascia": 4},
-                {"slot": 4, "name": "4° Portiere: Quarto Portiere", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ]
-        }
-    },
-    "modificatore_ferro": {
-        "id": "modificatore_ferro",
-        "name": "Modificatore di Ferro (Difesa Top)",
-        "badge": "DIF 22% / POR 13%",
-        "description": "Massimizza il bonus modificatore con Portiere Top e 3 difensori da alta MV (Dimarco, Bastoni). Attacco solido a 3 punte senza svenarsi.",
-        "split_pct": {"P": 0.13, "D": 0.22, "C": 0.21, "A": 0.44},
-        "split": {"P": "130 cr (13%)", "D": "220 cr (22%)", "C": "210 cr (21%)", "A": "440 cr (44%)"},
-        "slots": {
-            "D": [
-                {"slot": 1, "name": "1° Slot: Top Modificatore / Assistman", "target_budget": "70-110 cr", "max_limit": 125, "fascia": 1},
-                {"slot": 2, "name": "2° Slot: Secondo Top Difesa", "target_budget": "45-65 cr", "max_limit": 75, "fascia": 1},
-                {"slot": 3, "name": "3° Slot: Titolare Alta MV", "target_budget": "30-45 cr", "max_limit": 50, "fascia": 2},
-                {"slot": 4, "name": "4° Slot: Difensore Primaria Squadra", "target_budget": "15-25 cr", "max_limit": 30, "fascia": 2},
-                {"slot": 5, "name": "5° Slot: Titolare Sicuro", "target_budget": "8-15 cr", "max_limit": 18, "fascia": 3},
-                {"slot": 6, "name": "6° Slot: Terzino di Spinta", "target_budget": "4-10 cr", "max_limit": 12, "fascia": 3},
-                {"slot": 7, "name": "7° Slot: Titolare Low Cost", "target_budget": "2-6 cr", "max_limit": 8, "fascia": 4},
-                {"slot": 8, "name": "8° Slot: Riserva", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-                {"slot": 9, "name": "9° Slot: Chiusura Reparto", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ],
-            "A": [
-                {"slot": 1, "name": "1° Slot: Attaccante Top / Semi-Top Primario", "target_budget": "180-230 cr", "max_limit": 250, "fascia": 1},
-                {"slot": 2, "name": "2° Slot: Secondo Attaccante da Bonus", "target_budget": "110-140 cr", "max_limit": 150, "fascia": 2},
-                {"slot": 3, "name": "3° Slot: Terzo Attaccante Titolare", "target_budget": "60-85 cr", "max_limit": 95, "fascia": 2},
-                {"slot": 4, "name": "4° Slot: Co-Titolare / Opportunità", "target_budget": "20-40 cr", "max_limit": 45, "fascia": 3},
-                {"slot": 5, "name": "5° Slot: Copertura Reparto", "target_budget": "5-15 cr", "max_limit": 18, "fascia": 3},
-                {"slot": 6, "name": "6° Slot: Scommessa a 1 cr", "target_budget": "1-4 cr", "max_limit": 5, "fascia": 4},
-                {"slot": 7, "name": "7° Slot: Chiusura Reparto", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ],
-            "C": [
-                {"slot": 1, "name": "1° Slot: Centrocampista Top / Semi-Top", "target_budget": "70-100 cr", "max_limit": 110, "fascia": 1},
-                {"slot": 2, "name": "2° Slot: Titolare da Bonus", "target_budget": "40-60 cr", "max_limit": 70, "fascia": 2},
-                {"slot": 3, "name": "3° Slot: Regolarista Affidabile", "target_budget": "25-40 cr", "max_limit": 45, "fascia": 2},
-                {"slot": 4, "name": "4° Slot: Titolare Squadra Media", "target_budget": "15-25 cr", "max_limit": 30, "fascia": 3},
-                {"slot": 5, "name": "5° Slot: Titolare Low-Cost", "target_budget": "8-15 cr", "max_limit": 18, "fascia": 3},
-                {"slot": 6, "name": "6° Slot: Copertura", "target_budget": "4-10 cr", "max_limit": 12, "fascia": 3},
-                {"slot": 7, "name": "7° Slot: Scommessa", "target_budget": "1-5 cr", "max_limit": 6, "fascia": 4},
-                {"slot": 8, "name": "8° Slot: Riserva", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-                {"slot": 9, "name": "9° Slot: Chiusura", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ],
-            "P": [
-                {"slot": 1, "name": "1° Portiere: Top Portiere Squadra Scudetto", "target_budget": "70-110 cr", "max_limit": 125, "fascia": 1},
-                {"slot": 2, "name": "2° Portiere: Secondo Portiere (Riserva Blocco)", "target_budget": "1-10 cr", "max_limit": 15, "fascia": 4},
-                {"slot": 3, "name": "3° Portiere: Terzo Portiere (Chiusura Blocco)", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-                {"slot": 4, "name": "4° Portiere: Quarto Portiere", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ]
-        }
-    },
-    "centrocampo_dominante": {
-        "id": "centrocampo_dominante",
-        "name": "Centrocampo Dominante (Doppio Top CEN)",
-        "badge": "CEN 37%",
-        "description": "Acquista 2 centrocampisti rigoristi/top da 8-12 gol (Calhanoglu, McTominay, Paz). Attacco formato da 3 titolari continui.",
-        "split_pct": {"P": 0.09, "D": 0.12, "C": 0.37, "A": 0.42},
-        "split": {"P": "90 cr (9%)", "D": "120 cr (12%)", "C": "370 cr (37%)", "A": "420 cr (42%)"},
-        "slots": {
-            "C": [
-                {"slot": 1, "name": "1° Slot: Top Centrocampista Rigorista", "target_budget": "140-180 cr", "max_limit": 195, "fascia": 1},
-                {"slot": 2, "name": "2° Slot: Secondo Top Centrocampo", "target_budget": "90-130 cr", "max_limit": 140, "fascia": 1},
-                {"slot": 3, "name": "3° Slot: Titolare Alta MV", "target_budget": "40-60 cr", "max_limit": 70, "fascia": 2},
-                {"slot": 4, "name": "4° Slot: Regolarista Squadra Media", "target_budget": "20-35 cr", "max_limit": 40, "fascia": 2},
-                {"slot": 5, "name": "5° Slot: Titolare Low-Cost", "target_budget": "10-20 cr", "max_limit": 25, "fascia": 3},
-                {"slot": 6, "name": "6° Slot: Copertura", "target_budget": "5-10 cr", "max_limit": 12, "fascia": 3},
-                {"slot": 7, "name": "7° Slot: Scommessa", "target_budget": "2-5 cr", "max_limit": 6, "fascia": 4},
-                {"slot": 8, "name": "8° Slot: Riserva", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-                {"slot": 9, "name": "9° Slot: Chiusura", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ],
-            "A": [
-                {"slot": 1, "name": "1° Slot: Top / Primo Attaccante Titolare", "target_budget": "190-230 cr", "max_limit": 250, "fascia": 1},
-                {"slot": 2, "name": "2° Slot: Secondo Attaccante Titolare", "target_budget": "110-140 cr", "max_limit": 150, "fascia": 2},
-                {"slot": 3, "name": "3° Slot: Terzo Attaccante Titolare", "target_budget": "55-80 cr", "max_limit": 90, "fascia": 2},
-                {"slot": 4, "name": "4° Slot: Quarto Slot / Rotazione", "target_budget": "15-30 cr", "max_limit": 35, "fascia": 3},
-                {"slot": 5, "name": "5° Slot: Copertura", "target_budget": "5-12 cr", "max_limit": 15, "fascia": 3},
-                {"slot": 6, "name": "6° Slot: Scommessa a 1 cr", "target_budget": "1-3 cr", "max_limit": 4, "fascia": 4},
-                {"slot": 7, "name": "7° Slot: Chiusura Reparto", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ],
-            "D": [
-                {"slot": 1, "name": "1° Slot: Top Difensore Primario", "target_budget": "30-50 cr", "max_limit": 55, "fascia": 1},
-                {"slot": 2, "name": "2° Slot: Titolare Sicuro", "target_budget": "20-30 cr", "max_limit": 35, "fascia": 2},
-                {"slot": 3, "name": "3° Slot: Titolare Squadra Media", "target_budget": "12-20 cr", "max_limit": 25, "fascia": 2},
-                {"slot": 4, "name": "4° Slot: Regolarista", "target_budget": "8-15 cr", "max_limit": 18, "fascia": 3},
-                {"slot": 5, "name": "5° Slot: Terzino Low Cost", "target_budget": "4-10 cr", "max_limit": 12, "fascia": 3},
-                {"slot": 6, "name": "6° Slot: Titolare Provincia", "target_budget": "2-5 cr", "max_limit": 6, "fascia": 3},
-                {"slot": 7, "name": "7° Slot: Copertura", "target_budget": "1 cr", "max_limit": 3, "fascia": 4},
-                {"slot": 8, "name": "8° Slot: Riserva", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-                {"slot": 9, "name": "9° Slot: Chiusura", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ],
-            "P": [
-                {"slot": 1, "name": "1° Portiere: Top Titolare", "target_budget": "40-75 cr", "max_limit": 80, "fascia": 1},
-                {"slot": 2, "name": "2° Portiere: Riserva Blocco", "target_budget": "1-5 cr", "max_limit": 10, "fascia": 4},
-                {"slot": 3, "name": "3° Portiere: Terzo Portiere", "target_budget": "1 cr", "max_limit": 3, "fascia": 4},
-                {"slot": 4, "name": "4° Portiere: Quarto Portiere", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ]
-        }
-    },
-    "moneyball_value": {
-        "id": "moneyball_value",
-        "name": "Equilibrata Moneyball (Profondità & Valore)",
-        "badge": "EQUILIBRATA",
-        "description": "Nessun giocatore oltre i 205 crediti. Massimizza il surplus di valore statistico e garantisce 29 titolari affidabili.",
-        "split_pct": {"P": 0.10, "D": 0.16, "C": 0.26, "A": 0.48},
-        "split": {"P": "100 cr (10%)", "D": "160 cr (16%)", "C": "260 cr (26%)", "A": "480 cr (48%)"},
-        "slots": {
-            "A": [
-                {"slot": 1, "name": "1° Slot: Top Attaccante Value", "target_budget": "150-195 cr", "max_limit": 205, "fascia": 1},
-                {"slot": 2, "name": "2° Slot: Secondo Attaccante Titolare", "target_budget": "120-155 cr", "max_limit": 165, "fascia": 2},
-                {"slot": 3, "name": "3° Slot: Terzo Attaccante Titolare", "target_budget": "90-120 cr", "max_limit": 130, "fascia": 2},
-                {"slot": 4, "name": "4° Slot: Quarto Attaccante / Titolare", "target_budget": "40-60 cr", "max_limit": 70, "fascia": 3},
-                {"slot": 5, "name": "5° Slot: Copertura Reparto", "target_budget": "15-25 cr", "max_limit": 30, "fascia": 3},
-                {"slot": 6, "name": "6° Slot: Scommessa Giovane", "target_budget": "2-6 cr", "max_limit": 8, "fascia": 4},
-                {"slot": 7, "name": "7° Slot: Chiusura Reparto", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ],
-            "C": [
-                {"slot": 1, "name": "1° Slot: Top Centrocampista Leader", "target_budget": "80-110 cr", "max_limit": 120, "fascia": 1},
-                {"slot": 2, "name": "2° Slot: Titolare Bonus", "target_budget": "60-85 cr", "max_limit": 95, "fascia": 2},
-                {"slot": 3, "name": "3° Slot: Titolare Continuo", "target_budget": "40-60 cr", "max_limit": 70, "fascia": 2},
-                {"slot": 4, "name": "4° Slot: Regolarista", "target_budget": "20-35 cr", "max_limit": 40, "fascia": 3},
-                {"slot": 5, "name": "5° Slot: Titolare Squadra Media", "target_budget": "12-20 cr", "max_limit": 25, "fascia": 3},
-                {"slot": 6, "name": "6° Slot: Copertura", "target_budget": "6-12 cr", "max_limit": 15, "fascia": 3},
-                {"slot": 7, "name": "7° Slot: Scommessa", "target_budget": "2-6 cr", "max_limit": 8, "fascia": 4},
-                {"slot": 8, "name": "8° Slot: Riserva", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-                {"slot": 9, "name": "9° Slot: Chiusura", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ],
-            "D": [
-                {"slot": 1, "name": "1° Slot: Top Difensore Modificatore", "target_budget": "40-60 cr", "max_limit": 65, "fascia": 1},
-                {"slot": 2, "name": "2° Slot: Titolare Alta MV", "target_budget": "25-40 cr", "max_limit": 45, "fascia": 2},
-                {"slot": 3, "name": "3° Slot: Titolare Sicuro", "target_budget": "20-30 cr", "max_limit": 35, "fascia": 2},
-                {"slot": 4, "name": "4° Slot: Difensore Primaria Squadra", "target_budget": "12-20 cr", "max_limit": 25, "fascia": 3},
-                {"slot": 5, "name": "5° Slot: Regolarista", "target_budget": "8-15 cr", "max_limit": 18, "fascia": 3},
-                {"slot": 6, "name": "6° Slot: Terzino Low Cost", "target_budget": "4-10 cr", "max_limit": 12, "fascia": 3},
-                {"slot": 7, "name": "7° Slot: Titolare Provincia", "target_budget": "2-5 cr", "max_limit": 6, "fascia": 4},
-                {"slot": 8, "name": "8° Slot: Riserva", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-                {"slot": 9, "name": "9° Slot: Chiusura", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ],
-            "P": [
-                {"slot": 1, "name": "1° Portiere: Titolare Solido / Value", "target_budget": "30-55 cr", "max_limit": 60, "fascia": 2},
-                {"slot": 2, "name": "2° Portiere: Alternanza Titolare", "target_budget": "20-35 cr", "max_limit": 40, "fascia": 2},
-                {"slot": 3, "name": "3° Portiere: Riserva / Terzo", "target_budget": "1-3 cr", "max_limit": 5, "fascia": 4},
-                {"slot": 4, "name": "4° Portiere: Quarto Portiere", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ]
-        }
-    },
-    "custom": {
-        "id": "custom",
-        "name": "Personalizzata (Custom)",
-        "badge": "PERSONALIZZATA",
-        "description": "Configura liberamente la suddivisione del budget per reparto e personalizza i tetti Stop-Loss e le fasce per ogni singolo slot.",
-        "split_pct": {"P": 0.08, "D": 0.12, "C": 0.25, "A": 0.55},
-        "split": {"P": "80 cr (8%)", "D": "120 cr (12%)", "C": "250 cr (25%)", "A": "550 cr (55%)"},
-        "slots": {
-            "A": [
-                {"slot": 1, "name": "1° Slot: Top Scorer Primario", "target_budget": "300-390 cr", "max_limit": 410, "fascia": 1},
-                {"slot": 2, "name": "2° Slot: Secondo Attaccante Titolare", "target_budget": "110-140 cr", "max_limit": 150, "fascia": 2},
-                {"slot": 3, "name": "3° Slot: Terzo Attaccante Titolare", "target_budget": "50-80 cr", "max_limit": 90, "fascia": 2},
-                {"slot": 4, "name": "4° Slot: Quarto Slot / Rotazione", "target_budget": "20-40 cr", "max_limit": 45, "fascia": 3},
-                {"slot": 5, "name": "5° Slot: Copertura Reparto", "target_budget": "10-20 cr", "max_limit": 25, "fascia": 3},
-                {"slot": 6, "name": "6° Slot: Scommessa", "target_budget": "2-6 cr", "max_limit": 8, "fascia": 4},
-                {"slot": 7, "name": "7° Slot: Chiusura Reparto", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ],
-            "C": [
-                {"slot": 1, "name": "1° Slot: Top Centrocampista", "target_budget": "90-130 cr", "max_limit": 140, "fascia": 1},
-                {"slot": 2, "name": "2° Slot: Titolare Bonus", "target_budget": "50-80 cr", "max_limit": 90, "fascia": 2},
-                {"slot": 3, "name": "3° Slot: Titolare Squadra Media", "target_budget": "30-50 cr", "max_limit": 55, "fascia": 2},
-                {"slot": 4, "name": "4° Slot: Regolarista Continuo", "target_budget": "15-30 cr", "max_limit": 35, "fascia": 3},
-                {"slot": 5, "name": "5° Slot: Titolare Provincia", "target_budget": "10-20 cr", "max_limit": 25, "fascia": 3},
-                {"slot": 6, "name": "6° Slot: Copertura", "target_budget": "5-10 cr", "max_limit": 12, "fascia": 3},
-                {"slot": 7, "name": "7° Slot: Scommessa Giovane", "target_budget": "2-5 cr", "max_limit": 6, "fascia": 4},
-                {"slot": 8, "name": "8° Slot: Riserva", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-                {"slot": 9, "name": "9° Slot: Chiusura", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ],
-            "D": [
-                {"slot": 1, "name": "1° Slot: Top Difensore Modificatore", "target_budget": "35-55 cr", "max_limit": 60, "fascia": 1},
-                {"slot": 2, "name": "2° Slot: Titolare Alta MV", "target_budget": "20-35 cr", "max_limit": 40, "fascia": 2},
-                {"slot": 3, "name": "3° Slot: Terzino di Spinta", "target_budget": "15-25 cr", "max_limit": 30, "fascia": 2},
-                {"slot": 4, "name": "4° Slot: Centrale Affidabile", "target_budget": "10-18 cr", "max_limit": 20, "fascia": 3},
-                {"slot": 5, "name": "5° Slot: Regolarista", "target_budget": "6-12 cr", "max_limit": 15, "fascia": 3},
-                {"slot": 6, "name": "6° Slot: Titolare Low Cost", "target_budget": "3-8 cr", "max_limit": 10, "fascia": 3},
-                {"slot": 7, "name": "7° Slot: Copertura", "target_budget": "1-4 cr", "max_limit": 5, "fascia": 4},
-                {"slot": 8, "name": "8° Slot: Riserva", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-                {"slot": 9, "name": "9° Slot: Chiusura", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ],
-            "P": [
-                {"slot": 1, "name": "1° Portiere: Top Titolare", "target_budget": "35-80 cr", "max_limit": 85, "fascia": 1},
-                {"slot": 2, "name": "2° Portiere: Riserva Blocco", "target_budget": "1-10 cr", "max_limit": 15, "fascia": 4},
-                {"slot": 3, "name": "3° Portiere: Terzo Portiere", "target_budget": "1-3 cr", "max_limit": 5, "fascia": 4},
-                {"slot": 4, "name": "4° Portiere: Quarto Portiere", "target_budget": "1 cr", "max_limit": 2, "fascia": 4},
-            ]
-        }
-    }
-}
-
-DEFAULT_TACTIC_ID = "trazione_anteriore"
 
 
 def load_dataset():
@@ -457,284 +151,6 @@ def load_dataset():
             df.loc[mask & (prices < q3), "fascia"] = 4
 
     return df
-
-
-# ──────────────────────────────────────────────────────────────────────
-# CLOUD REDIS STATE & LEAGUE SESSION SYNCHRONIZATION (UPSTASH)
-# ──────────────────────────────────────────────────────────────────────
-_REDIS_CACHE = {}
-_REDIS_CACHE_TS = {}
-
-def _get_upstash_credentials():
-    url = os.environ.get("UPSTASH_REDIS_REST_URL") or os.environ.get("KV_REST_API_URL")
-    token = os.environ.get("UPSTASH_REDIS_REST_TOKEN") or os.environ.get("KV_REST_API_TOKEN")
-    if url and token:
-        return url.rstrip("/"), token
-    return None, None
-
-def _redis_get(key, max_age_seconds=1.5):
-    """
-    Fetches JSON data from Upstash Redis with a short in-memory cache
-    to avoid burning through rate limits during live auction multi-user polling.
-    """
-    now = time.time()
-    if key in _REDIS_CACHE and (now - _REDIS_CACHE_TS.get(key, 0)) < max_age_seconds:
-        return _REDIS_CACHE[key]
-
-    url, token = _get_upstash_credentials()
-    if not url or not token:
-        return None
-    try:
-        res = requests.post(
-            url,
-            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-            json=["GET", key],
-            timeout=2.2
-        )
-        if res.status_code == 200:
-            raw = res.json().get("result")
-            if raw:
-                val = json.loads(raw)
-                _REDIS_CACHE[key] = val
-                _REDIS_CACHE_TS[key] = now
-                return val
-    except Exception as e:
-        print(f"[Upstash] GET failed for key {key}: {e}")
-    return _REDIS_CACHE.get(key)
-
-def _redis_set(key, value):
-    """Saves JSON data to Upstash Redis and updates local memory cache immediately."""
-    now = time.time()
-    _REDIS_CACHE[key] = value
-    _REDIS_CACHE_TS[key] = now
-
-    url, token = _get_upstash_credentials()
-    if not url or not token:
-        return False
-    try:
-        payload = json.dumps(value, ensure_ascii=False)
-        res = requests.post(
-            url,
-            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-            json=["SET", key, payload],
-            timeout=2.2
-        )
-        return res.status_code == 200
-    except Exception as e:
-        print(f"[Upstash] SET failed for key {key}: {e}")
-        return False
-
-def _redis_del(key):
-    _REDIS_CACHE.pop(key, None)
-    _REDIS_CACHE_TS.pop(key, None)
-    url, token = _get_upstash_credentials()
-    if not url or not token:
-        return False
-    try:
-        res = requests.post(
-            url,
-            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-            json=["DEL", key],
-            timeout=2.2
-        )
-        return res.status_code == 200
-    except Exception as e:
-        print(f"[Upstash] DEL failed for key {key}: {e}")
-        return False
-
-
-def load_league_settings():
-    """Load league settings from Upstash Redis, file, in-memory cache, or return defaults."""
-    global _IN_MEMORY_SETTINGS
-    # 1. Check Redis first for multi-client synchronization
-    redis_settings = _redis_get("fanta_shared_settings", max_age_seconds=2.0)
-    if redis_settings and isinstance(redis_settings, dict) and "budget" in redis_settings and "roster_slots" in redis_settings and "teams" in redis_settings:
-        _IN_MEMORY_SETTINGS = redis_settings
-        return redis_settings
-
-    # 2. Check local file
-    if os.path.exists(SETTINGS_PATH):
-        try:
-            with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
-                settings = json.load(f)
-                if "budget" in settings and "roster_slots" in settings and "teams" in settings:
-                    _IN_MEMORY_SETTINGS = settings
-                    return settings
-        except Exception:
-            pass
-
-    if _IN_MEMORY_SETTINGS is not None:
-        return _IN_MEMORY_SETTINGS
-
-    defaults = {
-        "budget": DEFAULT_BUDGET,
-        "roster_slots": DEFAULT_ROSTER_SLOTS,
-        "teams": DEFAULT_TEAMS
-    }
-    _IN_MEMORY_SETTINGS = defaults
-    return defaults
-
-
-def save_league_settings(settings):
-    """Persist league settings to Upstash Redis, file, and in-memory cache."""
-    global _IN_MEMORY_SETTINGS
-    _IN_MEMORY_SETTINGS = settings
-    _redis_set("fanta_shared_settings", settings)
-    try:
-        with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
-            json.dump(settings, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
-
-
-def get_initial_state():
-    """Creates a fresh auction state based on current league settings."""
-    settings = load_league_settings()
-    budget = settings["budget"]
-    roster_slots = settings["roster_slots"]
-    teams_cfg = settings["teams"]
-    total_size = sum(roster_slots.values())
-
-    teams = []
-    for t in teams_cfg:
-        teams.append({
-            "id": t["id"],
-            "name": t["name"],
-            "is_me": t.get("is_me", False),
-            "budget": budget,
-            "spent": 0,
-            "spent_by_role": {"P": 0, "D": 0, "C": 0, "A": 0},
-            "remaining": budget,
-            "roster": [],
-            "counts": {"P": 0, "D": 0, "C": 0, "A": 0},
-            "slots_left": dict(roster_slots),
-            "total_slots_left": total_size,
-            "max_bid": budget - (total_size - 1)
-        })
-
-    return {
-        "budget_total": budget,
-        "roster_structure": dict(roster_slots),
-        "teams": teams,
-        "assigned_players": {},
-        "favorites": [],
-        "history": []
-    }
-
-
-def recalculate_team_metrics(team, budget_total, roster_structure=None):
-    """Recomputes counts, department expenditures, remaining funds and allowable max bid."""
-    if roster_structure is None:
-        roster_structure = load_league_settings()["roster_slots"]
-
-    counts = {"P": 0, "D": 0, "C": 0, "A": 0}
-    spent_by_role = {"P": 0, "D": 0, "C": 0, "A": 0}
-    spent = 0
-    for p in team.get("roster", []):
-        r = p.get("role", "C")
-        p_price = int(p.get("price", 1))
-        counts[r] = counts.get(r, 0) + 1
-        spent += p_price
-        spent_by_role[r] = spent_by_role.get(r, 0) + p_price
-
-    slots_left = {
-        "P": max(0, roster_structure.get("P", 3) - counts["P"]),
-        "D": max(0, roster_structure.get("D", 8) - counts["D"]),
-        "C": max(0, roster_structure.get("C", 8) - counts["C"]),
-        "A": max(0, roster_structure.get("A", 6) - counts["A"])
-    }
-    total_slots_left = sum(slots_left.values())
-    remaining = budget_total - spent
-
-    if total_slots_left > 0:
-        max_bid = max(1, remaining - (total_slots_left - 1))
-    else:
-        max_bid = 0
-
-    team["spent"] = spent
-    team["spent_by_role"] = spent_by_role
-    team["remaining"] = remaining
-    team["counts"] = counts
-    team["slots_left"] = slots_left
-    team["total_slots_left"] = total_slots_left
-    team["max_bid"] = max_bid
-
-
-def load_state():
-    """
-    Load auction state from Upstash Redis, file, or in-memory cache and automatically synchronize with current league settings.
-    """
-    global _IN_MEMORY_STATE
-    settings = load_league_settings()
-    settings_budget = settings.get("budget", DEFAULT_BUDGET)
-    settings_slots = settings.get("roster_slots", DEFAULT_ROSTER_SLOTS)
-    settings_teams = settings.get("teams", DEFAULT_TEAMS)
-
-    state = None
-    # 1. Try Upstash Redis first for real-time multi-device shared session
-    state = _redis_get("fanta_shared_state", max_age_seconds=1.5)
-
-    # 2. Try local file if Redis returned nothing
-    if state is None and os.path.exists(STATE_PATH):
-        try:
-            with open(STATE_PATH, "r", encoding="utf-8") as f:
-                state = json.load(f)
-        except Exception:
-            state = None
-
-    # 3. Try in-memory
-    if state is None and _IN_MEMORY_STATE is not None:
-        state = _IN_MEMORY_STATE
-
-    if state and isinstance(state.get("teams"), list) and isinstance(state.get("assigned_players"), dict):
-        state["budget_total"] = settings_budget
-        state["roster_structure"] = dict(settings_slots)
-
-        # Synchronize team names & is_me from league settings
-        teams_map = {t["id"]: t for t in settings_teams}
-        updated_teams = []
-        for i, st_team in enumerate(state.get("teams", [])):
-            tid = st_team.get("id", i + 1)
-            if tid in teams_map:
-                st_team["name"] = teams_map[tid]["name"]
-                st_team["is_me"] = teams_map[tid].get("is_me", False)
-            elif i < len(settings_teams):
-                st_team["name"] = settings_teams[i]["name"]
-                st_team["is_me"] = settings_teams[i].get("is_me", False)
-
-            # Deduplicate roster to clean up any corrupted duplicate records
-            seen_p = set()
-            cleaned_roster = []
-            for p_item in st_team.get("roster", []):
-                p_name = p_item.get("player")
-                if p_name and p_name not in seen_p:
-                    seen_p.add(p_name)
-                    cleaned_roster.append(p_item)
-            st_team["roster"] = cleaned_roster
-
-            recalculate_team_metrics(st_team, settings_budget, settings_slots)
-            updated_teams.append(st_team)
-
-        state["teams"] = updated_teams
-        _IN_MEMORY_STATE = state
-        return state
-
-    initial = get_initial_state()
-    _IN_MEMORY_STATE = initial
-    _redis_set("fanta_shared_state", initial)
-    return initial
-
-
-def save_state(state):
-    """Persist auction state to Upstash Redis, file, and in-memory cache."""
-    global _IN_MEMORY_STATE
-    _IN_MEMORY_STATE = state
-    _redis_set("fanta_shared_state", state)
-    try:
-        with open(STATE_PATH, "w", encoding="utf-8") as f:
-            json.dump(state, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
 
 
 _PRICING_CACHE = {}
@@ -824,203 +240,29 @@ def send_static(path):
 
 
 
-@app.route("/api/settings")
-def api_get_settings():
-    """Return current league settings (budget, slots, teams) and environment metadata."""
-    settings = load_league_settings()
-    return jsonify({
-        "settings": settings,
-        "app_env": APP_ENV,
-        "is_personal": IS_PERSONAL
-    })
-
-
-@app.route("/api/settings", methods=["POST"])
-def api_save_settings():
-    """Save league settings from UI. Resets auction state if budget/slots changed or force_reset is True."""
-    data = request.json or {}
-    budget = int(data.get("budget", DEFAULT_BUDGET))
-    roster_slots = data.get("roster_slots", DEFAULT_ROSTER_SLOTS)
-    teams_raw = data.get("teams", DEFAULT_TEAMS)
-    force_reset = bool(data.get("force_reset", False))
-
-    # Validate
-    if budget < 100 or budget > 5000:
-        return jsonify({"error": "Budget deve essere tra 100 e 5000 crediti"}), 400
-    for role in ["P", "D", "C", "A"]:
-        if int(roster_slots.get(role, 0)) < 1:
-            return jsonify({"error": f"Almeno 1 slot per il ruolo {role}"}), 400
-    if len(teams_raw) < 2 or len(teams_raw) > 16:
-        return jsonify({"error": "Numero squadre deve essere tra 2 e 16"}), 400
-
-    # Normalize roster_slots to int
-    roster_slots = {k: int(v) for k, v in roster_slots.items()}
-
-    # Build clean teams list
-    teams = []
-    for i, t in enumerate(teams_raw):
-        teams.append({
-            "id": t.get("id", i + 1),
-            "name": str(t.get("name", f"Squadra {i+1}")).strip() or f"Squadra {i+1}",
-            "is_me": bool(t.get("is_me", i == 0))
-        })
-
-    new_settings = {"budget": budget, "roster_slots": roster_slots, "teams": teams}
-
-    # Check if structural change requires state reset
-    old_settings = load_league_settings()
-    needs_reset = force_reset or (
-        old_settings["budget"] != budget or
-        old_settings["roster_slots"] != roster_slots or
-        len(old_settings["teams"]) != len(teams)
-    )
-
-    save_league_settings(new_settings)
-
-    if needs_reset:
-        # Reset auction state with new settings
-        new_state = get_initial_state()
-        save_state(new_state)
-        return jsonify({"success": True, "reset": True, "message": "Impostazioni salvate. Asta inizializzata con la nuova configurazione."})
-
-    # Immediately sync team names and settings into state file
-    state = load_state()
-    save_state(state)
-    return jsonify({"success": True, "reset": False, "message": "Impostazioni salvate e squadre aggiornate."})
-
-
-@app.route("/api/auth_admin", methods=["POST"])
-def api_auth_admin():
-    data = request.json or {}
-    pwd = str(data.get("password", "")).strip()
-    if pwd in [ADMIN_PASSWORD, ADMIN_PIN]:
-        return jsonify({"success": True, "is_admin": True})
-    return jsonify({"error": "Password errata"}), 401
-
-
-@app.route("/api/auth/login", methods=["POST"])
-def api_auth_login():
-    data = request.json or {}
-    pin = str(data.get("pin", "")).strip()
-    try:
-        team_id = int(data.get("team_id", 1))
-    except (ValueError, TypeError):
-        team_id = 1
-
-    is_admin = (pin in [ADMIN_PIN, ADMIN_PASSWORD])
-    is_participant = (pin == LEAGUE_PIN or is_admin)
-
-    if not is_participant:
-        return jsonify({"authenticated": False, "error": "PIN non corretto. Inserisci il PIN di Lega o il PIN Admin."}), 401
-
-    role = "admin" if is_admin else "participant"
-    return jsonify({
-        "authenticated": True,
-        "role": role,
-        "is_admin": is_admin,
-        "team_id": team_id
-    })
-
-
-@app.route("/api/session/reset", methods=["POST"])
-def api_session_reset():
-    data = request.json or {}
-    pin = str(data.get("admin_pin", "")).strip()
-    if pin not in [ADMIN_PIN, ADMIN_PASSWORD]:
-        return jsonify({"error": "PIN Admin non valido. Reset non autorizzato."}), 403
-
-    initial_state = get_initial_state()
-    save_state(initial_state)
-    return jsonify({
-        "success": True,
-        "message": "Nuova sessione d'asta avviata! Rose e crediti azzerati.",
-        "state": initial_state
-    })
-
-
-def compute_market_inflation(df, state):
-    """Computes dynamic market inflation index comparing discretionary budget to remaining unassigned VORP."""
-    assigned = state.get("assigned_players", {})
-    assigned_keys = set(assigned.keys())
-    teams = state.get("teams", [])
-    total_remaining = sum(t.get("remaining", 0) for t in teams)
-    total_slots_left = sum(t.get("total_slots_left", 0) for t in teams)
-    discretionary_credits = max(0, total_remaining - total_slots_left)
-
-    unassigned_df = df[~df["player"].isin(assigned_keys)]
-    unassigned_vorp = float(unassigned_df["vorp_points"].clip(lower=0).sum())
-
-    total_league_budget = state.get("budget_total", DEFAULT_BUDGET) * max(1, len(teams))
-    roster_structure = state.get("roster_structure", DEFAULT_ROSTER_SLOTS)
-    total_league_slots = sum(roster_structure.values()) * max(1, len(teams))
-    initial_discretionary = max(1, total_league_budget - total_league_slots)
-    initial_total_vorp = float(df["vorp_points"].clip(lower=0).sum()) or 1.0
-    initial_ratio = initial_discretionary / initial_total_vorp
-
-    current_ratio = discretionary_credits / max(1.0, unassigned_vorp)
-    raw_inflation = current_ratio / max(0.001, initial_ratio)
-    inflation_index = round(max(0.5, min(3.0, float(raw_inflation))), 2)
-
-    if inflation_index >= 1.25:
-        status = "SURRISCALDATO"
-        desc = "Forte inflazione: i top costano oltre il Fair Price. Cerca value picks e attendi."
-        color = "red"
-    elif inflation_index >= 1.05:
-        status = "INFLAZIONATO"
-        desc = "Leggera inflazione: prezzi leggermente sopra la parità teorica."
-        color = "yellow"
-    elif inflation_index <= 0.85:
-        status = "DEFLAZIONATO"
-        desc = "Occasioni sul mercato! Tanti crediti spesi e molto VORP libero."
-        color = "green"
-    else:
-        status = "EQUILIBRATO"
-        desc = "Mercato in perfetto equilibrio con le stime teoriche."
-        color = "blue"
-
-    return {
-        "index": inflation_index,
-        "status": status,
-        "description": desc,
-        "color": color,
-        "discretionary_credits": discretionary_credits,
-        "unassigned_vorp": round(unassigned_vorp, 1)
-    }
-
-
 @app.route("/api/players")
 def api_players():
     df = load_dataset()
-    state = load_state()
-    assigned = state.get("assigned_players", {})
-    favorites = set(state.get("favorites", []))
 
-    league_settings = load_league_settings()
     budget_arg = request.args.get("budget", type=int)
-    budget_total = budget_arg if (budget_arg and budget_arg > 0) else state.get("budget_total", league_settings.get("budget", DEFAULT_BUDGET))
-    roster_structure = state.get("roster_structure", league_settings.get("roster_slots", DEFAULT_ROSTER_SLOTS))
-    n_teams = max(2, len(state.get("teams", [])))
+    budget_total = budget_arg if (budget_arg and budget_arg > 0) else DEFAULT_BUDGET
+    roster_structure = DEFAULT_ROSTER_SLOTS
+    n_teams = DEFAULT_N_TEAMS
 
     pricing_data = get_dynamic_fair_prices(df, budget_total, roster_structure, n_teams)
     custom_fair_prices = pricing_data["fair_prices"]
     custom_vorp = pricing_data["vorp"]
 
     budget_scale = budget_total / 1000.0
-    market_info = compute_market_inflation(df, state)
-    inflation_factor = market_info["index"]
 
     role_filter = request.args.get("role")
     fascia_filter = request.args.get("fascia")
-    only_available = request.args.get("available", "false").lower() == "true"
     search = request.args.get("q", "").strip().lower()
 
     records = []
     for _, row in df.iterrows():
         p_name = row["player"]
-        is_assigned = p_name in assigned
 
-        if only_available and is_assigned:
-            continue
         if role_filter and role_filter != "ALL" and row["role"] != role_filter:
             continue
         if fascia_filter and fascia_filter != "ALL" and str(row["fascia"]) != str(fascia_filter):
@@ -1035,10 +277,7 @@ def api_players():
         else:
             base_fair = custom_fair_prices.get(p_name, max(1, int(round(fair_1000 * budget_scale))))
         fair_scaled = base_fair
-        fair_live = max(1, int(round(fair_scaled * inflation_factor)))
         vorp_val = custom_vorp.get(p_name, float(row.get("vorp_points", 0)))
-
-        assignment_info = assigned.get(p_name)
 
         # Medical & Physical Fragility Audit (Transfermarkt)
         inj_info = _INJURIES_CACHE.get(p_name, {})
@@ -1135,9 +374,6 @@ def api_players():
             "minutes_2627": int(row.get("minutes_2627", 0)),
             "xg_3y": float(row.get("xg_media_3y", 0)) if pd.notna(row.get("xg_media_3y")) else None,
             "xa_3y": float(row.get("xa_media_3y", 0)) if pd.notna(row.get("xa_media_3y")) else None,
-            "is_assigned": is_assigned,
-            "assignment": assignment_info,
-            "is_favorite": p_name in favorites,
             "medical": {
                 "days_lost_3y": days_lost,
                 "injuries_count_3y": inj_count,
@@ -1167,164 +403,11 @@ def api_players():
     return jsonify({
         "players": records,
         "total": len(records),
-        "tactical_presets": TACTICAL_PRESETS,
-        "default_tactic": DEFAULT_TACTIC_ID,
-        "market_index": market_info,
         "budget_scale": budget_scale,
         "league_budget": budget_total,
         "roster_structure": roster_structure,
         "n_teams": n_teams
     })
-
-
-@app.route("/api/state")
-def api_state():
-    state = load_state()
-    df = load_dataset()
-    assigned = state.get("assigned_players", {})
-
-    for t in state["teams"]:
-        recalculate_team_metrics(t, state["budget_total"], state.get("roster_structure"))
-
-    scarcity = {}
-    for role in ["P", "D", "C", "A"]:
-        scarcity[role] = {1: 0, 2: 0, 3: 0, 4: 0}
-        sub = df[df["role"] == role]
-        for _, r in sub.iterrows():
-            if r["player"] not in assigned:
-                f = int(r["fascia"])
-                scarcity[role][f] = scarcity[role].get(f, 0) + 1
-
-    market_info = compute_market_inflation(df, state)
-
-    return jsonify({
-        "state": state,
-        "scarcity": scarcity,
-        "tactical_presets": TACTICAL_PRESETS,
-        "default_tactic": DEFAULT_TACTIC_ID,
-        "market_index": market_info
-    })
-
-
-@app.route("/api/sync_state", methods=["POST"])
-def api_sync_state():
-    client_state = request.json or {}
-    if "teams" in client_state and "assigned_players" in client_state:
-        for t in client_state["teams"]:
-            recalculate_team_metrics(t, client_state.get("budget_total", DEFAULT_BUDGET), client_state.get("roster_structure"))
-        save_state(client_state)
-        return jsonify({"success": True})
-    return jsonify({"error": "Invalid state structure"}), 400
-
-
-@app.route("/api/assign", methods=["POST"])
-def api_assign():
-    data = request.json or {}
-    player_name = data.get("player")
-    try:
-        team_id = int(data.get("team_id", 1))
-    except (ValueError, TypeError):
-        team_id = 1
-    try:
-        price = int(data.get("price", 1))
-    except (ValueError, TypeError):
-        price = 1
-
-    if not player_name:
-        return jsonify({"error": "Specificare il calciatore"}), 400
-
-    df = load_dataset()
-    p_match = df[df["player"] == player_name]
-    if p_match.empty:
-        return jsonify({"error": "Calciatore non presente nel database"}), 404
-
-    p_row = p_match.iloc[0]
-    state = load_state()
-
-    team = next((t for t in state["teams"] if t["id"] == team_id), None)
-    if not team:
-        return jsonify({"error": "Squadra non trovata"}), 404
-
-    if player_name in state.get("assigned_players", {}):
-        assigned_to = state["assigned_players"][player_name].get("team_name", "un'altra squadra")
-        return jsonify({"error": f"{player_name} è già stato assegnato a {assigned_to}!"}), 400
-
-    for t in state.get("teams", []):
-        if any(p.get("player") == player_name for p in t.get("roster", [])):
-            return jsonify({"error": f"{player_name} è già presente nella rosa di {t.get('name', 'una squadra')}!"}), 400
-
-    role = p_row["role"]
-    roster_structure = state.get("roster_structure", DEFAULT_ROSTER_SLOTS)
-    max_slots_for_role = roster_structure.get(role, 3)
-
-    if team["counts"].get(role, 0) >= max_slots_for_role:
-        return jsonify({"error": f"{team['name']} ha già completato i {max_slots_for_role} slot previsti per il ruolo {role}."}), 400
-
-    # Ensure team metrics are freshly synchronized with current budget
-    recalculate_team_metrics(team, state["budget_total"], roster_structure)
-
-    if price > team["remaining"]:
-        return jsonify({"error": f"Crediti insufficienti per {team['name']}: disponibili {team['remaining']} cr, offerta {price} cr."}), 400
-
-    if price > team["max_bid"] and team["total_slots_left"] > 1:
-        return jsonify({
-            "error": f"Offerta ({price} cr) superiore al limite massimo consentito per {team['name']} ({team['max_bid']} cr). "
-                     f"Devi conservare almeno 1 credito per ciascuno dei {team['total_slots_left'] - 1} slot rimanenti."
-        }), 400
-
-    player_item = {
-        "player": player_name,
-        "role": role,
-        "team": str(p_row.get("team", "")),
-        "price": price,
-        "pts_exp": float(p_row.get("predicted_pts_p50", 0)),
-        "score": float(p_row.get("score_composito", 0))
-    }
-
-    team["roster"].append(player_item)
-    state["assigned_players"][player_name] = {
-        "team_id": team_id,
-        "team_name": team["name"],
-        "price": price
-    }
-
-    state["history"].append({
-        "action": "assign",
-        "player": player_name,
-        "team_id": team_id,
-        "price": price
-    })
-
-    recalculate_team_metrics(team, state["budget_total"], state.get("roster_structure"))
-    save_state(state)
-
-    return jsonify({
-        "success": True,
-        "state": state,
-        "message": f"Assegnato {player_name} ({role}) a {team['name']} per {price} cr"
-    })
-
-
-@app.route("/api/undo", methods=["POST"])
-def api_undo():
-    state = load_state()
-    if not state.get("history"):
-        return jsonify({"error": "Nessuna operazione registrata da annullare"}), 400
-
-    last_action = state["history"].pop()
-    player_name = last_action["player"]
-    team_id = last_action["team_id"]
-
-    if player_name in state["assigned_players"]:
-        del state["assigned_players"][player_name]
-
-    team = next((t for t in state["teams"] if t["id"] == team_id), None)
-    if team:
-        team["roster"] = [p for p in team["roster"] if p["player"] != player_name]
-        recalculate_team_metrics(team, state["budget_total"], state.get("roster_structure"))
-
-    save_state(state)
-    return jsonify({"success": True, "undone": last_action, "state": state})
 
 
 @app.route("/api/ai_status", methods=["GET"])
@@ -1351,22 +434,16 @@ def api_ai_test():
 @app.route("/api/ai_query", methods=["POST"])
 def api_ai_query():
     """
-    Il Maestro AI Tactical Engine
+    Il Maestro AI — Player Q&A Engine
     Priorità: Ollama locale -> OpenAI-compatible -> Google Gemini -> Local Quantitative Reasoner.
     """
     data = request.json or {}
     prompt = str(data.get("prompt", "")).strip()
-    profile_id = int(data.get("profile_id", 1))
 
     if not prompt:
         return jsonify({"error": "Prompt vuoto"}), 400
 
     df = load_dataset()
-    state = load_state()
-    assigned = state.get("assigned_players", {})
-    team = next((t for t in state["teams"] if t["id"] == profile_id), state["teams"][0])
-    spent = team.get("spent_by_role", {"P": 0, "D": 0, "C": 0, "A": 0})
-    counts = team.get("counts", {"P": 0, "D": 0, "C": 0, "A": 0})
 
     prompt_lower = prompt.lower()
 
@@ -1412,20 +489,19 @@ def api_ai_query():
     # ─────────────────────────────────────────────────────────────
     try:
         from core.copilot import get_copilot_response
-        league_settings = load_league_settings()
-        budget_total = state.get("budget_total", league_settings.get("budget", DEFAULT_BUDGET))
-        roster_structure = state.get("roster_structure", league_settings.get("roster_slots", DEFAULT_ROSTER_SLOTS))
-        n_teams = max(2, len(state.get("teams", [])))
+        budget_total = DEFAULT_BUDGET
+        roster_structure = DEFAULT_ROSTER_SLOTS
+        n_teams = DEFAULT_N_TEAMS
 
         pricing_data = get_dynamic_fair_prices(df, budget_total, roster_structure, n_teams)
         custom_fair_prices = pricing_data["fair_prices"]
         custom_vorp = pricing_data["vorp"]
 
-        unassigned_df = df[~df['player'].isin(assigned.keys())].copy()
-        unassigned_df['fair_custom'] = unassigned_df['player'].map(custom_fair_prices).fillna(1).astype(int)
-        unassigned_df['vorp_custom'] = unassigned_df['player'].map(custom_vorp).fillna(0.0).astype(float)
+        pool_df = df.copy()
+        pool_df['fair_custom'] = pool_df['player'].map(custom_fair_prices).fillna(1).astype(int)
+        pool_df['vorp_custom'] = pool_df['player'].map(custom_vorp).fillna(0.0).astype(float)
 
-        sample_df = unassigned_df.copy()
+        sample_df = pool_df.copy()
         
         role_map_kw = {'portier': 'P', 'difensor': 'D', 'centrocampist': 'C', 'attaccant': 'A'}
         for r_key, r_code in role_map_kw.items():
@@ -1455,7 +531,7 @@ def api_ai_query():
             sample_df = sample_df.sort_values(['is_starter_2627', 'vorp_custom'], ascending=[False, False])
 
         if sample_df.empty:
-            sample_df = unassigned_df.sort_values('vorp_custom', ascending=False)
+            sample_df = pool_df.sort_values('vorp_custom', ascending=False)
 
         explicit_sample = []
         for row in explicit_matches:
@@ -1480,17 +556,9 @@ def api_ai_query():
 
         top_sample = explicit_sample + other_sample
 
-        team_context = {
-            "name": team["name"],
-            "remaining": team["remaining"],
-            "max_bid": team["max_bid"],
-            "counts": counts,
-            "spent_by_role": spent,
-            "roster_structure": state.get("roster_structure", DEFAULT_ROSTER_SLOTS)
-        }
         llm_reply = get_copilot_response(
-            prompt, team_context, top_sample,
-            budget_total=state.get("budget_total", DEFAULT_BUDGET),
+            prompt, {}, top_sample,
+            budget_total=DEFAULT_BUDGET,
             is_personal=IS_PERSONAL
         )
         if llm_reply:
@@ -1501,40 +569,6 @@ def api_ai_query():
     # ─────────────────────────────────────────────────────────────
     # 2. LOCAL QUANTITATIVE REASONING ENGINE (Zero Latency & 0 Cost)
     # ─────────────────────────────────────────────────────────────
-
-    # A. Check for Squad Health / Roster Diagnostic
-    squad_keywords = ["squadra", "rosa", "come sono", "cosa mi manca", "situazione", "budget", "bilancio", "diagnosi"]
-    if any(k in prompt_lower for k in squad_keywords) and not explicit_matches:
-        p_slots = 4 - counts.get('P', 0)
-        d_slots = 9 - counts.get('D', 0)
-        c_slots = 9 - counts.get('C', 0)
-        a_slots = 7 - counts.get('A', 0)
-        tot_free = p_slots + d_slots + c_slots + a_slots
-        avg_cr_per_slot = round(team['remaining'] / max(1, tot_free), 1)
-
-        advice_points = []
-        if a_slots > 0 and team['remaining'] > 300:
-            advice_points.append(f"Riserva circa il 40-48% del budget residuo ({int(team['remaining']*0.45)} cr) per completare il reparto d'attacco con almeno 1 Top e 1 Semi-Top.")
-        if d_slots > 3:
-            advice_points.append(f"Mancano {d_slots} difensori. Se punti al Modificatore, investi su 2 centrali da 6.20+ MV a 15-25 cr e completa con titolari a 1-3 cr.")
-        if c_slots > 3:
-            advice_points.append(f"A centrocampo hai {c_slots} slot liberi: cerca profili con VORP positivo e xG alto (rigoristi/incursori).")
-        if avg_cr_per_slot < 6:
-            advice_points.append("ATTENZIONE: Media crediti per slot molto bassa. Procedi con disciplina chiamando solo svincolati a 1 credito.")
-
-        return jsonify({
-            "type": "squad_diagnostic",
-            "title": f"Diagnosi Tattica: {team['name']}",
-            "engine": "Regole Tattiche Locali (Offline)",
-            "metrics": {
-                "remaining": team['remaining'],
-                "max_bid": team['max_bid'],
-                "free_slots": tot_free,
-                "avg_per_slot": avg_cr_per_slot
-            },
-            "advice": advice_points,
-            "verdict": f"Stato Finanziario: Ti restano {team['remaining']} cr per {tot_free} slot (media {avg_cr_per_slot} cr/slot). Max rilancio disponibile: {team['max_bid']} cr."
-        })
 
     # B. Multi-Player Comparison (2 or more players, explicit or comparison query)
     is_comp = any(w in prompt_lower for w in ["vs", "contro", "confront", "meglio tra", "differenza tra", "chi tra", "chi prendere tra"]) or len(explicit_matches) >= 2
@@ -1567,7 +601,6 @@ def api_ai_query():
     target_matches = explicit_matches if explicit_matches else [row for _, row in df.iterrows() if player_matches_query(row['player'], expanded_prompt)]
     if target_matches:
         row = target_matches[0]
-        is_ass = row['player'] in assigned
         starter_txt = "Titolare confermato 2026/27" if row.get('is_starter_2627') else "Rotazione / Non ancora titolare fisso"
         return jsonify({
             "type": "player_deepdive",
@@ -1586,8 +619,7 @@ def api_ai_query():
                 "vorp": float(row.get('vorp_points', 0)),
                 "starts": int(row.get('starts_2627', 0)),
                 "minutes": int(row.get('minutes_2627', 0)),
-                "injury_days": int(row.get('giorni_infortunio_3y', 0)),
-                "is_assigned": is_ass
+                "injury_days": int(row.get('giorni_infortunio_3y', 0))
             },
             "verdict": f"Valutazione Modello: Prezzo fair stimato a 1000cr: **{row.get('prezzo_fair_1000', 1)} cr**. {starter_txt} con proiezione P50 di **{row.get('predicted_pts_p50', 0):.1f} punti attesi** e VORP **+{row.get('vorp_points', 0):.1f}**."
         })
@@ -1618,7 +650,6 @@ def api_ai_query():
     max_budget = int(budget_match.group(1)) if budget_match else None
 
     filtered = df.copy()
-    filtered = filtered[~filtered['player'].isin(assigned.keys())]
 
     if target_team:
         filtered = filtered[filtered['team'] == target_team]
@@ -1658,123 +689,6 @@ def api_ai_query():
         "players": records,
         "verdict": "Consiglio Tattico: I profili selezionati offrono il miglior compromesso tra titolarità confermata e surplus di valore VORP."
     })
-
-
-@app.route("/api/favorite", methods=["POST"])
-def api_favorite():
-    data = request.json or {}
-    player_name = data.get("player")
-    if not player_name:
-        return jsonify({"error": "Specificare il calciatore"}), 400
-
-    state = load_state()
-    favs = set(state.get("favorites", []))
-    if player_name in favs:
-        favs.remove(player_name)
-    else:
-        favs.add(player_name)
-
-    state["favorites"] = list(favs)
-    save_state(state)
-    return jsonify({"success": True, "favorites": state["favorites"]})
-
-
-@app.route("/api/reset", methods=["POST"])
-def api_reset():
-    state = get_initial_state()
-    save_state(state)
-    return jsonify({"success": True, "state": state})
-
-
-# ──────────────────────────────────────────────────────────────────────
-# FANTALAB LIVE ROOM SNIFFER (BETA) & ADVISORY
-# ──────────────────────────────────────────────────────────────────────
-
-from live_bridge.adapter import FantaLabLiveAdapter
-
-live_adapter = FantaLabLiveAdapter()
-
-
-@app.route("/api/live/snapshot", methods=["GET", "POST"])
-def api_live_snapshot():
-    try:
-        if request.method == "POST":
-            data = request.get_json(silent=True) or {}
-        else:
-            data = request.args.to_dict()
-
-        room_id = data.get("room_id", "").strip()
-        shard = data.get("shard")
-        if shard in ("auto", "null", "none", ""):
-            shard = None
-        elif shard is not None:
-            try:
-                shard = int(shard)
-            except (ValueError, TypeError):
-                pass
-
-        profile_id = data.get("profile_id", "my_team")
-        user_targets_raw = data.get("user_targets")
-
-        user_targets = {}
-        if isinstance(user_targets_raw, dict):
-            user_targets = user_targets_raw
-        elif isinstance(user_targets_raw, str) and user_targets_raw:
-            try:
-                user_targets = json.loads(user_targets_raw)
-            except Exception:
-                user_targets = {}
-
-        state = load_state()
-        df = load_dataset()
-        league_settings = load_league_settings()
-        budget_arg = request.args.get("budget", type=int)
-        budget_total = budget_arg if (budget_arg and budget_arg > 0) else state.get("budget_total", league_settings.get("budget", 1000))
-        fair_col = "prezzo_fair_500" if budget_total == 500 else "prezzo_fair_1000"
-
-        players_by_name = {}
-        for _, row in df.iterrows():
-            name = str(row["player"]).strip()
-            players_by_name[name.lower()] = {
-                "player": name,
-                "role": str(row.get("role", "")),
-                "team": str(row.get("team", "")),
-                "price_fair_live": float(row.get(fair_col, row.get("prezzo_fair_1000", row.get("Prezzo_Consigliato_Cr", 1)))),
-                "prezzo_fair_1000": float(row.get("prezzo_fair_1000", row.get("Prezzo_Consigliato_Cr", 1))),
-                "prezzo_fair_500": float(row.get("prezzo_fair_500", 1)),
-                "target_price_1000": float(row.get("target_price_1000", row.get("prezzo_fair_1000", 1))),
-                "target_price_500": float(row.get("target_price_500", row.get("prezzo_fair_500", 1))),
-                "clearing_price_1000": float(row.get("clearing_price_1000", row.get("target_price_1000", row.get("prezzo_fair_1000", 1)))),
-                "clearing_price_500": float(row.get("clearing_price_500", row.get("target_price_500", row.get("prezzo_fair_500", 1)))),
-                "target_flags": str(row.get("target_flags", "")),
-                "score_composito": float(row.get("score_composito", 0.0)),
-                "pts_exp": float(row.get("predicted_pts_p50", 0.0)),
-                "fascia": int(row.get("fascia", 3)) if "fascia" in row and not pd.isna(row.get("fascia")) else 3,
-            }
-
-        # Check if shard was cached in Redis for this room
-        if shard in ("auto", "none", "", None):
-            cached_r_shard = _redis_get(f"room_shard_{room_id}")
-            if cached_r_shard:
-                shard = str(cached_r_shard)
-
-        res = live_adapter.get_advisory_snapshot(
-            room_id=room_id,
-            shard=shard,
-            active_profile_id=profile_id,
-            auction_state=state,
-            all_players_by_name=players_by_name,
-            user_targets=user_targets,
-            budget_total=budget_total,
-        )
-
-        # Cache resolved shard in Redis so future polls on any container are instant
-        if res.get("shard") and str(res["shard"]).lower() not in ("auto", "none", "null", ""):
-            _redis_set(f"room_shard_{room_id}", str(res["shard"]))
-        return jsonify(res)
-    except Exception as e:
-        logger.error(f"Error in api_live_snapshot: {e}", exc_info=True)
-        return jsonify({"status": "error", "message": str(e), "lot": None}), 500
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -5891,22 +4805,15 @@ HTML_TEMPLATE = """
             await fetchState();
             await fetchPlayers();
             fetchAIStatus();
-            checkSessionAuth();
             updateAdminUI();
             updateProfileDisplay();
-            renderTeamSelect();
             renderListone();
-            renderRosterTeamPills();
-            renderRosterTab();
-            renderStrategyTab();
-            renderTargetsTab();
             setupSearch();
-            renderAuctionDavinciPitch();
 
             ensureMaestroAmbient();
-            updateMaestroAmbientState('targets');
+            updateMaestroAmbientState('listone');
 
-            runBootSplash(() => maybeStartIdentityGate());
+            runBootSplash(() => {});
 
             if (window.location.hash) {
                 const tabName = window.location.hash.replace('#', '');
@@ -5914,47 +4821,21 @@ HTML_TEMPLATE = """
                     switchTab(tabName);
                 }
             }
-
-            // Periodic live refresh polling for real-time updates (every 3s)
-            setInterval(async () => {
-                try {
-                    const res = await fetch('/api/state');
-                    if (!res.ok) return;
-                    const data = await res.json();
-                    if (data.state && JSON.stringify(data.state) !== JSON.stringify(auctionState)) {
-                        auctionState = data.state;
-                        if (data.market_index) updateMarketBadge(data.market_index);
-                        updateHeader();
-                        updateProfileDisplay();
-                        updateLiveAdvice();
-                        renderRecent();
-                        renderRosterTab();
-                        renderTargetsTab();
-                        renderStrategyTab();
-                        renderListone();
-                    }
-                } catch (e) {
-                    console.warn('Real-time sync poll error:', e);
-                }
-            }, 3000);
         }
 
+        // Static placeholder state: the auction/league backend was removed in the
+        // player-data pivot. Kept only so legacy UI code still finds a valid shape.
         async function fetchState() {
-            const res = await fetch('/api/state');
-            const data = await res.json();
-            auctionState = data.state;
-            slotFramework = data.slot_framework || {};
-            tacticalPresets = data.tactical_presets || tacticalPresets;
-            if (data.market_index) updateMarketBadge(data.market_index);
-            localStorage.setItem('fanta_lab_auction_state', JSON.stringify(auctionState));
+            auctionState = {
+                budget_total: 1000,
+                roster_structure: { P: 3, D: 8, C: 8, A: 6 },
+                teams: [],
+                assigned_players: {},
+                favorites: [],
+                history: []
+            };
             updateHeader();
             updateProfileDisplay();
-            updateLiveAdvice();
-            renderRecent();
-            renderRosterTab();
-            renderStrategyTab();
-            renderTargetsTab();
-            renderListone();
         }
 
         let leagueBudget = 1000;
@@ -6117,16 +4998,7 @@ HTML_TEMPLATE = """
                 bd.classList.remove('show');
             }
 
-            if (tabId === 'targets') {
-                if (currentTargetSubview === 'strategy') {
-                    renderStrategyTab();
-                } else {
-                    renderTargetsTab();
-                }
-            }
-            if (tabId === 'rosters') renderRosterTab();
             if (tabId === 'listone') renderListone();
-            if (tabId === 'draft') renderAuctionDavinciPitch();
         }
 
         async function loadLineupSolver() {
@@ -8993,93 +7865,6 @@ HTML_TEMPLATE = """
 </html>
 """
 
-@app.route("/api/lineup/solve", methods=["POST"])
-def api_lineup_solve():
-    data = request.json or {}
-    state = load_state()
-    team_id = data.get("team_id")
-
-    if team_id is None:
-        team = next((t for t in state["teams"] if t.get("is_me")), state["teams"][0] if state["teams"] else None)
-    else:
-        team = next((t for t in state["teams"] if t["id"] == int(team_id)), None)
-
-    if not team:
-        return jsonify({"success": False, "error": "team_not_found", "message": "Squadra non trovata"}), 404
-
-    overlay = get_dynamic_overlay()
-    result = solve_lineup(team.get("roster", []), overlay)
-
-    status_code = 200 if result["success"] else 503
-    return jsonify(result), status_code
-
-
-@app.route("/api/audit/rankings", methods=["GET"])
-def api_audit_rankings():
-    state = load_state()
-    df = load_dataset()
-    tracking_history = load_tracking_history(config.SEASON_TRACKING_JSONL)
-
-    rankings = compute_audit(state["teams"], df, tracking_history)
-    return jsonify({"success": True, "rankings": rankings})
-
-
-@app.route("/api/trades/evaluate", methods=["POST"])
-def api_trades_evaluate():
-    data = request.json or {}
-    team_id_a = data.get("team_id_a")
-    team_id_b = data.get("team_id_b")
-    players_out = data.get("players_out", [])
-    players_in = data.get("players_in", [])
-
-    if len(players_out) + len(players_in) > 6:
-        return jsonify({"success": False, "error": "too_many_players",
-                         "message": "Massimo 6 giocatori totali coinvolti nello scambio"}), 400
-
-    state = load_state()
-    team_a = next((t for t in state["teams"] if t["id"] == int(team_id_a)), None)
-    team_b = next((t for t in state["teams"] if t["id"] == int(team_id_b)), None)
-    if not team_a or not team_b:
-        return jsonify({"success": False, "error": "team_not_found", "message": "Squadra non trovata"}), 404
-
-    df = load_dataset()
-    overlay = get_dynamic_overlay()
-
-    result = evaluate_trade(team_a.get("roster", []), players_out, team_b.get("roster", []), players_in, df, overlay)
-    if "error" in result:
-        status_code = 503 if result["error"] in ("feed_unavailable", "no_feasible_formation") else 400
-        return jsonify({"success": False, **result}), status_code
-
-    return jsonify({"success": True, **result})
-
-
-@app.route("/api/trades/winwin", methods=["GET"])
-def api_trades_winwin():
-    team_id = request.args.get("team_id")
-    state = load_state()
-
-    if team_id is None:
-        my_team = next((t for t in state["teams"] if t.get("is_me")), None)
-    else:
-        my_team = next((t for t in state["teams"] if t["id"] == int(team_id)), None)
-
-    if not my_team:
-        return jsonify({"success": False, "error": "team_not_found", "message": "Squadra non trovata"}), 404
-
-    df = load_dataset()
-    all_trades = []
-    for opponent in state["teams"]:
-        if opponent["id"] == my_team["id"]:
-            continue
-        trades = find_winwin_trades(my_team.get("roster", []), opponent.get("roster", []), df, max_per_side=3, top_n=10)
-        for t in trades:
-            t["opponent_team_id"] = opponent["id"]
-            t["opponent_team_name"] = opponent.get("name", "")
-        all_trades.extend(trades)
-
-    all_trades.sort(key=lambda t: t["combined_delta"], reverse=True)
-    return jsonify({"success": True, "trades": all_trades[:10]})
-
 @app.route("/")
 def index():
     return render_template_string(
@@ -9103,8 +7888,7 @@ def main():
         local_ip = "127.0.0.1"
 
     print("\n" + "=" * 70)
-    print("  La FantaOfficina — Centro Decisionale Asta & Strategia (PRO)")
-    print("  Regole: 1.000 Crediti | Struttura Roster 4-9-9-7 (29 Giocatori)")
+    print("  footballerdata — Player Data & Statistics Explorer (Serie A)")
     print("=" * 70)
     print(f"\n  Accesso Desktop: http://localhost:5050")
     print(f"  Accesso Mobile:  http://{local_ip}:5050 (stessa rete Wi-Fi)\n")
