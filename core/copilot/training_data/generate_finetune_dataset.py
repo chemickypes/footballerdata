@@ -42,9 +42,9 @@ def create_player_deepdive(row):
     fair_1000 = int(row.get("prezzo_fair_1000", 1))
     fair_500 = int(row.get("prezzo_fair_500", 1))
     official = int(row.get("Prezzo_Consigliato_Cr", 1))
-    p50 = float(row.get("predicted_pts_p50", 0))
-    p10 = float(row.get("predicted_pts_p10", 0))
-    p90 = float(row.get("predicted_pts_p90", 0))
+    p50 = float(row.get("predicted_contrib_p50", 0))
+    p10 = float(row.get("predicted_contrib_p10", 0))
+    p90 = float(row.get("predicted_contrib_p90", 0))
     vorp = float(row.get("vorp_points", 0))
     surplus = int(row.get("surplus_value_cr", 0))
     inj_days = int(row.get("giorni_infortunio_3y", 0))
@@ -85,8 +85,8 @@ def create_comparison(row1, row2):
     v1, v2 = float(row1.get("vorp_points", 0)), float(row2.get("vorp_points", 0))
     f1_1000 = int(row1.get("prezzo_fair_1000", 1))
     f2_1000 = int(row2.get("prezzo_fair_1000", 1))
-    p1_pts = float(row1.get("predicted_pts_p50", 0))
-    p2_pts = float(row2.get("predicted_pts_p50", 0))
+    p1_pts = float(row1.get("predicted_contrib_p50", 0))
+    p2_pts = float(row2.get("predicted_contrib_p50", 0))
 
     winner = row1 if v1 >= v2 else row2
     loser = row2 if v1 >= v2 else row1

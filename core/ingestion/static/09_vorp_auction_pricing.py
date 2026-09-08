@@ -2,17 +2,21 @@
 """
 STAGE 9 — Positional Market Hierarchy & Power-Law Fair Auction Valuation Engine.
 
-Calculates realistic fantasy auction credit valuations using:
+Calcul realistic quality scores and credit valuations using:
   - Calibrated Role Budget Allocation (40% Attack, 33% Midfield, 18% Defense, 9% Goalkeepers)
   - Modificatore Difesa Tiering (Dimarco ~105cr, Bastoni/Bremer/Akanji/N'Dicka/Di Lorenzo ~38-52cr)
   - Midfield Scoring Heavyweights (Paz/Chala/McTominay/Orsolini ~185-205cr)
   - Top Attack Anchors (Malen ~400cr, Lautaro ~390cr, Thuram/Hojlund ~240-265cr, Krstovic/Dybala ~85-105cr)
 
 Outputs added to data/dataset_finale.csv:
-  - vorp_points: Marginal fantasy points above replacement baseline
+  - vorp_points: Rating-volume above the replacement-level baseline (role-relative quality score)
   - prezzo_fair_1000: Realistic rational auction bid on a 1,000 credit budget scale
   - prezzo_fair_500: Realistic rational auction bid on a 500 credit budget scale
   - surplus_value_cr: Market discrepancy indicator (Fair Price - Official Price)
+
+Note: target/clearing/fair prices are ML-independent (econometric model on Qt.A/FVM/history);
+if they are already present in the dataset they are preserved as-is — only VORP is recomputed
+from the retargeted (pg x mv) quantile projections.
 """
 
 import os, sys, warnings
@@ -50,16 +54,16 @@ def calculate_replacement_levels(df, n_teams=DEFAULT_N_TEAMS):
     replacement_baselines = {}
     for role, slots_per_team in ROSTER_SLOTS.items():
         total_drafted_in_league = n_teams * slots_per_team
-        role_df = df[df["role"] == role].sort_values("predicted_pts_p50", ascending=False).reset_index(drop=True)
+        role_df = df[df["role"] == role].sort_values("predicted_contrib_p50", ascending=False).reset_index(drop=True)
 
         if len(role_df) > total_drafted_in_league:
-            baseline_pts = role_df.iloc[total_drafted_in_league]["predicted_pts_p50"]
+            baseline_contrib = role_df.iloc[total_drafted_in_league]["predicted_contrib_p50"]
         elif len(role_df) > 0:
-            baseline_pts = role_df.iloc[-1]["predicted_pts_p50"] * 0.70
+            baseline_contrib = role_df.iloc[-1]["predicted_contrib_p50"] * 0.70
         else:
-            baseline_pts = 50.0
+            baseline_contrib = 50.0
 
-        replacement_baselines[role] = float(baseline_pts)
+        replacement_baselines[role] = float(baseline_contrib)
 
     return replacement_baselines
 
@@ -103,7 +107,7 @@ def get_adjusted_market_fvm(df):
 
 
 def compute_vorp_and_fair_prices(df_input, n_teams=DEFAULT_N_TEAMS):
-    """Computes VORP points and maps them into realistic fair auction credit prices."""
+    """Computes VORP quality scores and maps them into realistic fair auction credit prices."""
     df = df_input.copy()
 
     # 1. Calculate replacement baselines & VORP
@@ -112,24 +116,29 @@ def compute_vorp_and_fair_prices(df_input, n_teams=DEFAULT_N_TEAMS):
     vorp_list = []
     for _, row in df.iterrows():
         role = row["role"]
-        pts = row.get("predicted_pts_p50", 150.0)
+        contrib = row.get("predicted_contrib_p50", 150.0)
         base = baselines.get(role, 100.0)
-        vorp = max(0.0, float(pts - base))
+        vorp = max(0.0, float(contrib - base))
         vorp_list.append(round(vorp, 1))
 
     df["vorp_points"] = vorp_list
 
-    # 2. Econometric Target & Clearing Pricing Engine
-    from core.ingestion.static.target_pricing import compute_target_prices
+    # 2. Econometric Target & Clearing Pricing Engine (ML-independent — computed only if absent)
+    price_cols = {"target_price_1000", "target_price_500", "clearing_price_1000", "clearing_price_500",
+                  "prezzo_fair_1000", "prezzo_fair_500", "target_flags", "surplus_value_cr"}
+    if price_cols.issubset(df.columns):
+        print("  Prezzi target/clearing/fair già presenti nel dataset — preservati (solo VORP ricalcolato).")
+    else:
+        from core.ingestion.static.target_pricing import compute_target_prices
 
-    df = compute_target_prices(df)
-    df["prezzo_fair_1000"] = df["target_price_1000"]
-    df["prezzo_fair_500"] = df["target_price_500"]
+        df = compute_target_prices(df)
+        df["prezzo_fair_1000"] = df["target_price_1000"]
+        df["prezzo_fair_500"] = df["target_price_500"]
 
-    # 3. Surplus Value (Target Price 1000 - Observed Clearing Price 1000)
-    # Positive surplus = Undervalued by market / Opportunity
-    # Negative surplus = Market hype / Overpriced
-    df["surplus_value_cr"] = (df["prezzo_fair_1000"] - df["clearing_price_1000"]).astype(int)
+        # 3. Surplus Value (Target Price 1000 - Observed Clearing Price 1000)
+        # Positive surplus = Undervalued by market / Opportunity
+        # Negative surplus = Market hype / Overpriced
+        df["surplus_value_cr"] = (df["prezzo_fair_1000"] - df["clearing_price_1000"]).astype(int)
 
     return df, baselines
 
@@ -144,7 +153,7 @@ def main():
 
     df = pd.read_csv(config.DATASET_FINALE_CSV)
 
-    if "predicted_pts_p50" not in df.columns:
+    if "predicted_contrib_p50" not in df.columns:
         print("  Running Stage 8 quantile modeling first...")
         import importlib
         mod08 = importlib.import_module("core.ingestion.static.08_quantile_points_model")

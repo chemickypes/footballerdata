@@ -585,7 +585,7 @@ function renderAIChatContent(data) {
                                     <b>${p.name}</b>
                                 </div>
                                 <div style="color:var(--text-muted); font-size:0.75rem; margin-bottom:4px;">${p.team} - ${p.starts || 0} start</div>
-                                <div>Punti Attesi: <b>${p.pts_exp || 0} pts</b></div>
+                                <div>Contributo Atteso: <b>${p.contrib_exp || 0}</b></div>
                                 <div>Fair Price: <b style="color:var(--gold);">${p.fair_1000 || 1} cr</b></div>
                                 <div>VORP: <b style="color:var(--success);">+${p.vorp || 0}</b></div>
                             </div>
@@ -607,7 +607,7 @@ function renderAIChatContent(data) {
                     <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; text-align:center; margin-bottom:10px;">
                         <div style="background:#0b111e; padding:8px; border-radius:6px; border:1px solid var(--border);">
                             <div style="font-size:0.7rem; color:var(--text-muted); font-weight:700;">PROIEZIONE P50</div>
-                            <div style="font-size:1.1rem; font-weight:800; color:var(--primary);">${p.pts_exp || 0} pts</div>
+                            <div style="font-size:1.1rem; font-weight:800; color:var(--primary);">${p.contrib_exp || 0}</div>
                         </div>
                         <div style="background:#0b111e; padding:8px; border-radius:6px; border:1px solid var(--border);">
                             <div style="font-size:0.7rem; color:var(--text-muted); font-weight:700;">FAIR PRICE 1000</div>
@@ -785,8 +785,8 @@ function renderListone() {
     // Sorting logic (Default: Miglior Giocatore come in Scala Slot)
     filtered.sort((a, b) => {
         if (sortBy === 'best') {
-            const aScore = (parseFloat(a.score) || 0) * 12 + (parseFloat(a.vorp) || 0) * 2 + (a.is_starter_2627 ? 15 : 0) + (parseFloat(a.pts_exp) || 0) * 0.1;
-            const bScore = (parseFloat(b.score) || 0) * 12 + (parseFloat(b.vorp) || 0) * 2 + (b.is_starter_2627 ? 15 : 0) + (parseFloat(b.pts_exp) || 0) * 0.1;
+            const aScore = (parseFloat(a.score) || 0) * 12 + (parseFloat(a.vorp) || 0) * 2 + (a.is_starter_2627 ? 15 : 0) + (parseFloat(a.contrib_exp) || 0) * 0.1;
+            const bScore = (parseFloat(b.score) || 0) * 12 + (parseFloat(b.vorp) || 0) * 2 + (b.is_starter_2627 ? 15 : 0) + (parseFloat(b.contrib_exp) || 0) * 0.1;
             return bScore - aScore;
         } else if (sortBy === 'mv_desc') {
             return (parseFloat(b.mv) || 0) - (parseFloat(a.mv) || 0);
@@ -800,8 +800,8 @@ function renderListone() {
             const aFair = getPlayerFairPrice(a, activeBudget);
             const bFair = getPlayerFairPrice(b, activeBudget);
             return aFair - bFair;
-        } else if (sortBy === 'pts_desc') {
-            return (parseFloat(b.pts_exp) || 0) - (parseFloat(a.pts_exp) || 0);
+        } else if (sortBy === 'contrib_desc') {
+            return (parseFloat(b.contrib_exp) || 0) - (parseFloat(a.contrib_exp) || 0);
         } else if (sortBy === 'vorp_desc') {
             return (parseFloat(b.vorp) || 0) - (parseFloat(a.vorp) || 0);
         } else if (sortBy === 'alpha') {
@@ -853,7 +853,7 @@ function renderListone() {
                         <span style="background:rgba(16,185,129,0.12); color:#34d399; padding:2px 7px; border-radius:5px; font-size:0.78rem; font-weight:700;">FM: <b>${p.mfv || '6.0'}</b></span>
                         <span style="color:var(--text-main); font-size:0.78rem; font-weight:600;"><span style="color:var(--gold); font-weight:700;">Bonus:</span> ${p.bonus_range || 'N/D'}</span>
                         <span class="scout-vorp-badge" style="font-size:0.75rem;">VORP +${p.vorp}</span>
-                        <small style="color:var(--text-muted); font-size:0.72rem; margin-left:auto;">P50: <b>${p.pts_exp} pt</b> (~${p.expected_matches || 28}p)</small>
+                        <small style="color:var(--text-muted); font-size:0.72rem; margin-left:auto;">P50: <b>${p.contrib_exp}</b> (~${p.expected_matches || 28}p)</small>
                     </div>
                 </div>
                 <div class="player-stats">

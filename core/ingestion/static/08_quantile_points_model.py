@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """
-STAGE 8 — Quantile Regression Points Modeling (P10 Floor, P50 Expected, P90 Ceiling).
+STAGE 8 — Quantile Regression Contribution Modeling (P10 Floor, P50 Expected, P90 Ceiling).
 
 Eliminates Target Leakage and Train-Serve Skew by training three Gradient Boosting
 Regressors on genuine multi-season lagged transitions (seasons t-1 ... t-3 predicting season t)
 across 11 Serie A seasons (2015-16 to 2025-26).
+
+Target (fantasy-neutral): season rating-volume in season t = pg_t * mv_t
+  (appearances x objective match rating; no fantasy bonus/malus layer).
+Features: Multi-season rolling statistics strictly computed prior to season t (t-1, t-2, t-3).
 """
 
 import os, sys, warnings
@@ -21,15 +25,15 @@ warnings.filterwarnings("ignore")
 def prepare_training_data():
     """
     Constructs a true lagged time-series training dataset from historical Serie A records.
-    
-    Target: Total Season Fantasy Points in season t = pg_t * mfv_t
+
+    Target: Season Rating-Volume in season t = pg_t * mv_t (objective contribution).
     Features: Multi-season rolling statistics strictly computed prior to season t (t-1, t-2, t-3).
     Zero Target Leakage: No in-season statistics from season t are used as features.
     """
     raw_path = config.STORICO_RAW_CSV
     if not os.path.exists(raw_path):
         print(f"Warning: {raw_path} not found.")
-        return None, None
+        return None, None, None
 
     df_raw = pd.read_csv(raw_path)
 
@@ -65,8 +69,8 @@ def prepare_training_data():
             curr = group.iloc[i]
             prior = group.iloc[:i]
 
-            # Minimum activity in target season (at least 3 appearances to evaluate fantasy points)
-            if curr["pg"] < 3 or pd.isna(curr["mfv"]) or pd.isna(curr["mv"]):
+            # Minimum activity in target season (at least 3 appearances to evaluate contribution)
+            if curr["pg"] < 3 or pd.isna(curr["mv"]):
                 continue
 
             last1 = prior.iloc[-1]
@@ -75,33 +79,35 @@ def prepare_training_data():
             tot_pg = float(last3["pg"].sum())
             if tot_pg > 0:
                 mv_3y = float((last3["mv"] * last3["pg"]).sum() / tot_pg)
-                mfv_3y = float((last3["mfv"] * last3["pg"]).sum() / tot_pg)
                 gol_3y = float(last3["gol"].sum() / tot_pg)
                 ass_3y = float(last3["assist"].sum() / tot_pg)
                 amm_3y = float(last3["amm"].sum() / tot_pg)
             else:
                 mv_3y = float(last1["mv"]) if pd.notna(last1["mv"]) else 6.0
-                mfv_3y = float(last1["mfv"]) if pd.notna(last1["mfv"]) else 6.0
                 gol_3y = 0.0
                 ass_3y = 0.0
                 amm_3y = 0.12
 
+            # Rating consistency across all prior seasons (std of per-season match rating)
+            mvs_prior = prior["mv"].dropna()
+            std_mv = float(mvs_prior.std(ddof=0)) if len(mvs_prior) > 1 else 0.0
+
             # Historical availability rate (matches / 38)
             avail_3y = min(1.0, float(last3["pg"].mean()) / 38.0)
-            target_pts = float(curr["pg"] * curr["mfv"])
+            target_contrib = float(curr["pg"] * curr["mv"])
 
             role_str = str(curr["role"]).strip().upper()
             records.append({
                 "player_name": curr["player_name"],
                 "role": role_str,
                 "season_target": curr["season"],
-                "target_pts": target_pts,
+                "target_contrib": target_contrib,
                 "mv": mv_3y,
-                "mfv": mfv_3y,
                 "gol_rate": gol_3y,
                 "ass_rate": ass_3y,
                 "amm_rate": amm_3y,
                 "avail_rate": avail_3y,
+                "std_mv": std_mv,
                 "role_P": int(role_str == "P"),
                 "role_D": int(role_str == "D"),
                 "role_C": int(role_str == "C"),
@@ -118,12 +124,12 @@ def prepare_training_data():
     print(f"  Generated {len(df_train)} lagged player-season transition samples (Zero Data Leakage).")
 
     feature_cols = [
-        "mv", "mfv", "gol_rate", "ass_rate", "amm_rate", "avail_rate",
+        "mv", "gol_rate", "ass_rate", "amm_rate", "avail_rate", "std_mv",
         "role_P", "role_D", "role_C", "role_A"
     ]
 
     X = df_train[feature_cols].fillna(0)
-    y = df_train["target_pts"]
+    y = df_train["target_contrib"]
 
     return df_train, X, y
 
@@ -160,7 +166,7 @@ def train_quantile_models(df_train, X, y):
         print(f"\n  [Out-of-Time Temporal Validation: Held-out {last_season} (N={test_mask.sum()})]")
         print(f"    Empirical 80% CI Coverage: {oot_coverage:.1f}% (Ideal: 80.0%)")
         print(f"    Out-of-Time P50 Correlation: {oot_corr:.3f}")
-        print(f"    Out-of-Time P50 MAE: {oot_mae:.1f} pts\n")
+        print(f"    Out-of-Time P50 MAE: {oot_mae:.1f} rating-volume pts\n")
 
     # Train final production models on all available historical seasons
     models = {}
@@ -190,14 +196,14 @@ def get_series(df: pd.DataFrame, col: str, default_val=0.0) -> pd.Series:
 def predict_active_dataset(models, df_active):
     """
     Applies the trained lagged quantile models to the active roster dataset.
-    Uses genuine multi-season weighted MFV (mfv_media_3y) directly from historical tracking,
+    Uses genuine multi-season weighted MV (mv_media_3y) directly from historical tracking,
     retaining the synthetic formula strictly as a fallback for foreign transfers and rookies.
     """
     df = df_active.copy()
 
     fvm_arr = get_series(df, "FVM_1000", 10.0)
     prezzo_arr = get_series(df, "Prezzo_Consigliato_Cr", 1.0)
-    
+
     # 1. Base Mean Vote (MV) — prior multi-season rolling average or expected vote
     mv_input = pd.to_numeric(df["mv_media_3y"], errors="coerce") if "mv_media_3y" in df.columns else pd.Series(np.nan, index=df.index)
     mv_fallback = get_series(df, "NN_MV_Atteso", 6.05)
@@ -243,11 +249,8 @@ def predict_active_dataset(models, df_active):
             if ass_rate.iloc[i] < 0.05:
                 ass_rate.iloc[i] = round(0.08 + (f_val / 1000.0) * 0.40, 3)
 
-    # 4. Genuine Historical Fantamedia (MFV) — use historical mfv_media_3y directly!
-    mfv_hist = pd.to_numeric(df["mfv_media_3y"], errors="coerce") if "mfv_media_3y" in df.columns else pd.Series(np.nan, index=df.index)
-    mfv_synthetic = (mv_input + (gol_rate * 3.0) + (ass_rate * 1.0) - (amm_rate * 0.5)).clip(5.0, 9.5)
-    mfv_input = np.where(mfv_hist.notna() & (mfv_hist >= 4.5), mfv_hist, mfv_synthetic)
-    mfv_input = pd.Series(mfv_input, index=df.index).fillna(mfv_synthetic).clip(5.0, 9.5)
+    # 4. Rating consistency across historical seasons (per-season match rating std)
+    std_mv = get_series(df, "mv_std", 0.35)
 
     # Adjust availability with medical injury malus
     injury_malus = get_series(df, "malus_infortuni", 0.0)
@@ -255,11 +258,11 @@ def predict_active_dataset(models, df_active):
 
     X_active = pd.DataFrame({
         "mv": mv_input,
-        "mfv": mfv_input,
         "gol_rate": gol_rate,
         "ass_rate": ass_rate,
         "amm_rate": amm_rate,
         "avail_rate": effective_avail,
+        "std_mv": std_mv,
         "role_P": (df["role"] == "P").astype(int),
         "role_D": (df["role"] == "D").astype(int),
         "role_C": (df["role"] == "C").astype(int),
@@ -267,14 +270,19 @@ def predict_active_dataset(models, df_active):
     })
 
     # Predict Floor (P10), Expected (P50), Ceiling (P90)
-    df["predicted_pts_p10"] = np.maximum(0, models["p10_floor"].predict(X_active).round(1))
-    df["predicted_pts_p50"] = np.maximum(0, models["p50_expected"].predict(X_active).round(1))
-    df["predicted_pts_p90"] = np.maximum(0, models["p90_ceiling"].predict(X_active).round(1))
+    df["predicted_contrib_p10"] = np.maximum(0, models["p10_floor"].predict(X_active).round(1))
+    df["predicted_contrib_p50"] = np.maximum(0, models["p50_expected"].predict(X_active).round(1))
+    df["predicted_contrib_p90"] = np.maximum(0, models["p90_ceiling"].predict(X_active).round(1))
 
     # Ensure quantile monotonicity: P10 <= P50 <= P90
-    df["predicted_pts_p50"] = np.maximum(df["predicted_pts_p50"], df["predicted_pts_p10"])
-    df["predicted_pts_p90"] = np.maximum(df["predicted_pts_p90"], df["predicted_pts_p50"])
-    df["pts_volatility_spread"] = (df["predicted_pts_p90"] - df["predicted_pts_p10"]).round(1)
+    df["predicted_contrib_p50"] = np.maximum(df["predicted_contrib_p50"], df["predicted_contrib_p10"])
+    df["predicted_contrib_p90"] = np.maximum(df["predicted_contrib_p90"], df["predicted_contrib_p50"])
+    df["contrib_volatility_spread"] = (df["predicted_contrib_p90"] - df["predicted_contrib_p10"]).round(1)
+
+    # Legacy columns (fantasy-points projections) are dropped: the retargeted model replaces them
+    for legacy_col in ["predicted_pts_p10", "predicted_pts_p50", "predicted_pts_p90", "pts_volatility_spread"]:
+        if legacy_col in df.columns:
+            df = df.drop(columns=[legacy_col])
 
     return df
 
@@ -282,6 +290,7 @@ def predict_active_dataset(models, df_active):
 def main():
     print("=" * 60)
     print("  STAGE 8 — QUANTILE REGRESSION (FLOOR / EXPECTED / CEILING)")
+    print("  Target: season rating-volume = pg x mv (fantasy-neutral)")
     print("=" * 60)
 
     if not os.path.exists(config.DATASET_FINALE_CSV):
@@ -301,11 +310,11 @@ def main():
     print(f"\n  Updated dataset with quantile projections: {config.DATASET_FINALE_CSV}")
 
     print("\n  TOP ATTACKERS QUANTILE PROJECTIONS (P10 / P50 / P90):")
-    top_a = df_predicted[df_predicted["role"] == "A"].sort_values("predicted_pts_p50", ascending=False).head(8)
+    top_a = df_predicted[df_predicted["role"] == "A"].sort_values("predicted_contrib_p50", ascending=False).head(8)
     for _, r in top_a.iterrows():
         print(f"    {r['player']:<20} Sq:{str(r['team']):<4} "
-              f"Floor(P10):{r['predicted_pts_p10']:>5.1f} | Expected(P50):{r['predicted_pts_p50']:>5.1f} | "
-              f"Ceiling(P90):{r['predicted_pts_p90']:>5.1f} | Spread: {r['pts_volatility_spread']:>4.1f} pts")
+              f"Floor(P10):{r['predicted_contrib_p10']:>5.1f} | Expected(P50):{r['predicted_contrib_p50']:>5.1f} | "
+              f"Ceiling(P90):{r['predicted_contrib_p90']:>5.1f} | Spread: {r['contrib_volatility_spread']:>4.1f}")
 
     print("\n  STAGE 8 COMPLETED.\n")
 

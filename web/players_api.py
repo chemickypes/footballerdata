@@ -13,6 +13,10 @@ from web.pricing import get_dynamic_fair_prices
 
 players_bp = Blueprint("players", __name__)
 
+# Rating-volume spread (P90 - P10 of pg x mv) below which a player is flagged as a consistency profile.
+# Calibrated on the dataset distribution: spread median ~150 (range 86-190); below-median = lower floor risk
+VOLATILITY_PROFILE_THRESHOLD = 150.0
+
 
 @players_bp.route("/api/players")
 def api_players():
@@ -84,18 +88,18 @@ def api_players():
         xg_avg = float(row.get("xg_media_3y", 0)) if pd.notna(row.get("xg_media_3y")) else 0.0
         delta_goals_xg = round((gol_rate * 30.0) - xg_avg, 2) if (gol_rate > 0 or xg_avg > 0) else 0.0
 
-        # Quantiles & Volatility (Gradient Boosting)
-        p10 = float(row.get("predicted_pts_p10", 0)) if pd.notna(row.get("predicted_pts_p10")) else 0.0
-        p50 = float(row.get("predicted_pts_p50", 0)) if pd.notna(row.get("predicted_pts_p50")) else 0.0
-        p90 = float(row.get("predicted_pts_p90", 0)) if pd.notna(row.get("predicted_pts_p90")) else 0.0
-        spread = float(row.get("pts_volatility_spread", 0)) if pd.notna(row.get("pts_volatility_spread")) else round(p90 - p10, 1)
+        # Quantiles & Volatility (Gradient Boosting on season rating-volume pg x mv)
+        p10 = float(row.get("predicted_contrib_p10", 0)) if pd.notna(row.get("predicted_contrib_p10")) else 0.0
+        p50 = float(row.get("predicted_contrib_p50", 0)) if pd.notna(row.get("predicted_contrib_p50")) else 0.0
+        p90 = float(row.get("predicted_contrib_p90", 0)) if pd.notna(row.get("predicted_contrib_p90")) else 0.0
+        spread = float(row.get("contrib_volatility_spread", 0)) if pd.notna(row.get("contrib_volatility_spread")) else round(p90 - p10, 1)
 
         # Media Voto & FantaMedia
         mv_val = round(float(row.get("mv_media_3y", 6.0)), 2) if pd.notna(row.get("mv_media_3y")) and float(row.get("mv_media_3y", 0)) > 0 else 6.0
         mfv_val = round(float(row.get("mfv_media_3y", 6.0)), 2) if pd.notna(row.get("mfv_media_3y")) and float(row.get("mfv_media_3y", 0)) > 0 else 6.0
 
-        # Estimated appearances (partite a voto stimate)
-        expected_matches = min(38, max(5, int(round(p50 / max(4.5, mfv_val))))) if mfv_val > 0 else 28
+        # Estimated appearances (partite a voto stimate): P50 = pg x mv, so pg ~ P50 / mv
+        expected_matches = min(38, max(5, int(round(p50 / max(5.0, mv_val))))) if mfv_val > 0 else 28
 
         # Bonus / Malus Range estimation (standard 28 gare baseline)
         if row["role"] == "P":
@@ -131,10 +135,10 @@ def api_players():
             "clearing_price_1000": int(row.get("clearing_price_1000", fair_1000)),
             "clearing_price_500": int(row.get("clearing_price_500", fair_500)),
             "target_flags": str(row.get("target_flags", "")),
-            "pts_exp": p50,
-            "pts_floor": p10,
-            "pts_ceil": p90,
-            "pts_spread": spread,
+            "contrib_exp": p50,
+            "contrib_floor": p10,
+            "contrib_ceil": p90,
+            "contrib_spread": spread,
             "vorp": vorp_val,
             "mv": mv_val,
             "mfv": mfv_val,
@@ -169,8 +173,8 @@ def api_players():
                 "expected_p50": p50,
                 "ceiling_p90": p90,
                 "spread": spread,
-                "profile_label": "Regolarista da Modificatore" if spread < 135 else "Boom-or-Bust / Alta Volatilità",
-                "profile_badge": '<i class="fa-solid fa-shield" style="margin-right:4px;"></i> Regolarista' if spread < 135 else '<i class="fa-solid fa-bolt icon-pulse" style="margin-right:4px;"></i> Boom-or-Bust'
+                "profile_label": "Regolarista / Basso Rischio" if spread < VOLATILITY_PROFILE_THRESHOLD else "Boom-or-Bust / Alta Volatilità",
+                "profile_badge": '<i class="fa-solid fa-shield" style="margin-right:4px;"></i> Regolarista' if spread < VOLATILITY_PROFILE_THRESHOLD else '<i class="fa-solid fa-bolt icon-pulse" style="margin-right:4px;"></i> Boom-or-Bust'
             }
         })
 

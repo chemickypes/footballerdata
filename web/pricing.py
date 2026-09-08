@@ -27,11 +27,11 @@ def get_dynamic_fair_prices(df, budget_total, roster_slots, n_teams):
     baselines = {}
     for role, slots in roster_slots.items():
         total_drafted = n_teams * slots
-        role_df = df[df["role"] == role].sort_values("predicted_pts_p50", ascending=False).reset_index(drop=True)
+        role_df = df[df["role"] == role].sort_values("predicted_contrib_p50", ascending=False).reset_index(drop=True)
         if len(role_df) > total_drafted:
-            base = role_df.iloc[total_drafted]["predicted_pts_p50"]
+            base = role_df.iloc[total_drafted]["predicted_contrib_p50"]
         elif len(role_df) > 0:
-            base = role_df.iloc[-1]["predicted_pts_p50"] * 0.70
+            base = role_df.iloc[-1]["predicted_contrib_p50"] * 0.70
         else:
             base = 50.0
         baselines[role] = float(base)
@@ -61,8 +61,8 @@ def get_dynamic_fair_prices(df, budget_total, roster_slots, n_teams):
 
         for idx, row in role_df.iterrows():
             p_name = row["player"]
-            pts = float(row.get("predicted_pts_p50", 150.0))
-            vorp = max(0.0, pts - role_base)
+            contrib = float(row.get("predicted_contrib_p50", 150.0))
+            vorp = max(0.0, contrib - role_base)
             vorp_dict[p_name] = round(vorp, 1)
 
             fvm_val = float(adj_fvm_series[idx]) if idx in adj_fvm_series.index else 10.0

@@ -59,19 +59,19 @@ Ordered stages (note: CLI step 7 = Excel export, runs last):
 | 4b | `04b_scrape_lineups.py` | Sofascore API (NOT in CLI, run manually) | `starts/sub_apps/minutes/is_starter/starter_pct` for 2026/27 first matchdays |
 | 5 | `05_scrape_injuries.py` | Transfermarkt (multithreaded) | `giorni/n_infortuni_3y`, severity, malus + `data/tm_injuries_cache.json` |
 | 6 | `06_build_dataset.py` | Merges all above via 4-tier fuzzy name matching (`MANUAL_FUZZY_MAP` in config) | **`data/dataset_finale.csv`** + `score_composito` |
-| 8 | `08_quantile_points_model.py` | Trains 3 GradientBoosting quantile regressors (P10/P50/P90) on lagged historical seasons | Adds `predicted_pts_p10/p50/p90`, `pts_volatility_spread`. Models NOT persisted |
+| 8 | `08_quantile_points_model.py` | Trains 3 GradientBoosting quantile regressors (P10/P50/P90) on lagged historical seasons; **target = season rating-volume `pg × mv` (fantasy-neutral, retargeted in Step 4b)** | Adds `predicted_contrib_p10/p50/p90`, `contrib_volatility_spread`. Models NOT persisted |
 | 9 | `09_vorp_auction_pricing.py` + `target_pricing.py` | Replacement-level math + econometric price regression | Adds `vorp_points`, `target/clearing/fair prices`, `surplus_value_cr` |
 | 10 | `10_roster_optimizer.py` | scipy MILP knapsack | Prints optimal 25-player squad (no file output) |
 | 7 | `07_generate_excel.py` | `dataset_finale.csv` | `data/analisi_fantacalcio_completa.xlsx` multi-tab workbook |
 
 ### dataset_finale.csv schema (57 columns, 533 players)
 
-Column groups: identity (player, role, role_mantra, team) → auction prices (cols 5-12) → historical aggregates (13-24) → Understat xG/xA (25-31) → team indices (32-33) → injuries (34-37) → Sofascore lineups (38-42) → composite scores (43-44) → ML quantile projections (45-48) → VORP/pricing (49-57). Full header in the CSV itself.
+Column groups: identity (player, role, role_mantra, team) → auction prices (cols 5-12) → historical aggregates (13-24) → Understat xG/xA (25-31) → team indices (32-33) → injuries (34-37) → Sofascore lineups (38-42) → composite scores (43-44) → ML quantile projections (45-48: predicted_contrib_p*, contrib_volatility_spread) → VORP/pricing (49-57). Full header in the CSV itself.
 
 ### Key hardcoded Fantacalcio assumptions
 
 - Budgets 500/1000 credits; 25-player roster 3P/8D/8C/6A (but 09 uses 4/9/9/7 — inconsistent); 10-team league
-- Role codes P/D/C/A + `role_mantra`; MFV/fantavoto (rating + fantasy bonus/malus) everywhere, incl. ML target `pg × mfv`
+- Role codes P/D/C/A + `role_mantra`; MFV/fantavoto (rating + fantasy bonus/malus) in historical aggregates only — the ML target was retargeted to `pg × mv` (Step 4b); `mfv` dropped from model features
 - Injury "malus" designed to discount fantasy auction value
 - `score_composito` weights include fantavote/bonus-probability terms (`SCORE_WEIGHTS` in `core/config.py`)
 - Quotazioni xlsx filename hardcoded to season 2026_27; Serie-A-only team maps
@@ -132,7 +132,7 @@ Optional `.env` keys: `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY` (copilot), `API_F
 - Pipeline stages **1, 4, 4b, 5** (historical ratings, Understat, Sofascore lineups, injuries) — generic player analytics
 - Stage **6** (dataset build/fuzzy matching) — keep, strip fantasy scoring columns
 - Stage **9** (VORP + fair pricing) — **KEEP, reinterpreted as quality scoring** (see "Deliberate exception" above). Keeps `vorp_points`, `prezzo_fair_*`, `target/clearing_price_*` in the dataset; the web UI keeps showing them as quality/value columns
-- ML stage **8** concept — quantile projections are generic, but retarget away from `pg × mfv` (fantasy points) to e.g. mv/goals/assists/xG projections
+- ~~ML stage **8** concept — retarget away from `pg × mfv`~~ — **DONE (Step 4b: target = `pg × mv` season rating-volume; columns `predicted_contrib_*`)**
 - Web: `/api/players`, tab-listone, Player Detail Drawer, filters/sort/search, copilot (player Q&A only)
 - `core/ingestion/dynamic/` — live status/lineups/form feed is genuinely useful player info
 - Tests for kept components; docs update
@@ -148,7 +148,8 @@ Optional `.env` keys: `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY` (copilot), `API_F
 - **Step 2 (DONE)**: frontend strip — removed tabs draft/targets/strategy/rosters/lineup/audit/trades, all their modals (target/pitch-picker/profile/custom-tactic/league-settings/inflation/admin/session), identity gates, admin/session JS, FantaLab sniffer JS, target/profile/preset systems, market-badge JS, draft helpers (search/assign/undo/recent); sidebar/bottom-nav reduced to Listone + AI; listone is the default active tab; `tutorial.js` pruned to 3 steps; AI quick-chips retargeted to player queries; branding → footballerdata. `web/app.py` now ~3.8k lines (from 9.1k). Known leftover: ~1.7k lines of inline CSS still contain dead selectors for removed UI (inert; cleanup happens in Step 3 when CSS moves to its own file).
 - **Step 3 (DONE)**: frontend extraction — `HTML_TEMPLATE` string deleted; frontend now lives in `web/templates/index.html` (Jinja), `web/static/css/main.css` (1733 → 968 lines: 130 dead rules + 145 dead selectors + 8 dead keyframes purged), `web/static/js/app.js` (dead `showToast`/toast UI removed). `web/app.py` is pure Python (~720 lines, from 9116 pre-pivot) using `render_template()` + Flask built-in static serving. Smoke test updated to check external assets (78/78).
 - **Step 4a (DONE)**: backend split — `web/app.py` (720 lines) → entrypoint (~75) + `web/config.py` (paths/.env/persona/injuries/pricing defaults) + `web/data.py` (`load_dataset` + fasce) + `web/pricing.py` (VORP/fair-price) + `web/players_api.py` (Blueprint `/api/players`) + `web/ai_api.py` (Blueprint `/api/ai_*`); `web/__init__.py` bootstraps `sys.path` for script/package/Vercel import modes. Also fixed: `core/copilot/__init__.py` broken absolute imports (`from copilot.*` → relative) so the LLM copilot path actually engages; smoke-script helper renamed `test()` → `check()` (was breaking pytest collection). Unit tests 64/64, smoke 78/78.
-- **Step 4b (NEXT)**: pipeline retargeting (ML target away from fantasy points); new data sources (FBref etc.).
+- **Step 4b (DONE)**: ML retargeting — stage 8 target `pg × mfv` (fantasy pts) → `pg × mv` (season rating-volume); features drop fantasy-derived `mfv`, add rating-consistency `std_mv`; columns renamed `predicted_contrib_p10/p50/p90` + `contrib_volatility_spread`; stage 9 VORP rebased on new P50 and made price-preserving (target/clearing/fair prices are ML-independent and are no longer recomputed when already present — protects observed clearing prices now that Asta.xlsx/quotazioni cache are absent); web payload `pts_exp/floor/ceil/spread` → `contrib_*`; UI labels de-fantasy-ized ("Contributo Atteso", profile threshold recalibrated to spread median 150); fixed latent `.str.upper()` bug in stage 8 player_id fallback; storico rebuilt via stage 1 scrape (11 seasons, 7291 rows; football-data.co.uk unreachable — team indices empty, stage-6-only input). OOT validation on 2025-26: 80% CI coverage 75.4%, P50 MAE 49.4 rating-pts.
+- **Step 4c (NEXT)**: new data sources (FBref etc.) — discuss candidates before implementing.
 
 ### EXPAND (the fork's actual goal — more player data)
 Candidate new sources/metrics to discuss before implementing:

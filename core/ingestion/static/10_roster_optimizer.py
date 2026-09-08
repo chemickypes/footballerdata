@@ -37,11 +37,11 @@ def optimize_roster(df, budget=1000, price_col="Prezzo_Consigliato_Cr", locked_p
       price_col: Column to use for player cost ('Prezzo_Consigliato_Cr' or 'prezzo_fair_1000')
       locked_players: List of player names already acquired (locked into roster)
     """
-    df_opt = df.dropna(subset=["predicted_pts_p50", price_col]).reset_index(drop=True)
+    df_opt = df.dropna(subset=["predicted_contrib_p50", price_col]).reset_index(drop=True)
     n = len(df_opt)
 
     # Objective function: Maximize total expected points -> Minimize (-1 * expected_points)
-    c = -1.0 * df_opt["predicted_pts_p50"].values
+    c = -1.0 * df_opt["predicted_contrib_p50"].values
 
     # Price vector
     prices = df_opt[price_col].clip(lower=1).values
@@ -99,22 +99,22 @@ def optimize_roster(df, budget=1000, price_col="Prezzo_Consigliato_Cr", locked_p
 def display_optimized_roster(roster, budget, price_col):
     """Prints a structured summary of the optimal roster."""
     total_spend = roster["cost"].sum()
-    total_pts = roster["predicted_pts_p50"].sum()
-    total_floor = roster["predicted_pts_p10"].sum()
-    total_ceiling = roster["predicted_pts_p90"].sum()
+    total_pts = roster["predicted_contrib_p50"].sum()
+    total_floor = roster["predicted_contrib_p10"].sum()
+    total_ceiling = roster["predicted_contrib_p90"].sum()
     remaining_budget = budget - total_spend
 
     print(f"\n  OPTIMAL ROSTER SUMMARY (Budget: {budget} cr | Spend: {total_spend} cr | Bank: {remaining_budget} cr)")
     print(f"  Projected Points -> Expected: {total_pts:.1f} pts | Floor: {total_floor:.1f} pts | Ceiling: {total_ceiling:.1f} pts\n")
 
     for role, name, count in [("P", "Goalkeepers", 3), ("D", "Defenders", 8), ("C", "Midfielders", 8), ("A", "Forwards", 6)]:
-        sub = roster[roster["role"] == role].sort_values("predicted_pts_p50", ascending=False)
+        sub = roster[roster["role"] == role].sort_values("predicted_contrib_p50", ascending=False)
         spend_role = sub["cost"].sum()
-        pts_role = sub["predicted_pts_p50"].sum()
+        pts_role = sub["predicted_contrib_p50"].sum()
         print(f"  --- {name.upper()} ({len(sub)}/{count}) | Spend: {spend_role} cr | Projected: {pts_role:.1f} pts ---")
         for _, r in sub.iterrows():
             print(f"    {r['player']:<20} Sq:{str(r['team']):<4} Cost:{int(r['cost']):>3}cr | "
-                  f"Exp:{r['predicted_pts_p50']:>5.1f} pts | Spread:{r['pts_volatility_spread']:>4.1f} | "
+                  f"Exp:{r['predicted_contrib_p50']:>5.1f} pts | Spread:{r['contrib_volatility_spread']:>4.1f} | "
                   f"Score:{r['score_composito']:.4f}")
         print()
 
@@ -129,7 +129,7 @@ def main():
 
     df = pd.read_csv(config.DATASET_FINALE_CSV)
 
-    if "predicted_pts_p50" not in df.columns:
+    if "predicted_contrib_p50" not in df.columns:
         print("  Running prerequisite stages 08 and 09...")
         import importlib
         importlib.import_module("core.ingestion.static.08_quantile_points_model").main()

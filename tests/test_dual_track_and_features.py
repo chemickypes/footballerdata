@@ -107,6 +107,8 @@ def main():
     # ── 7. VORP / Fair Price quality scores ───────────────────────────
     print("\n▸ 7. Quality Scores — VORP & Prezzi Fair")
     check("Calciatore include 'vorp'", "vorp" in sample, f"vorp={sample.get('vorp')}")
+    check("Calciatore include 'contrib_exp' (pg×MV projection)", "contrib_exp" in sample, f"contrib={sample.get('contrib_exp')}")
+    check("Nessun campo 'pts_exp' fantasy residuo", "pts_exp" not in sample)
     check("Calciatore include 'price_fair_1000'", "price_fair_1000" in sample, f"fair={sample.get('price_fair_1000')}")
     check("Calciatore include 'surplus_value'", "surplus_value" in sample, f"surplus={sample.get('surplus_value')}")
     check("Nessun campo 'is_assigned' residuo", "is_assigned" not in sample)

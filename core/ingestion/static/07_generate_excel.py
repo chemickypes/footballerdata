@@ -26,7 +26,7 @@ warnings.filterwarnings("ignore")
 DISPLAY_COLS = [
     "player", "role", "role_mantra", "team", "Prezzo_Consigliato_Cr",
     "prezzo_fair_1000", "surplus_value_cr", "score_composito",
-    "predicted_pts_p50", "predicted_pts_p10", "predicted_pts_p90", "pts_volatility_spread",
+    "predicted_contrib_p50", "predicted_contrib_p10", "predicted_contrib_p90", "contrib_volatility_spread",
     "vorp_points", "mv_media_3y", "mv_std", "mv_trend", "availability",
     "xg_media_3y", "xa_media_3y", "offensive_index",
     "giorni_infortunio_3y", "n_infortuni_3y", "infortunio_grave", "malus_infortuni",
@@ -39,8 +39,8 @@ COL_RENAME = {
     "team": "Team", "Prezzo_Consigliato_Cr": "Official Price (Cr)",
     "prezzo_fair_1000": "Fair Price 1000 (Cr)", "surplus_value_cr": "Surplus Value (Cr)",
     "score_composito": "Composite Score",
-    "predicted_pts_p50": "Expected Pts (P50)", "predicted_pts_p10": "Floor Pts (P10)",
-    "predicted_pts_p90": "Ceiling Pts (P90)", "pts_volatility_spread": "Pts Volatility Spread",
+    "predicted_contrib_p50": "Expected Pts (P50)", "predicted_contrib_p10": "Floor Pts (P10)",
+    "predicted_contrib_p90": "Ceiling Pts (P90)", "contrib_volatility_spread": "Pts Volatility Spread",
     "vorp_points": "VORP Points",
     "mv_media_3y": "3y Weighted Rating", "mv_std": "Rating Volatility (Std)",
     "mv_trend": "Rating Trend", "availability": "Availability %",
@@ -87,7 +87,7 @@ def generate_excel(df, output_path=None):
     output_path = output_path or config.OUTPUT_EXCEL
 
     # Check key columns
-    key_cols = ["predicted_pts_p50", "vorp_points", "prezzo_fair_1000", "surplus_value_cr"]
+    key_cols = ["predicted_contrib_p50", "vorp_points", "prezzo_fair_1000", "surplus_value_cr"]
     missing_keys = [c for c in key_cols if c not in df.columns]
     if missing_keys:
         raise ValueError(
@@ -203,7 +203,7 @@ def main():
     df = pd.read_csv(config.DATASET_FINALE_CSV)
 
     # Validazione integrità colonne essenziali
-    required_ml_cols = ["predicted_pts_p50", "vorp_points", "prezzo_fair_1000", "score_composito"]
+    required_ml_cols = ["predicted_contrib_p50", "vorp_points", "prezzo_fair_1000", "score_composito"]
     missing_cols = [c for c in required_ml_cols if c not in df.columns]
     if missing_cols:
         print(f"\n  ⚠️ ATTENZIONE: Mancano colonne analitiche essenziali nel dataset: {missing_cols}")

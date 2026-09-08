@@ -130,7 +130,7 @@ def api_ai_query():
         low_cost_threshold = max(3, int(budget_total * 0.02))
         if is_low_cost:
             sample_df = sample_df[sample_df['fair_custom'] <= low_cost_threshold].sort_values(
-                ['is_starter_2627', 'predicted_pts_p50', 'vorp_custom'], ascending=[False, False, False]
+                ['is_starter_2627', 'predicted_contrib_p50', 'vorp_custom'], ascending=[False, False, False]
             )
         else:
             sample_df = sample_df.sort_values(['is_starter_2627', 'vorp_custom'], ascending=[False, False])
@@ -147,7 +147,7 @@ def api_ai_query():
                 'player': p_name,
                 'role': row['role'],
                 'team': row['team'],
-                'predicted_pts_p50': float(row.get('predicted_pts_p50', 0)),
+                'predicted_contrib_p50': float(row.get('predicted_contrib_p50', 0)),
                 'prezzo_fair_1000': p_fair,
                 'vorp_points': p_vorp,
                 'is_starter_2627': bool(row.get('is_starter_2627', False))
@@ -155,7 +155,7 @@ def api_ai_query():
 
         sample_unmentioned = sample_df[~sample_df['player'].isin(seen_explicit)]
         remaining_slots = max(0, 35 - len(explicit_sample))
-        other_sample = sample_unmentioned.head(remaining_slots)[['player', 'role', 'team', 'predicted_pts_p50', 'fair_custom', 'vorp_custom', 'is_starter_2627']].rename(
+        other_sample = sample_unmentioned.head(remaining_slots)[['player', 'role', 'team', 'predicted_contrib_p50', 'fair_custom', 'vorp_custom', 'is_starter_2627']].rename(
             columns={'fair_custom': 'prezzo_fair_1000', 'vorp_custom': 'vorp_points'}
         ).to_dict(orient='records')
 
@@ -186,7 +186,7 @@ def api_ai_query():
         for r in matched_players:
             p_list.append({
                 "name": r['player'], "team": r['team'], "role": r['role'],
-                "pts_exp": float(r.get('predicted_pts_p50', 0)),
+                "contrib_exp": float(r.get('predicted_contrib_p50', 0)),
                 "fair_1000": int(r.get('prezzo_fair_1000', 1)),
                 "vorp": float(r.get('vorp_points', 0)),
                 "starts": int(r.get('starts_2627', 0)),
@@ -199,7 +199,7 @@ def api_ai_query():
             "engine": "Regole Tattiche Locali (Offline)",
             "players": p_list,
             "winner": winner['player'],
-            "verdict": f"Scelta Consigliata: **{winner['player']}** è il profilo con efficienza superiore (+{winner.get('vorp_points', 0):.1f} VORP, {winner.get('predicted_pts_p50', 0):.1f} pts attesi, Prezzo Fair: {int(winner.get('prezzo_fair_1000', 1))} cr)."
+            "verdict": f"Scelta Consigliata: **{winner['player']}** è il profilo con efficienza superiore (+{winner.get('vorp_points', 0):.1f} VORP, {winner.get('predicted_contrib_p50', 0):.1f} punti-rating attesi, Prezzo Fair: {int(winner.get('prezzo_fair_1000', 1))} cr)."
         })
 
     # C. Specific Player Analysis
@@ -216,9 +216,9 @@ def api_ai_query():
                 "team": row['team'],
                 "role": row['role'],
                 "role_mantra": str(row.get('role_mantra', '')),
-                "pts_exp": float(row.get('predicted_pts_p50', 0)),
-                "pts_floor": float(row.get('predicted_pts_p10', 0)),
-                "pts_ceil": float(row.get('predicted_pts_p90', 0)),
+                "contrib_exp": float(row.get('predicted_contrib_p50', 0)),
+                "contrib_floor": float(row.get('predicted_contrib_p10', 0)),
+                "contrib_ceil": float(row.get('predicted_contrib_p90', 0)),
                 "fair_1000": int(row.get('prezzo_fair_1000', 1)),
                 "surplus": int(row.get('surplus_value_cr', 0)),
                 "vorp": float(row.get('vorp_points', 0)),
@@ -226,7 +226,7 @@ def api_ai_query():
                 "minutes": int(row.get('minutes_2627', 0)),
                 "injury_days": int(row.get('giorni_infortunio_3y', 0))
             },
-            "verdict": f"Valutazione Modello: Prezzo fair stimato a 1000cr: **{row.get('prezzo_fair_1000', 1)} cr**. {starter_txt} con proiezione P50 di **{row.get('predicted_pts_p50', 0):.1f} punti attesi** e VORP **+{row.get('vorp_points', 0):.1f}**."
+            "verdict": f"Valutazione Modello: Prezzo fair stimato a 1000cr: **{row.get('prezzo_fair_1000', 1)} cr**. {starter_txt} con proiezione P50 di **{row.get('predicted_contrib_p50', 0):.1f} punti-rating attesi (pg×MV)** e VORP **+{row.get('vorp_points', 0):.1f}**."
         })
 
     # D. Recommendations by Role, Team, Budget, or Modificatore
@@ -264,9 +264,9 @@ def api_ai_query():
         filtered = filtered[filtered['prezzo_fair_1000'] <= max_budget]
 
     if 'modificatore' in prompt_lower or 'difesa' in prompt_lower:
-        filtered = filtered[filtered['role'] == 'D'].sort_values(['is_starter_2627', 'predicted_pts_p50'], ascending=[False, False])
+        filtered = filtered[filtered['role'] == 'D'].sort_values(['is_starter_2627', 'predicted_contrib_p50'], ascending=[False, False])
     elif 'scommess' in prompt_lower or 'low cost' in prompt_lower or '1 credito' in prompt_lower:
-        filtered = filtered[filtered['prezzo_fair_1000'] <= 5].sort_values(['is_starter_2627', 'predicted_pts_p50'], ascending=[False, False])
+        filtered = filtered[filtered['prezzo_fair_1000'] <= 5].sort_values(['is_starter_2627', 'predicted_contrib_p50'], ascending=[False, False])
     else:
         filtered = filtered.sort_values(['is_starter_2627', 'vorp_points'], ascending=[False, False])
 
@@ -277,7 +277,7 @@ def api_ai_query():
             "name": r['player'],
             "team": r['team'],
             "role": r['role'],
-            "pts_exp": float(r.get('predicted_pts_p50', 0)),
+            "contrib_exp": float(r.get('predicted_contrib_p50', 0)),
             "fair_1000": int(r.get('prezzo_fair_1000', 1)),
             "vorp": float(r.get('vorp_points', 0)),
             "starts": int(r.get('starts_2627', 0))

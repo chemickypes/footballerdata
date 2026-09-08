@@ -52,11 +52,11 @@ def demo_case_study(df):
     for label, p, tag in [("UNDERVALUED GEM", gem, "PRIMARY TARGET"), ("OVERHYPED TRAP", trap, "AVOID / PRICE DRIVER")]:
         print(f"  [{label}] -> {p['player']} ({p['role']}) - {p['team']} [{tag}]")
         print(f"    - Official List Price : {int(p['Prezzo_Consigliato_Cr']):>3} credits")
-        print(f"    - Rational Fair Price : {int(p.get('prezzo_fair_1000', 0)):>3} credits (VORP: {p.get('vorp_points', 0):.1f} pts)")
+        print(f"    - Rational Fair Price : {int(p.get('prezzo_fair_1000', 0)):>3} credits (VORP: {p.get('vorp_points', 0):.1f})")
         surplus = int(p.get("surplus_value_cr", 0))
         sign = "+" if surplus > 0 else ""
         print(f"    - Market Surplus Value: {sign}{surplus} credits ({'High ROI Bargain' if surplus > 0 else 'Capital Burner'})")
-        print(f"    - Expected Season Pts : {p.get('predicted_pts_p50', 0):.1f} pts (Floor: {p.get('predicted_pts_p10', 0):.1f} | Ceiling: {p.get('predicted_pts_p90', 0):.1f})")
+        print(f"    - Expected Season Contrib : {p.get('predicted_contrib_p50', 0):.1f} (Floor: {p.get('predicted_contrib_p10', 0):.1f} | Ceiling: {p.get('predicted_contrib_p90', 0):.1f})")
         print(f"    - 3y Injury Days Lost : {int(p.get('giorni_infortunio_3y', 0))} days (Malus: {p.get('malus_infortuni', 0):.3f})")
         print()
 
@@ -68,17 +68,17 @@ def demo_floor_ceiling(df):
     print("  Static averages hide volatility. Let's compare steady vs boom-or-bust profiles:\n")
 
     # Pick sample players across roles
-    samples = df.dropna(subset=["predicted_pts_p50"]).sort_values("pts_volatility_spread", ascending=False)
+    samples = df.dropna(subset=["predicted_contrib_p50"]).sort_values("contrib_volatility_spread", ascending=False)
     high_spread = samples.iloc[0]
-    low_spread = df[(df["predicted_pts_p50"] > 140) & (df["pts_volatility_spread"] < 30)].iloc[0] if len(df[(df["predicted_pts_p50"] > 140) & (df["pts_volatility_spread"] < 30)]) > 0 else samples.iloc[-1]
+    low_spread = df[(df["predicted_contrib_p50"] > 140) & (df["contrib_volatility_spread"] < 30)].iloc[0] if len(df[(df["predicted_contrib_p50"] > 140) & (df["contrib_volatility_spread"] < 30)]) > 0 else samples.iloc[-1]
 
     print(f"  [BOOM-OR-BUST PROFILE] -> {high_spread['player']} ({high_spread['role']}, {high_spread['team']})")
-    print(f"    Floor (P10): {high_spread['predicted_pts_p10']:.1f} pts  |  Expected (P50): {high_spread['predicted_pts_p50']:.1f} pts  |  Ceiling (P90): {high_spread['predicted_pts_p90']:.1f} pts")
-    print(f"    Uncertainty Spread: {high_spread['pts_volatility_spread']:.1f} pts -> High upside tournament/match-winner target.\n")
+    print(f"    Floor (P10): {high_spread['predicted_contrib_p10']:.1f}  |  Expected (P50): {high_spread['predicted_contrib_p50']:.1f}  |  Ceiling (P90): {high_spread['predicted_contrib_p90']:.1f}")
+    print(f"    Uncertainty Spread: {high_spread['contrib_volatility_spread']:.1f} -> High upside tournament/match-winner target.\n")
 
     print(f"  [ROCK-SOLID FLOOR PROFILE] -> {low_spread['player']} ({low_spread['role']}, {low_spread['team']})")
-    print(f"    Floor (P10): {low_spread['predicted_pts_p10']:.1f} pts  |  Expected (P50): {low_spread['predicted_pts_p50']:.1f} pts  |  Ceiling (P90): {low_spread['predicted_pts_p90']:.1f} pts")
-    print(f"    Uncertainty Spread: {low_spread['pts_volatility_spread']:.1f} pts -> Safe floor modifier defender/starter.\n")
+    print(f"    Floor (P10): {low_spread['predicted_contrib_p10']:.1f}  |  Expected (P50): {low_spread['predicted_contrib_p50']:.1f}  |  Ceiling (P90): {low_spread['predicted_contrib_p90']:.1f}")
+    print(f"    Uncertainty Spread: {low_spread['contrib_volatility_spread']:.1f} -> Safe floor modifier defender/starter.\n")
 
 
 def demo_roster_optimization(df):
@@ -99,18 +99,18 @@ def demo_roster_optimization(df):
 
     if roster is not None:
         total_cost = roster["cost"].sum()
-        total_exp = roster["predicted_pts_p50"].sum()
-        total_floor = roster["predicted_pts_p10"].sum()
-        total_ceiling = roster["predicted_pts_p90"].sum()
+        total_exp = roster["predicted_contrib_p50"].sum()
+        total_floor = roster["predicted_contrib_p10"].sum()
+        total_ceiling = roster["predicted_contrib_p90"].sum()
 
         print(f"  [SOLVER RESULT] Optimal Squad Found in <0.05 seconds:")
         print(f"    - Total Spend: {int(total_cost)} / 500 credits (Bank: {int(500 - total_cost)} cr)")
-        print(f"    - Projected Season Points: {total_exp:.1f} pts (Floor: {total_floor:.1f} | Ceiling: {total_ceiling:.1f})\n")
+        print(f"    - Projected Season Contrib: {total_exp:.1f} (Floor: {total_floor:.1f} | Ceiling: {total_ceiling:.1f})\n")
 
         print("  Key Core Assets Selected by MILP Solver:")
         for role, name in [("P", "Goalkeeper"), ("D", "Top Defender"), ("C", "Top Midfielder"), ("A", "Top Forward")]:
-            top_asset = roster[roster["role"] == role].sort_values("predicted_pts_p50", ascending=False).iloc[0]
-            print(f"    [{name:<14}] {top_asset['player']:<18} ({top_asset['team']}) Cost:{int(top_asset['cost']):>2}cr | Exp:{top_asset['predicted_pts_p50']:>5.1f} pts | VORP:{top_asset.get('vorp_points', 0):>5.1f}")
+            top_asset = roster[roster["role"] == role].sort_values("predicted_contrib_p50", ascending=False).iloc[0]
+            print(f"    [{name:<14}] {top_asset['player']:<18} ({top_asset['team']}) Cost:{int(top_asset['cost']):>2}cr | Exp:{top_asset['predicted_contrib_p50']:>5.1f} | VORP:{top_asset.get('vorp_points', 0):>5.1f}")
         print()
 
 
@@ -143,9 +143,9 @@ def interactive_player_search(df):
                       f"{int(r['Prezzo_Consigliato_Cr']):>7}cr "
                       f"{int(r.get('prezzo_fair_1000', 0)):>9}cr "
                       f"{sign + str(surplus):>7}cr "
-                      f"{r.get('predicted_pts_p50', 0):>7.1f} "
-                      f"{r.get('predicted_pts_p10', 0):>6.1f} "
-                      f"{r.get('predicted_pts_p90', 0):>6.1f} "
+                      f"{r.get('predicted_contrib_p50', 0):>7.1f} "
+                      f"{r.get('predicted_contrib_p10', 0):>6.1f} "
+                      f"{r.get('predicted_contrib_p90', 0):>6.1f} "
                       f"{int(r.get('giorni_infortunio_3y', 0)):>7}d")
         except (KeyboardInterrupt, EOFError):
             print("\n  Exiting demo.")

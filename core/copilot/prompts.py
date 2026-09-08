@@ -53,12 +53,12 @@ def build_system_prompt(team_context: dict, budget_total: int = 1000, is_persona
 def build_user_prompt(prompt: str, top_players: list) -> str:
     """Build user prompt with grounded player data context in clean readable table format."""
     lines = [
-        "| Giocatore | Ruolo | Squadra | P50 Atteso | Prezzo Fair (1000) | VORP | Titolare 26/27 |",
+        "| Giocatore | Ruolo | Squadra | Contributo Atteso (pg×MV) | Prezzo Fair (1000) | VORP | Titolare 26/27 |",
         "|---|---|---|---|---|---|---|"
     ]
     for p in (top_players or [])[:35]:
         starter = "SI" if p.get("is_starter_2627") else "No"
-        p50 = float(p.get("predicted_pts_p50", 0))
+        p50 = float(p.get("predicted_contrib_p50", 0))
         fair = int(p.get("prezzo_fair_1000", 1))
         vorp = float(p.get("vorp_points", 0))
         lines.append(f"| {p.get('player')} | {p.get('role')} | {p.get('team')} | {p50:.1f} | {fair} cr | +{vorp:.1f} | {starter} |")

@@ -31,7 +31,7 @@ OUTPUT_EXCEL_IT = os.path.join(config.DATA_DIR, "analisi_fantacalcio_italiano.xl
 DISPLAY_COLS = [
     "player", "role", "role_mantra", "team", "Prezzo_Consigliato_Cr",
     "prezzo_fair_1000", "surplus_value_cr", "score_composito",
-    "predicted_pts_p50", "predicted_pts_p10", "predicted_pts_p90", "pts_volatility_spread",
+    "predicted_contrib_p50", "predicted_contrib_p10", "predicted_contrib_p90", "contrib_volatility_spread",
     "vorp_points", "mv_media_3y", "mv_std", "mv_trend", "availability",
     "xg_media_3y", "xa_media_3y", "offensive_index",
     "giorni_infortunio_3y", "n_infortuni_3y", "infortunio_grave", "malus_infortuni",
@@ -48,10 +48,10 @@ COL_RENAME_IT = {
     "prezzo_fair_1000": "Prezzo Fair Asta (su 1000)",
     "surplus_value_cr": "Surplus Valore (Cr)",
     "score_composito": "Score Sintetico (0-1)",
-    "predicted_pts_p50": "Punti Attesi (P50)",
-    "predicted_pts_p10": "Punti Minimi Floor (P10)",
-    "predicted_pts_p90": "Punti Picco Ceiling (P90)",
-    "pts_volatility_spread": "Forbice Volatilità Punti",
+    "predicted_contrib_p50": "Punti Attesi (P50)",
+    "predicted_contrib_p10": "Punti Minimi Floor (P10)",
+    "predicted_contrib_p90": "Punti Picco Ceiling (P90)",
+    "contrib_volatility_spread": "Forbice Volatilità Punti",
     "vorp_points": "Punti VORP",
     "mv_media_3y": "Media Voto Storica (3y)",
     "mv_std": "Volatilità Voto (Std)",
@@ -169,7 +169,7 @@ def create_italian_workbook():
                     row_vals.append("")
                 elif col_key in ["prezzo_fair_1000", "Prezzo_Consigliato_Cr", "surplus_value_cr", "FVM_1000", "giorni_infortunio_3y", "n_infortuni_3y"]:
                     row_vals.append(int(round(float(val))))
-                elif col_key in ["score_composito", "predicted_pts_p50", "predicted_pts_p10", "predicted_pts_p90", "pts_volatility_spread", "vorp_points", "mv_media_3y", "mv_std", "xg_media_3y", "xa_media_3y", "NN_MV_Atteso", "NN_FV_Atteso"]:
+                elif col_key in ["score_composito", "predicted_contrib_p50", "predicted_contrib_p10", "predicted_contrib_p90", "contrib_volatility_spread", "vorp_points", "mv_media_3y", "mv_std", "xg_media_3y", "xa_media_3y", "NN_MV_Atteso", "NN_FV_Atteso"]:
                     row_vals.append(round(float(val), 2))
                 elif col_key in ["availability", "Prob_Bonus_Ge_8_%", "Prob_Picco_Ge_10_%", "Clean_Sheet_%"]:
                     row_vals.append(f"{round(float(val), 1)}%")
