@@ -1,5 +1,5 @@
 /* ============================================================
-   Tutorial Interattivo Spotlight — fanta-lab
+   Tutorial Interattivo Spotlight — footballerdata
    Zero-dependency walkthrough engine (vanilla JS, IIFE module).
    ============================================================ */
 
@@ -8,24 +8,10 @@ window.FantaTour = (function () {
 
     var STEPS = [
         {
-            selector: '#btnLeagueSettings',
-            title: 'Pannello Impostazioni',
-            text: 'Configura qui budget di lega, numero di squadre e slot per ruolo. Puoi modificarli in qualsiasi momento.',
-            maestroText: 'Ogni officina parte da misure corrette: budget e slot fissano il telaio della lega.',
-            maestroPose: 'greeting'
-        },
-        {
-            selector: '#sideNav-strategy',
-            title: 'Blueprint Strategici',
-            text: 'Scegli tra 5 piani tattici pre-configurati (es. Trazione Anteriore, Moneyball) con soglie di spesa per ruolo calcolate sul tuo budget di lega.',
-            maestroText: 'Qui scegli il disegno della macchina: aggressiva davanti o disciplinata nel mezzo.',
-            maestroPose: 'thoughtful'
-        },
-        {
             selector: '#tab-listone',
             requiresTab: 'listone',
             title: 'Colonne Listone',
-            text: 'Le colonne chiave: Prezzo Equo (il massimo razionale da offrire), P50 (punti attesi), e Surplus di Mercato (l\'affare potenziale rispetto alla quotazione).',
+            text: 'Le colonne chiave: Prezzo Equo (punteggio di qualità VORP riscalato), P50 (punti attesi), e Surplus di Mercato (l\'affare potenziale rispetto alla quotazione).',
             maestroText: 'Il Prezzo Equo è il mio compasso: oltre quella soglia, il mercato comanda te.',
             maestroPose: 'pointing'
         },
@@ -39,24 +25,10 @@ window.FantaTour = (function () {
             maestroPose: 'thoughtful'
         },
         {
-            selector: '#sideNav-draft',
-            title: 'Modulo Asta',
-            text: 'Qui gestisci l\'asta live: assegnazione giocatori, tracciamento budget, live draft.',
-            maestroText: 'Quando parte la battuta, tieni un occhio sul lotto e uno sul tuo margine di rilancio.',
-            maestroPose: 'pointing'
-        },
-        {
-            selector: '#sideNav-lineup',
-            title: 'Formazione Settimanale',
-            text: 'Calcola la formazione ottimale della giornata in base a probabili formazioni, quote e xPts.',
-            maestroText: 'Ricorda: il solver giornata è distinto dalla lavagna tattica della Rosa.',
-            maestroPose: 'neutral'
-        },
-        {
-            selector: '#sideNav-audit',
-            title: 'Valutatore & Scambi',
-            text: 'Analizza la classifica di lega post-asta e valuta scambi vantaggiosi con gli altri manager nella sezione Scambi.',
-            maestroText: 'Prima valuta i pesi della tua officina, poi contratta lo scambio giusto.',
+            selector: '#sideNav-ai',
+            title: 'Chiedi al Maestro',
+            text: 'Fai domande in linguaggio naturale sui calciatori: confronti testuali (es. "Malen vs Lautaro"), schede analitiche e raccomandazioni per ruolo, squadra o fascia di prezzo.',
+            maestroText: 'Chiedi e ti risponderò con i numeri del modello, mai con opinioni.',
             maestroPose: 'greeting'
         }
     ];

@@ -68,9 +68,9 @@ Column groups: identity (player, role, role_mantra, team) → auction prices (co
 
 ## Web App (web/app.py) — critical structure
 
-**Monolith**: one Python file, ~9.1k lines. Flask routes (lines 1-1780) + the ENTIRE frontend as `HTML_TEMPLATE = """..."""` (lines 1784-8993: inline CSS ~1796-3530, body 3532-4942, inline JS ~4944-8985). No Jinja files on disk. Dark "Officina Vittoriana" steampunk theme; Italian UI throughout.
+**Monolith**: one Python file, ~3.8k lines (after the pivot strip). Flask routes (~1-700) + the entire frontend as `HTML_TEMPLATE = """..."""` (head/CSS ~710-2444, body ~2446-2875, inline JS ~2877-3779). No Jinja files on disk. Dark "Officina Vittoriana" steampunk theme; Italian UI throughout. ~1.7k lines of the inline CSS are dead selectors for removed fantasy UI (inert; cleanup in Step 3).
 
-9 tabs: `draft` (Asta Live), `targets` (Target & Piano), `strategy` (empty legacy), `rosters` (Rose & Finanze), `listone` (player list — **the stats core**), `ai` (copilot chat "Il Maestro"), `lineup`, `audit` (Classifica Lega), `trades`.
+2 tabs: `listone` (player list — the stats core, default active) and `ai` (copilot chat "Il Maestro").
 
 ### Route map (after Step 1 backend strip)
 
@@ -123,8 +123,8 @@ Optional `.env` keys: `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY` (copilot), `API_F
 
 ### Pivot progress
 - **Step 1 (DONE)**: backend strip of `web/app.py` — removed all league/auction/auth/live/lineup/audit/trades routes, Redis helpers, auction state, TACTICAL_PRESETS, market inflation; decoupled `/api/players` (no is_assigned/is_favorite/market_index; fixed pricing defaults: budget 1000, slots 3/8/8/6, 10 teams for VORP baselines); `/api/ai_query` reduced to player Q&A (squad_diagnostic branch removed); frontend keeps booting via a static `auctionState` stub (no polling, no identity/session gates). Deleted `modules/{lineup,valuation,trades,auction}`, `live_bridge/` and their tests; smoke test `tests/test_dual_track_and_features.py` pruned to kept surface (72 checks, incl. removed-endpoints-404 + node --check).
-- **Step 2 (NEXT)**: frontend strip — remove tabs draft/targets/strategy/rosters/lineup/audit/trades from HTML+JS, their modals, admin/session JS, FantaLab sniffer JS, target/profile systems; prune tutorial.js steps; update header/sidebar/bottom-nav to listone+ai only.
-- **Step 3**: extract frontend from the Python string into `web/static/` + template files (kills the monolith fragility).
+- **Step 2 (DONE)**: frontend strip — removed tabs draft/targets/strategy/rosters/lineup/audit/trades, all their modals (target/pitch-picker/profile/custom-tactic/league-settings/inflation/admin/session), identity gates, admin/session JS, FantaLab sniffer JS, target/profile/preset systems, market-badge JS, draft helpers (search/assign/undo/recent); sidebar/bottom-nav reduced to Listone + AI; listone is the default active tab; `tutorial.js` pruned to 3 steps; AI quick-chips retargeted to player queries; branding → footballerdata. `web/app.py` now ~3.8k lines (from 9.1k). Known leftover: ~1.7k lines of inline CSS still contain dead selectors for removed UI (inert; cleanup happens in Step 3 when CSS moves to its own file).
+- **Step 3 (NEXT)**: extract frontend from the Python string into `web/static/` + template files (kills the monolith fragility); purge dead CSS while moving it.
 - **Step 4**: split remaining Python backend; pipeline retargeting (ML target away from fantasy points); new data sources (FBref etc.).
 
 ### EXPAND (the fork's actual goal — more player data)
