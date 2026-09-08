@@ -7,6 +7,7 @@ data/*.json
 data/*.xlsx
 !data/.gitkeep
 !data/dataset_finale*.csv
+!data/player_history.json
 !data/Quotazioni_Fantacalcio_Stagione_2026_27_latest.xlsx
 !data/fallback_matchday.json
 

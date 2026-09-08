@@ -193,6 +193,23 @@ def main():
         has_emoji = any(em in sort_opts for em in ["⭐", "💰", "📉", "🎯", "🚀", "🔤", "⚽", "🔥"])
         check("listSortBy non contiene emoji (design sobrio e pulito)", not has_emoji)
 
+    # ── 12. Career Trajectory Endpoint ────────────────────────────────
+    print("\n▸ 12. Traiettoria Carriera — /api/player_history")
+    r_hist = requests.get(f"{BASE_URL}/api/player_history", params={"player": "Svilar"}, timeout=10)
+    check("GET /api/player_history?player=Svilar → 200", r_hist.status_code == 200, f"status={r_hist.status_code}")
+    if r_hist.status_code == 200:
+        hist_data = r_hist.json()
+        seasons = [h.get("season") for h in hist_data.get("history", [])]
+        check("Storico Svilar non vuoto (>= 2 stagioni)", len(seasons) >= 2, f"seasons={seasons}")
+        check("Stagioni in ordine cronologico", seasons == sorted(seasons))
+        first = hist_data["history"][-1]
+        check("Riga storico ha season/team/pg/mv", all(k in first for k in ["season", "team", "pg", "mv"]))
+    r_hist_404 = requests.get(f"{BASE_URL}/api/player_history", params={"player": "Zzz_Nessuno"}, timeout=10)
+    check("Giocatore sconosciuto → 404", r_hist_404.status_code == 404, f"status={r_hist_404.status_code}")
+    r_hist_drawer = requests.get(f"{BASE_URL}/static/js/app.js", timeout=10)
+    check("app.js contiene 'renderTrajectorySVG'", "renderTrajectorySVG" in r_hist_drawer.text)
+    check("Drawer HTML contiene 'pdTrajectory'", "pdTrajectory" in html)
+
     # ── SUMMARY ───────────────────────────────────────────────────────
     print("\n" + "=" * 72)
     passed = sum(1 for _, s, _ in results if s == PASS)

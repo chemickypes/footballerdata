@@ -1,13 +1,18 @@
 """
 footballerdata — /api/players endpoint
 Player list payload: prices, quality scores, medical audit, Understat volumes,
-quantile projections, starter status.
+quantile projections, starter status. Plus /api/player_history for the
+career trajectory chart (per-season rows from the stage 1 scrape).
 """
+
+import json
+import os
+import re
 
 import pandas as pd
 from flask import Blueprint, jsonify, request
 
-from web.config import DEFAULT_BUDGET, DEFAULT_ROSTER_SLOTS, DEFAULT_N_TEAMS, INJURIES_CACHE
+from web.config import DEFAULT_BUDGET, DEFAULT_ROSTER_SLOTS, DEFAULT_N_TEAMS, INJURIES_CACHE, PROJECT_ROOT
 from web.data import load_dataset
 from web.pricing import get_dynamic_fair_prices
 
@@ -16,6 +21,39 @@ players_bp = Blueprint("players", __name__)
 # Rating-volume spread (P90 - P10 of pg x mv) below which a player is flagged as a consistency profile.
 # Calibrated on the dataset distribution: spread median ~150 (range 86-190); below-median = lower floor risk
 VOLATILITY_PROFILE_THRESHOLD = 150.0
+
+_HISTORY_CACHE = None
+
+
+def normalize_name(s):
+    """Name normalization shared with export_player_history.py (key format of player_history.json)."""
+    return re.sub(r"[.'\-\s]", "", str(s or "").lower().strip())
+
+
+def _load_history():
+    global _HISTORY_CACHE
+    if _HISTORY_CACHE is None:
+        path = os.path.join(PROJECT_ROOT, "data", "player_history.json")
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                _HISTORY_CACHE = json.load(f)
+        except Exception:
+            _HISTORY_CACHE = {}
+    return _HISTORY_CACHE
+
+
+@players_bp.route("/api/player_history")
+def api_player_history():
+    """Per-season career history for the Traiettoria Carriera chart."""
+    name = request.args.get("player", "").strip()
+    if not name:
+        return jsonify({"error": "player parameter required"}), 400
+
+    hist = _load_history().get(normalize_name(name))
+    if not hist:
+        return jsonify({"player": name, "history": []}), 404
+
+    return jsonify(hist)
 
 
 @players_bp.route("/api/players")

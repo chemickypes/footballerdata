@@ -41,6 +41,7 @@ web/
 data/                        # Generated artifacts (dataset_finale.csv etc.)
 dataset_finale.csv           # Root copy of the master dataset (533 players, 57 cols)
 run_pipeline.py              # CLI: --step N / --from N over ordered stages [1,3,4,5,6,8,9,10,7]
+export_player_history.py     # Exports data/player_history.json (per-season career rows, feeds trajectory chart)
 demo.py                      # Zero-config terminal demo (hype-trap, volatility, MILP, lookup)
 export_dataset.py            # Exports dataset_finale_{500,1000}.csv with unified prezzo_fair
 tests/                       # pytest suites + 1 HTTP smoke script (test_dual_track_and_features.py)
@@ -96,11 +97,12 @@ Standard Flask layout: split backend (Step 4a) + extracted frontend (Step 3):
 
 ### Route map (after Step 1 backend strip)
 
+- **Trajectory (KEPT, Step 4c)**: `/api/player_history?player=<name>` — per-season career rows (season/team/pg/mv/gol/assist/mfv) from `data/player_history.json`, normalized-name keyed; 404 = no Serie A history. Drawer section "Traiettoria Carriera" renders an SVG mv-per-season chart.
 - **Player stats (KEPT)**: `/api/players` — loads `dataset_finale.csv`, richest payload: prices, score, P10/P50/P90, spread, VORP, bonus range, injury audit, Understat metrics, quantile profile, starter status. Decoupled from auction state; pricing computed with fixed defaults (budget 1000, slots 3/8/8/6, 10 teams) via `get_dynamic_fair_prices()`.
 - **Copilot (KEPT)**: `/api/ai_status`, `/api/ai_test`, `/api/ai_query` — player deep-dive/comparison/recommendations only (squad_diagnostic branch removed). Local rule-based fallback reasoner needs no LLM key.
 - **REMOVED (404)**: `/api/settings`, `/api/state`, `/api/sync_state`, `/api/assign`, `/api/undo`, `/api/favorite`, `/api/reset`, `/api/live/snapshot`, `/api/auth_admin`, `/api/auth/login`, `/api/session/reset`, `/api/lineup/solve`, `/api/audit/rankings`, `/api/trades/*`
 
-Frontend keepers: `tab-listone` + `renderListone()` + filters/sorts; **Player Detail Drawer** `openPlayerDetailDrawer()` — price/value, Finestra Medica (injury history), Understat volumes, quantile profile, starter/minutes. No polling, no gates, no `auctionState`.
+Frontend keepers: `tab-listone` + `renderListone()` + filters/sorts; **Player Detail Drawer** `openPlayerDetailDrawer()` — price/value, Finestra Medica (injury history), Understat volumes, Traiettoria Carriera (SVG per-season mv chart), quantile profile, starter/minutes. No polling, no gates, no `auctionState`.
 
 ## Commands
 
@@ -149,7 +151,8 @@ Optional `.env` keys: `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY` (copilot), `API_F
 - **Step 3 (DONE)**: frontend extraction — `HTML_TEMPLATE` string deleted; frontend now lives in `web/templates/index.html` (Jinja), `web/static/css/main.css` (1733 → 968 lines: 130 dead rules + 145 dead selectors + 8 dead keyframes purged), `web/static/js/app.js` (dead `showToast`/toast UI removed). `web/app.py` is pure Python (~720 lines, from 9116 pre-pivot) using `render_template()` + Flask built-in static serving. Smoke test updated to check external assets (78/78).
 - **Step 4a (DONE)**: backend split — `web/app.py` (720 lines) → entrypoint (~75) + `web/config.py` (paths/.env/persona/injuries/pricing defaults) + `web/data.py` (`load_dataset` + fasce) + `web/pricing.py` (VORP/fair-price) + `web/players_api.py` (Blueprint `/api/players`) + `web/ai_api.py` (Blueprint `/api/ai_*`); `web/__init__.py` bootstraps `sys.path` for script/package/Vercel import modes. Also fixed: `core/copilot/__init__.py` broken absolute imports (`from copilot.*` → relative) so the LLM copilot path actually engages; smoke-script helper renamed `test()` → `check()` (was breaking pytest collection). Unit tests 64/64, smoke 78/78.
 - **Step 4b (DONE)**: ML retargeting — stage 8 target `pg × mfv` (fantasy pts) → `pg × mv` (season rating-volume); features drop fantasy-derived `mfv`, add rating-consistency `std_mv`; columns renamed `predicted_contrib_p10/p50/p90` + `contrib_volatility_spread`; stage 9 VORP rebased on new P50 and made price-preserving (target/clearing/fair prices are ML-independent and are no longer recomputed when already present — protects observed clearing prices now that Asta.xlsx/quotazioni cache are absent); web payload `pts_exp/floor/ceil/spread` → `contrib_*`; UI labels de-fantasy-ized ("Contributo Atteso", profile threshold recalibrated to spread median 150); fixed latent `.str.upper()` bug in stage 8 player_id fallback; storico rebuilt via stage 1 scrape (11 seasons, 7291 rows; football-data.co.uk unreachable — team indices empty, stage-6-only input). OOT validation on 2025-26: 80% CI coverage 75.4%, P50 MAE 49.4 rating-pts.
-- **Step 4c (NEXT)**: new data sources (FBref etc.) — discuss candidates before implementing.
+- **Step 4c — Part A (DONE)**: per-season trajectory — `export_player_history.py` -> `data/player_history.json` (2502 players / 7023 season rows from the stage-1 storico, 78% of current dataset covered; misses = youth/new signings with no Serie A history); `/api/player_history` endpoint; drawer SVG chart (mv line + pg labels + native tooltips); smoke 87/87. Also fixed 4b leftovers in app.js (spread threshold 135 -> 150 aligned with backend, quantile bar scale 350 -> 250).
+- **Step 4c — Part B (IN PROGRESS)**: Transfermarkt player attributes (age/height/foot/market value/contract).
 
 ### EXPAND (the fork's actual goal — more player data)
 Candidate new sources/metrics to discuss before implementing:

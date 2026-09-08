@@ -206,20 +206,23 @@ function openPlayerDetailDrawer(playerName) {
 
     const profBadge = document.getElementById('pdProfileBadge');
     profBadge.innerHTML = q.profile_badge || '';
-    if ((q.spread || 0) < 135) { profBadge.style.background = 'rgba(99,102,241,0.15)'; profBadge.style.color = '#818cf8'; }
+    if ((q.spread || 0) < 150) { profBadge.style.background = 'rgba(99,102,241,0.15)'; profBadge.style.color = '#818cf8'; }
     else { profBadge.style.background = 'rgba(245,158,11,0.15)'; profBadge.style.color = '#f59e0b'; }
 
     // Quantile visual bar
-    const maxPts = Math.max(p90, 350);
-    const barLeft = (p10 / maxPts) * 100;
-    const barWidth = ((p90 - p10) / maxPts) * 100;
-    const p50Pos = (p50 / maxPts) * 100;
+    const maxContrib = Math.max(p90, 250);
+    const barLeft = (p10 / maxContrib) * 100;
+    const barWidth = ((p90 - p10) / maxContrib) * 100;
+    const p50Pos = (p50 / maxContrib) * 100;
     const qBar = document.getElementById('pdQuantileBar');
     qBar.style.left = barLeft + '%';
     qBar.style.width = barWidth + '%';
     qBar.style.background = 'linear-gradient(90deg, #ef4444 0%, var(--gold) 50%, #22c55e 100%)';
     qBar.style.opacity = '0.3';
     document.getElementById('pdQuantileP50Mark').style.left = p50Pos + '%';
+
+    // Career trajectory (lazy fetch)
+    loadPlayerTrajectory(p.player);
 
     // Starter info
     const starterEl = document.getElementById('pdStarter');
@@ -241,6 +244,81 @@ function openPlayerDetailDrawer(playerName) {
             if (panel) panel.style.right = '0px';
         });
     }
+}
+
+function _normalizePlayerName(s) {
+    return String(s || '').toLowerCase().trim().replace(/[.'\-\s]/g, '');
+}
+
+function loadPlayerTrajectory(playerName) {
+    const el = document.getElementById('pdTrajectory');
+    if (!el) return;
+    el.innerHTML = '<div style="font-style:italic;">Caricamento…</div>';
+    fetch(`/api/player_history?player=${encodeURIComponent(playerName)}`)
+        .then(r => r.ok ? r.json() : Promise.reject(new Error('not found')))
+        .then(data => {
+            const hist = (data.history || []).filter(h => h.mv != null && h.mv > 0);
+            if (!hist.length) {
+                el.innerHTML = '<div style="font-style:italic;">Nessuno storico Serie A disponibile (giovane o nuova acquisizione)</div>';
+                return;
+            }
+            el.innerHTML = renderTrajectorySVG(hist);
+        })
+        .catch(() => {
+            el.innerHTML = '<div style="font-style:italic;">Nessuno storico Serie A disponibile</div>';
+        });
+}
+
+function renderTrajectorySVG(hist) {
+    const W = 400, H = 170, padL = 30, padR = 8, padT = 12, padB = 34;
+    const n = hist.length;
+    const mvs = hist.map(h => h.mv);
+    let yMin = Math.min(5.0, Math.floor(Math.min(...mvs) * 2) / 2) - 0.1;
+    const yMax = Math.max(7.5, Math.ceil(Math.max(...mvs) * 2) / 2) + 0.1;
+    const x = i => n === 1 ? (padL + (W - padL - padR) / 2) : padL + (i / (n - 1)) * (W - padL - padR);
+    const y = v => padT + (1 - (v - yMin) / (yMax - yMin)) * (H - padT - padB);
+
+    let gridLines = '';
+    for (let gv = Math.ceil(yMin); gv <= Math.floor(yMax); gv++) {
+        gridLines += `<line x1="${padL}" y1="${y(gv)}" x2="${W - padR}" y2="${y(gv)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>` +
+            `<text x="${padL - 5}" y="${y(gv) + 3}" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.35)">${gv}</text>`;
+    }
+
+    const points = hist.map((h, i) => ({ cx: x(i), cy: y(h.mv), h }));
+    const path = points.map((pt, i) => `${i === 0 ? 'M' : 'L'}${pt.cx.toFixed(1)},${pt.cy.toFixed(1)}`).join(' ');
+    const dots = points.map(pt => {
+        const h = pt.h;
+        const tip = `${h.season} · ${h.team || '?'} · ${h.pg} presenze · MV ${h.mv.toFixed(2)}` +
+            ((h.gol || h.assist) ? ` · ${h.gol || 0}G ${h.assist || 0}A` : '');
+        return `<circle cx="${pt.cx.toFixed(1)}" cy="${pt.cy.toFixed(1)}" r="4" fill="var(--gold)" stroke="#0b111e" stroke-width="1.5"><title>${tip}</title></circle>`;
+    }).join('');
+    const seasonLabels = points.map(pt => {
+        const s = pt.h.season || '';
+        const short = s.length >= 7 ? s.slice(2, 5) + '/' + s.slice(7) : s;
+        return `<text x="${pt.cx.toFixed(1)}" y="${H - padB + 14}" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,0.45)">${short}</text>`;
+    }).join('');
+    const pgLabels = points.map(pt =>
+        `<text x="${pt.cx.toFixed(1)}" y="${H - padB + 25}" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.30)">${pt.h.pg}p</text>`
+    ).join('');
+
+    const last = hist[n - 1];
+    const trend = n >= 2 ? (mvs[n - 1] - mvs[n - 2]) : 0;
+    const trendTxt = n >= 2
+        ? `<span style="color:${trend >= 0 ? '#22c55e' : '#ef4444'}; font-weight:700;">${trend >= 0 ? '▲' : '▼'} ${Math.abs(trend).toFixed(2)}</span> vs stagione precedente`
+        : '';
+
+    return `
+        <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto; display:block;" role="img" aria-label="Traiettoria MV per stagione">
+            ${gridLines}
+            <path d="${path}" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linejoin="round" opacity="0.9"/>
+            ${dots}
+            ${seasonLabels}
+            ${pgLabels}
+        </svg>
+        <div style="margin-top:4px; font-size:0.72rem; color:var(--text-muted);">
+            MV per stagione (presenze sotto) — ultima: <b style="color:var(--text);">${last.mv.toFixed(2)}</b> in ${n} stagioni Serie A ${trendTxt}
+        </div>
+    `;
 }
 
 function closePlayerDetailDrawer() {
