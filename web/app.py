@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-fanta-lab — Spectre - FantaMoneyball: Modern Quantitative Auction & Live Draft Platform for Fantacalcio Serie A
-Clean, professional interface with local profile isolation, custom targets, FantaMoneyball AI query assistant, and Admin-gated Live Draft.
+fanta-lab — La FantaOfficina: Modern Quantitative Auction & Live Draft Platform for Fantacalcio Serie A
+Clean, professional interface with local profile isolation, custom targets, Il Maestro AI query assistant, and Admin-gated Live Draft.
 """
 
 import os
@@ -132,12 +132,12 @@ TOTAL_ROSTER_SIZE = sum(DEFAULT_ROSTER_SLOTS.values())
 # ──────────────────────────────────────────────────────────────────────
 # BOT IDENTITY & PERSONA
 # ──────────────────────────────────────────────────────────────────────
-BOT_NAME = "FantaMoneyball AI"
+BOT_NAME = "Il Maestro"
 BOT_SUBTITLE = "Assistente Tattico Quantitativo"
 BOT_AVATAR_TEXT = "AI"
 BOT_BADGE = "PRO DECISION"
 BOT_GREETING = (
-    "Ciao! Sono l'assistente quantitativo di **Spectre - FantaMoneyball**. Chiedimi confronti (es. *Malen vs Lautaro*), "
+    "Ciao! Sono l'assistente quantitativo de **La FantaOfficina**. Chiedimi confronti (es. *Malen vs Lautaro*), "
     "analisi di reparto o raccomandazioni basate su VORP e proiezioni ML."
 )
 BOT_AVATAR_IMAGE = ""
@@ -1351,7 +1351,7 @@ def api_ai_test():
 @app.route("/api/ai_query", methods=["POST"])
 def api_ai_query():
     """
-    FantaMoneyball AI Tactical Engine
+    Il Maestro AI Tactical Engine
     Priorità: Ollama locale -> OpenAI-compatible -> Google Gemini -> Local Quantitative Reasoner.
     """
     data = request.json or {}
@@ -1787,7 +1787,7 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spectre - FantaMoneyball — Centro Decisionale Asta & Strategia</title>
+    <title>La FantaOfficina — Centro Decisionale Asta & Strategia</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -8374,7 +8374,7 @@ def main():
         local_ip = "127.0.0.1"
 
     print("\n" + "=" * 70)
-    print("  Spectre - FantaMoneyball — Centro Decisionale Asta & Strategia (PRO)")
+    print("  La FantaOfficina — Centro Decisionale Asta & Strategia (PRO)")
     print("  Regole: 1.000 Crediti | Struttura Roster 4-9-9-7 (29 Giocatori)")
     print("=" * 70)
     print(f"\n  Accesso Desktop: http://localhost:5050")
