@@ -136,3 +136,61 @@
 #guideNavBtn {
     /* Matches existing .profile-btn sibling styling context; no override needed beyond icon spacing */
 }
+
+.tour-tooltip--officina {
+    background: linear-gradient(180deg, #2a1e13, #1d140c);
+    border: 1px solid rgba(198,154,76,0.34);
+    color: #f1e6cd;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.tour-tooltip--officina .tour-tooltip-title {
+    color: #f6e9cc;
+    font-weight: 800;
+}
+
+.tour-tooltip--officina .tour-tooltip-text {
+    color: #cdb992;
+}
+
+.tour-tooltip-maestro-line {
+    margin: 0 0 12px;
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 0.94rem;
+    color: #f2c14e;
+}
+
+.tour-maestro {
+    position: fixed;
+    z-index: 10002;
+    width: 96px;
+    height: 138px;
+    pointer-events: none;
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.6));
+    animation: tour-maestro-float 4s ease-in-out infinite;
+}
+
+.tour-maestro__sprite {
+    position: relative;
+    z-index: 1;
+}
+
+.tour-maestro__shadow {
+    position: absolute;
+    left: 50%;
+    bottom: -6px;
+    transform: translateX(-50%);
+    width: 70%;
+    height: 8px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.45), transparent 70%);
+}
+
+.tour-maestro--pointing { transform-origin: bottom center; }
+.tour-maestro--thoughtful { filter: drop-shadow(0 6px 12px rgba(0,0,0,0.72)); }
+
+@keyframes tour-maestro-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}

@@ -10,40 +10,54 @@ window.FantaTour = (function () {
         {
             selector: '#btnLeagueSettings',
             title: 'Pannello Impostazioni',
-            text: 'Configura qui budget di lega, numero di squadre e slot per ruolo. Puoi modificarli in qualsiasi momento.'
+            text: 'Configura qui budget di lega, numero di squadre e slot per ruolo. Puoi modificarli in qualsiasi momento.',
+            maestroText: 'Ogni officina parte da misure corrette: budget e slot fissano il telaio della lega.',
+            maestroPose: 'greeting'
         },
         {
             selector: '#sideNav-strategy',
             title: 'Blueprint Strategici',
-            text: 'Scegli tra 5 piani tattici pre-configurati (es. Trazione Anteriore, Moneyball) con soglie di spesa per ruolo calcolate sul tuo budget di lega.'
+            text: 'Scegli tra 5 piani tattici pre-configurati (es. Trazione Anteriore, Moneyball) con soglie di spesa per ruolo calcolate sul tuo budget di lega.',
+            maestroText: 'Qui scegli il disegno della macchina: aggressiva davanti o disciplinata nel mezzo.',
+            maestroPose: 'thoughtful'
         },
         {
             selector: '#tab-listone',
             requiresTab: 'listone',
             title: 'Colonne Listone',
-            text: 'Le colonne chiave: Prezzo Equo (il massimo razionale da offrire), P50 (punti attesi), e Surplus di Mercato (l\'affare potenziale rispetto alla quotazione).'
+            text: 'Le colonne chiave: Prezzo Equo (il massimo razionale da offrire), P50 (punti attesi), e Surplus di Mercato (l\'affare potenziale rispetto alla quotazione).',
+            maestroText: 'Il Prezzo Equo è il mio compasso: oltre quella soglia, il mercato comanda te.',
+            maestroPose: 'pointing'
         },
         {
             selector: '.medical-badge',
             requiresTab: 'listone',
             fallbackSelector: '#tab-listone',
             title: 'Scheda Clinica',
-            text: 'Clicca il badge medico di un giocatore per aprire la sua cartella clinica: stato di rischio, giorni di infortunio, e metriche avanzate xG/xA.'
+            text: 'Clicca il badge medico di un giocatore per aprire la sua cartella clinica: stato di rischio, giorni di infortunio, e metriche avanzate xG/xA.',
+            maestroText: 'La bravura conta, ma la fragilità rompe gli ingranaggi nei momenti peggiori.',
+            maestroPose: 'thoughtful'
         },
         {
             selector: '#sideNav-draft',
             title: 'Modulo Asta',
-            text: 'Qui gestisci l\'asta live: assegnazione giocatori, tracciamento budget, live draft.'
+            text: 'Qui gestisci l\'asta live: assegnazione giocatori, tracciamento budget, live draft.',
+            maestroText: 'Quando parte la battuta, tieni un occhio sul lotto e uno sul tuo margine di rilancio.',
+            maestroPose: 'pointing'
         },
         {
             selector: '#sideNav-lineup',
             title: 'Formazione Settimanale',
-            text: 'Calcola la formazione ottimale della giornata in base a probabili formazioni, quote e xPts.'
+            text: 'Calcola la formazione ottimale della giornata in base a probabili formazioni, quote e xPts.',
+            maestroText: 'Ricorda: il solver giornata è distinto dalla lavagna tattica della Rosa.',
+            maestroPose: 'neutral'
         },
         {
             selector: '#sideNav-audit',
             title: 'Valutatore & Scambi',
-            text: 'Analizza la classifica di lega post-asta e valuta scambi vantaggiosi con gli altri manager nella sezione Scambi.'
+            text: 'Analizza la classifica di lega post-asta e valuta scambi vantaggiosi con gli altri manager nella sezione Scambi.',
+            maestroText: 'Prima valuta i pesi della tua officina, poi contratta lo scambio giusto.',
+            maestroPose: 'greeting'
         }
     ];
 
@@ -52,6 +66,34 @@ window.FantaTour = (function () {
     var overlayEls = [];
     var tooltipEl = null;
     var resizeHandler = null;
+    var maestroDockEl = null;
+
+    function _ensureMaestroDock(step) {
+        if (!maestroDockEl) {
+            maestroDockEl = document.createElement('div');
+            maestroDockEl.className = 'tour-maestro';
+            maestroDockEl.innerHTML = '<div class="tour-maestro__sprite" id="tourMaestroSprite"></div><div class="tour-maestro__shadow"></div>';
+            document.body.appendChild(maestroDockEl);
+        }
+        maestroDockEl.className = 'tour-maestro tour-maestro--' + (step.maestroPose || 'neutral');
+        if (typeof window.renderMaestroSprite === 'function') {
+            window.renderMaestroSprite('tourMaestroSprite', step.maestroPose || 'neutral', 4.2);
+        }
+        if (typeof window.setMaestroPose === 'function') {
+            window.setMaestroPose(step.maestroPose || 'neutral');
+        }
+    }
+
+    function _positionMaestroDock(targetEl, placeBelow) {
+        if (!maestroDockEl || !tooltipEl) return;
+        var tw = tooltipEl.offsetWidth;
+        var th = tooltipEl.offsetHeight;
+        var mw = maestroDockEl.offsetWidth;
+        var left = parseFloat(tooltipEl.style.left || '0');
+        var top = parseFloat(tooltipEl.style.top || '0');
+        maestroDockEl.style.left = Math.max(8, left - mw + 18) + 'px';
+        maestroDockEl.style.top = (placeBelow ? top - 24 : top + th - 74) + 'px';
+    }
 
     function _clearOverlay() {
         overlayEls.forEach(function (el) {
@@ -62,6 +104,10 @@ window.FantaTour = (function () {
             tooltipEl.parentNode.removeChild(tooltipEl);
         }
         tooltipEl = null;
+        if (maestroDockEl && maestroDockEl.parentNode) {
+            maestroDockEl.parentNode.removeChild(maestroDockEl);
+            maestroDockEl = null;
+        }
     }
 
     function _computeOverlayRects(targetEl) {
@@ -109,7 +155,7 @@ window.FantaTour = (function () {
         var placeBelow = spaceBelow >= 160 || spaceBelow >= spaceAbove;
 
         tooltipEl = document.createElement('div');
-        tooltipEl.className = 'tour-tooltip';
+        tooltipEl.className = 'tour-tooltip tour-tooltip--officina';
 
         var skipBtn = document.createElement('button');
         skipBtn.className = 'tour-btn-skip';
@@ -131,6 +177,13 @@ window.FantaTour = (function () {
         progressEl.className = 'tour-tooltip-progress';
         progressEl.textContent = 'Passo ' + (currentIndex + 1) + ' di ' + STEPS.length;
         tooltipEl.appendChild(progressEl);
+
+        if (step.maestroText) {
+            var maestroLine = document.createElement('div');
+            maestroLine.className = 'tour-tooltip-maestro-line';
+            maestroLine.innerHTML = step.maestroText + ' — <i>Il Maestro</i>';
+            tooltipEl.insertBefore(maestroLine, progressEl);
+        }
 
         var actionsEl = document.createElement('div');
         actionsEl.className = 'tour-tooltip-actions';
@@ -155,6 +208,7 @@ window.FantaTour = (function () {
         tooltipEl.appendChild(arrow);
 
         document.body.appendChild(tooltipEl);
+        _ensureMaestroDock(step);
 
         // Measure after insertion to get real tooltip dimensions.
         var tw = tooltipEl.offsetWidth;
@@ -165,6 +219,7 @@ window.FantaTour = (function () {
 
         tooltipEl.style.left = left + 'px';
         tooltipEl.style.top = top + 'px';
+        _positionMaestroDock(targetEl, placeBelow);
     }
 
     function _renderStep(index) {

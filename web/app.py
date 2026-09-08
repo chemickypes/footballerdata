@@ -1816,6 +1816,27 @@ HTML_TEMPLATE = """
             --role-d: #10b981;
             --role-c: #38bdf8;
             --role-a: #ff2d75;
+            --officina-brass: #c69a4c;
+            --officina-brass-dark: #8a6329;
+            --officina-gold: #f2c14e;
+            --officina-leather: #241a12;
+            --officina-leather-2: #2f2216;
+            --officina-wood: #1a130d;
+            --officina-ink: #ecdfc6;
+            --officina-muted: #a68a6a;
+            --officina-parchment: #e8d9b5;
+            --officina-shadow: rgba(0, 0, 0, 0.62);
+            --maestro-z: 1200;
+            --davinci-role-p: #d99b34;
+            --davinci-role-d: #5c9457;
+            --davinci-role-c: #4f89a3;
+            --davinci-role-a: #c0533f;
+            --davinci-ink: #5a4326;
+            --davinci-ink-soft: #6f5233;
+            --davinci-hatch: #7a5c38;
+            --davinci-parchment-a: #efe2c1;
+            --davinci-parchment-b: #e4d2a6;
+            --davinci-parchment-c: #c9ac74;
         }
 
         /* ══════════════════════════════════════════════════════════════════
@@ -2017,35 +2038,42 @@ HTML_TEMPLATE = """
         }
 
         .sidebar-nav {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
         }
 
         .sidebar-nav-btn {
             display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 14px;
-            border-radius: 8px;
-            border: none;
-            background: transparent;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px;
+            aspect-ratio: 1 / 1;
+            min-height: 74px;
+            border-radius: 12px;
+            border: 1px solid rgba(198,154,76,0.16);
+            background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.10));
             color: var(--text-muted);
-            font-size: 0.95rem;
-            font-weight: 600;
+            font-size: 0.82rem;
+            font-weight: 700;
             cursor: pointer;
             text-align: left;
-            transition: all 0.15s ease;
+            transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+        }
+        .sidebar-nav-btn i {
+            font-size: 1.4rem !important;
         }
         .sidebar-nav-btn:hover {
-            background: var(--surface-elevated);
+            transform: translateY(-2px);
+            border-color: rgba(198,154,76,0.4);
             color: var(--text-main);
         }
         .sidebar-nav-btn.active {
-            background: rgba(56, 189, 248, 0.15);
-            color: var(--primary);
-            font-weight: 700;
-            border: 1px solid rgba(56, 189, 248, 0.4);
+            border-color: var(--officina-gold);
+            box-shadow: inset 0 0 0 1px rgba(242,193,78,0.25), 0 0 20px rgba(242,193,78,0.16);
+            color: var(--officina-gold);
         }
 
         .sidebar-profile-card {
@@ -2205,31 +2233,140 @@ HTML_TEMPLATE = """
             bottom: 0;
             left: 0;
             right: 0;
-            background: var(--surface);
-            border-top: 1px solid var(--border);
             display: flex;
             height: 68px;
             z-index: 1000;
             padding-bottom: env(safe-area-inset-bottom);
+            background: linear-gradient(180deg, #241a11, #160f09);
+            border-top: 2px solid var(--officina-brass-dark);
+            box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.32);
         }
         .nav-item {
             flex: 1;
+            min-width: 0;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            color: var(--text-muted);
-            text-decoration: none;
-            font-size: 0.74rem;
-            font-weight: 600;
-            cursor: pointer;
+            gap: 5px;
+            margin: 6px 3px;
             border: none;
             background: transparent;
-            gap: 4px;
-            transition: color 0.15s ease;
+            color: var(--officina-muted);
+            text-decoration: none;
+            font-size: 0.62rem;
+            font-weight: 700;
+            cursor: pointer;
+            position: relative;
+            border-radius: 10px;
+            transition: color 0.18s ease, transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
         }
-        .nav-item.active { color: var(--primary); font-weight: 700; }
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            inset: 2px;
+            border-radius: 10px;
+            border: 1px solid rgba(198,154,76,0.14);
+            background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.08));
+            pointer-events: none;
+        }
+        .nav-item__icon {
+            font-size: 1.3rem;
+            line-height: 1;
+        }
+        .nav-item__label {
+            max-width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .nav-item.active {
+            color: var(--officina-gold);
+            transform: translateY(-2px) scale(1.04);
+        }
+        .nav-item.active::before {
+            border-color: rgba(198,154,76,0.55);
+            box-shadow: inset 0 0 0 1px rgba(242,193,78,0.25), 0 0 18px rgba(242,193,78,0.2);
+        }
+        .nav-item.active .nav-item__icon {
+            filter: drop-shadow(0 0 8px rgba(242,193,78,0.4));
+        }
+        @media (max-width: 560px) {
+            .nav-item {
+                font-size: 0.62rem;
+                gap: 3px;
+            }
+            .nav-item__icon {
+                font-size: 1rem;
+            }
+        }
         .nav-svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        .session-login-officina {
+            background: rgba(7, 5, 3, 0.88);
+            backdrop-filter: blur(12px);
+        }
+        .session-login-officina__box {
+            max-width: 440px;
+            text-align: center;
+            padding: 28px 24px;
+            border: 1px solid rgba(198,154,76,0.4);
+            box-shadow: 0 0 45px rgba(198,154,76,0.2);
+            background: linear-gradient(180deg, #2a1e13, #1d140c);
+        }
+        .session-login-officina__crest {
+            font-size: 2.2rem;
+            margin-bottom: 8px;
+            color: var(--officina-gold);
+        }
+        .session-login-officina__title {
+            justify-content: center;
+            margin-bottom: 4px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #f4e7ca;
+        }
+        .session-login-officina__copy,
+        .session-login-officina__note {
+            font-size: 0.82rem;
+            color: #d8c6a5;
+            line-height: 1.45;
+        }
+        .session-login-officina__field {
+            text-align: left;
+            margin: 0 0 14px;
+        }
+        .session-login-officina__field label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--officina-muted);
+        }
+        .session-login-officina__field select,
+        .session-login-officina__field input {
+            width: 100%;
+            margin-bottom: 0;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(198,154,76,0.22);
+            background: #0f0b08;
+            color: var(--officina-ink);
+        }
+        .session-login-officina__submit {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 6px;
+        }
+        .session-login-officina #loginErrorMsg {
+            margin-top: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #f59a7d;
+            text-align: center;
+        }
 
         /* Cards & Metrics */
         .card {
@@ -2622,20 +2759,6 @@ HTML_TEMPLATE = """
             gap: 4px;
             flex-wrap: wrap;
         }
-        .pitch-node {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            cursor: pointer;
-            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-            max-width: 76px;
-            text-align: center;
-            padding: 4px;
-        }
-        .pitch-node:hover {
-            transform: scale(1.15);
-            z-index: 5;
-        }
         .pitch-jersey {
             width: 40px;
             height: 40px;
@@ -2656,38 +2779,62 @@ HTML_TEMPLATE = """
         .pitch-jersey.role-C { background: linear-gradient(135deg, #38bdf8, #0284c7); box-shadow: 0 0 14px rgba(56, 189, 248, 0.45); }
         .pitch-jersey.role-A { background: linear-gradient(135deg, #f43f5e, #e11d48); box-shadow: 0 0 14px rgba(244, 63, 94, 0.45); }
 
-        .pitch-node-name {
-            font-size: 0.7rem;
-            font-weight: 700;
-            color: #ffffff;
-            background: rgba(0, 0, 0, 0.78);
-            padding: 2px 6px;
-            border-radius: 4px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 72px;
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255,255,255,0.1);
+        .davinci-pitch-shell {
+            position: relative;
+            width: 100%;
+            max-width: 420px;
+            margin: 0 auto;
+            filter: drop-shadow(0 8px 18px rgba(0,0,0,0.5));
         }
-        .pitch-node-price {
-            font-size: 0.65rem;
-            font-weight: 800;
-            color: #fbbf24;
-            margin-top: 1px;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        .davinci-pitch-frame {
+            position: relative;
+            border-radius: 16px;
+            padding: 12px;
+            border: 1px solid rgba(198,154,76,0.26);
+            background: linear-gradient(180deg, #2a1e13, #1c140d);
         }
-        .pitch-node-empty .pitch-jersey {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1.5px dashed rgba(255, 255, 255, 0.28);
-            color: rgba(255, 255, 255, 0.35);
-            box-shadow: none;
+        .davinci-pitch-stamp {
+            position: absolute;
+            top: 10px;
+            left: 14px;
+            z-index: 3;
+            font-family: 'Cormorant Garamond', serif;
+            font-style: italic;
+            color: var(--officina-brass-dark);
+            font-size: 0.8rem;
+            opacity: 0.8;
         }
-        .pitch-node-empty .pitch-node-name {
-            background: rgba(0,0,0,0.4);
-            color: rgba(255,255,255,0.4);
-            border: none;
+        .davinci-legend {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 12px;
+            font-size: 0.72rem;
+            color: var(--officina-muted);
         }
+        .davinci-legend span {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .davinci-legend i {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            display: inline-block;
+            border: 1px solid #3a2c14;
+        }
+        .davinci-token {
+            cursor: pointer;
+        }
+        .davinci-token--empty {
+            opacity: 0.56;
+        }
+        .davinci-jersey.role-P { fill: var(--davinci-role-p); }
+        .davinci-jersey.role-D { fill: var(--davinci-role-d); }
+        .davinci-jersey.role-C { fill: var(--davinci-role-c); }
+        .davinci-jersey.role-A { fill: var(--davinci-role-a); }
 
         /* Financial HUD Progress Bar */
         .hud-squad-bar {
@@ -3103,22 +3250,6 @@ HTML_TEMPLATE = """
                 padding: 10px 6px !important;
                 border-radius: 10px !important;
             }
-            .pitch-node {
-                min-width: 46px !important;
-            }
-            .pitch-jersey {
-                width: 28px !important;
-                height: 28px !important;
-                font-size: 0.72rem !important;
-            }
-            .pitch-node-name {
-                font-size: 0.65rem !important;
-                max-width: 56px !important;
-            }
-            .pitch-node-price {
-                font-size: 0.65rem !important;
-            }
-
             /* Department Grid */
             .dept-grid {
                 gap: 6px !important;
@@ -3154,9 +3285,297 @@ HTML_TEMPLATE = """
                 font-size: 0.7rem;
             }
         }
+
+        .splash-gate,
+        .maestro-intro {
+            position: fixed;
+            inset: 0;
+            z-index: var(--maestro-z);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .splash-gate__backdrop,
+        .maestro-intro__scrim {
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 28% -5%, rgba(198,154,76,0.22) 0%, transparent 55%),
+                linear-gradient(180deg, #1a130d 0%, #0e0906 100%);
+        }
+        .splash-gate__panel,
+        .maestro-intro__card {
+            position: relative;
+            width: min(960px, 100%);
+            border-radius: 18px;
+            border: 1px solid rgba(198,154,76,0.34);
+            background: linear-gradient(180deg, #2a1e13, #1d140c);
+            box-shadow: 0 28px 80px -30px var(--officina-shadow);
+            padding: 28px;
+            color: var(--officina-ink);
+        }
+        .splash-gate__eyebrow,
+        .maestro-intro__kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.74rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--officina-gold);
+            margin-bottom: 10px;
+        }
+        .splash-gate__title,
+        .maestro-intro__content h2 {
+            margin: 0 0 10px;
+            font-family: 'Outfit', sans-serif;
+            font-size: clamp(1.8rem, 4vw, 2.6rem);
+            color: #f4e7ca;
+        }
+        .splash-gate__copy,
+        .maestro-intro__content p {
+            margin: 0 0 20px;
+            max-width: 640px;
+            color: #d8c6a5;
+            line-height: 1.6;
+        }
+        .splash-team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+        }
+        .maestro-ambient {
+            position: fixed;
+            right: 16px;
+            bottom: 84px;
+            z-index: var(--maestro-z);
+            border: none;
+            background: transparent;
+            padding: 0;
+            cursor: pointer;
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            color: inherit;
+            filter: drop-shadow(0 6px 12px rgba(0,0,0,0.6));
+        }
+        .maestro-ambient__halo {
+            position: absolute;
+            inset: -8px auto auto -8px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(242,193,78,0.28), transparent 70%);
+            animation: maestro-pulse 3s ease-in-out infinite;
+        }
+        .maestro-ambient__sprite {
+            position: relative;
+            z-index: 1;
+            display: block;
+            width: 64px;
+            height: 96px;
+        }
+        .maestro-ambient__bubble {
+            position: relative;
+            z-index: 1;
+            max-width: 180px;
+            padding: 6px 11px;
+            border-radius: 8px 8px 3px 8px;
+            border: 1px solid var(--officina-brass-dark);
+            background: linear-gradient(180deg, #efe2c1, #dcc79a);
+            color: #4a3618;
+            font-family: 'Cormorant Garamond', serif;
+            font-style: italic;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+        @keyframes maestro-pulse {
+            0%, 100% { transform: scale(0.9); opacity: 0.5; }
+            50% { transform: scale(1.08); opacity: 1; }
+        }
+        @media (max-width: 640px) {
+            .maestro-ambient__bubble {
+                display: none;
+            }
+        }
+
+        .splash-team-card {
+            border: 1px solid rgba(198,154,76,0.28);
+            border-radius: 14px;
+            background: linear-gradient(180deg, #312214, #21160d);
+            color: var(--officina-ink);
+            padding: 18px 16px;
+            text-align: left;
+            cursor: pointer;
+            transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+        }
+        .splash-team-card:hover,
+        .splash-team-card:focus-visible {
+            transform: translateY(-2px);
+            border-color: rgba(242,193,78,0.58);
+            box-shadow: 0 14px 28px -22px rgba(242,193,78,0.9);
+        }
+        .splash-team-card__name {
+            display: block;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1rem;
+            font-weight: 800;
+            color: #f4e7ca;
+            margin-bottom: 4px;
+        }
+        .splash-team-card__meta {
+            display: block;
+            font-size: 0.78rem;
+            color: var(--officina-muted);
+        }
+        #appBootSplash {
+            position: fixed;
+            inset: 0;
+            z-index: 100000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            background:
+                radial-gradient(circle at 50% 20%, rgba(198,154,76,0.20) 0%, transparent 60%),
+                linear-gradient(180deg, #1a130d 0%, #0e0906 100%);
+            transition: opacity 0.4s ease;
+        }
+        #appBootSplash.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .boot-splash__logo {
+            font-family: 'Outfit', sans-serif;
+            font-size: clamp(1.6rem, 5vw, 2.4rem);
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            color: var(--officina-gold);
+            text-shadow: 0 0 24px rgba(242,193,78,0.35);
+        }
+        .boot-splash__spinner {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: 3px solid rgba(198,154,76,0.25);
+            border-top-color: var(--officina-gold);
+            animation: boot-splash-spin 0.9s linear infinite;
+        }
+        @keyframes boot-splash-spin {
+            to { transform: rotate(360deg); }
+        }
+        .boot-splash__version {
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: var(--officina-muted);
+        }
+        .bentornato-gate__actions {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+            margin-top: 6px;
+        }
+        .bentornato-gate__continue {
+            padding: 12px 28px;
+        }
+        .bentornato-gate__not-you {
+            background: none;
+            border: none;
+            color: var(--officina-muted);
+            font-size: 0.82rem;
+            text-decoration: underline;
+            cursor: pointer;
+            padding: 4px 0;
+        }
+        .bentornato-gate__not-you:hover {
+            color: var(--officina-gold);
+        }
+        .maestro-intro__card {
+            display: grid;
+            grid-template-columns: 140px 1fr;
+            gap: 20px;
+            align-items: center;
+        }
+        .maestro-intro__art {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 140px;
+            border-radius: 16px;
+            background: radial-gradient(circle at 50% 30%, #3a2a19, #1b130c 75%);
+            border: 2px solid var(--officina-brass);
+        }
+        .maestro-intro__btn {
+            width: auto;
+            padding: 12px 18px;
+            border-radius: 10px;
+        }
+        @media (max-width: 680px) {
+            .maestro-intro__card {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+        }
+        body.app-locked {
+            overflow: hidden;
+        }
+        body.app-locked .maestro-ambient {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
+
+    <div id="appBootSplash">
+        <div class="boot-splash__logo">La FantaOfficina</div>
+        <div class="boot-splash__spinner" aria-hidden="true"></div>
+        <div class="boot-splash__version">v.1.00</div>
+    </div>
+
+    <div id="splashIdentityGate" class="splash-gate" style="display:none;">
+        <div class="splash-gate__backdrop"></div>
+        <div class="splash-gate__panel">
+            <div class="splash-gate__eyebrow"><i class="fa-solid fa-compass-drafting"></i> Officina Vittoriana</div>
+            <h1 class="splash-gate__title">Seleziona la tua Squadra</h1>
+            <p class="splash-gate__copy">Scegli il tuo profilo locale per entrare nell'officina d'asta. Nessun account: il profilo resta salvato solo su questo browser.</p>
+            <div id="splashTeamGrid" class="splash-team-grid"></div>
+        </div>
+    </div>
+
+    <div id="bentornatoGate" class="splash-gate" style="display:none;">
+        <div class="splash-gate__backdrop"></div>
+        <div class="splash-gate__panel">
+            <div class="splash-gate__eyebrow"><i class="fa-solid fa-compass-drafting"></i> Officina Vittoriana</div>
+            <h1 class="splash-gate__title" id="bentornatoTitle">Ciao! Bentornato.</h1>
+            <p class="splash-gate__copy">Il tuo profilo locale è già configurato su questo browser. Prosegui per entrare nell'officina d'asta.</p>
+            <div class="bentornato-gate__actions">
+                <button class="btn btn-primary bentornato-gate__continue" onclick="hideBentornatoGate()">
+                    <i class="fa-solid fa-door-open" style="margin-right:6px;"></i> Entra nell'officina
+                </button>
+                <button class="bentornato-gate__not-you" onclick="handleNotYouClick()">Non sei tu?</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="maestroIntroOverlay" class="maestro-intro" style="display:none;">
+        <div class="maestro-intro__scrim"></div>
+        <div class="maestro-intro__card">
+            <div class="maestro-intro__art" id="maestroIntroSprite" aria-hidden="true"></div>
+            <div class="maestro-intro__content">
+                <div class="maestro-intro__kicker"><i class="fa-solid fa-feather"></i> Il Maestro</div>
+                <h2>Benvenuto nell'Officina</h2>
+                <p>Inventore, cartografo del calcio e tua guida d'asta: ti mostrerò dove leggere prezzo equo, surplus e formazione senza cambiare la logica della tua lega.</p>
+                <button class="btn btn-primary maestro-intro__btn" onclick="maybeShowMaestroIntro(true)">
+                    <i class="fa-solid fa-door-open" style="margin-right:6px;"></i> Entra nella dashboard
+                </button>
+            </div>
+        </div>
+    </div>
 
     <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleMobileSidebar()"></div>
 
@@ -3436,6 +3855,24 @@ HTML_TEMPLATE = """
                 </div>
             </div>
 
+            <div class="card" id="auctionDavinciCard">
+                <div class="card-header" style="margin-bottom:10px;">
+                    <div>
+                        <div class="card-title" style="display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-compass-drafting" style="color:var(--officina-brass);"></i>
+                            Tavola Tattica del Lotto
+                        </div>
+                        <div style="font-size:0.74rem; color:var(--officina-muted);">
+                            Campo Da Vinci decorativo per il lotto in corso — già predisposto per una futura preview live senza cambiare la struttura.
+                        </div>
+                    </div>
+                </div>
+                <div class="davinci-pitch-frame">
+                    <span class="davinci-pitch-stamp">tavola tattica</span>
+                    <div id="auctionDavinciPitch" class="davinci-pitch-shell" data-preview-mode="decorative"></div>
+                </div>
+            </div>
+
             <!-- MANUAL DRAFT CARD -->
             <div class="card">
                 <div class="card-header">
@@ -3706,9 +4143,9 @@ HTML_TEMPLATE = """
             </div>
         </div>
 
-        <div id="tab-strategy" class="tab-content" style="display:none;"></div>
+        <div id="tab-strategy" class="tab-content"></div>
 
-        <div id="tab-lineup" class="tab-content" style="display:none;">
+        <div id="tab-lineup" class="tab-content">
             <div class="card" style="padding:16px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="margin:0;">Formazione Consigliata</h3>
@@ -3720,7 +4157,7 @@ HTML_TEMPLATE = """
             </div>
         </div>
 
-        <div id="tab-audit" class="tab-content" style="display:none;">
+        <div id="tab-audit" class="tab-content">
             <div class="card" style="padding:16px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="margin:0;">Classifica Lega Post-Asta</h3>
@@ -3732,7 +4169,7 @@ HTML_TEMPLATE = """
             </div>
         </div>
 
-        <div id="tab-trades" class="tab-content" style="display:none;">
+        <div id="tab-trades" class="tab-content">
             <div class="card" style="padding:16px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="margin:0;">Scambi Win-Win Suggeriti</h3>
@@ -3828,19 +4265,16 @@ HTML_TEMPLATE = """
                         <button onclick="resetPitchLineup()" class="btn-secondary" style="width:auto; padding:2px 8px; font-size:0.7rem; margin-bottom:0;" title="Reimposta titolari automatici in base al rendimento">Auto-Fill</button>
                     </div>
                     
-                    <div class="pitch-board" id="pitchBoard">
-                        <div class="pitch-penalty-top"></div>
-                        <div class="pitch-midline"></div>
-                        <div class="pitch-penalty-bottom"></div>
-
-                        <!-- Attacco (A) -->
-                        <div class="pitch-row pitch-row-a" id="pitchRowA"></div>
-                        <!-- Centrocampo (C) -->
-                        <div class="pitch-row pitch-row-c" id="pitchRowC"></div>
-                        <!-- Difesa (D) -->
-                        <div class="pitch-row pitch-row-d" id="pitchRowD"></div>
-                        <!-- Portiere (P) -->
-                        <div class="pitch-row pitch-row-p" id="pitchRowP"></div>
+                    <div class="davinci-pitch-frame">
+                        <span class="davinci-pitch-stamp">f.34r · lo schieramento</span>
+                        <div id="pitchBoardDavinci" class="davinci-pitch-shell"></div>
+                    </div>
+                    <div class="davinci-legend">
+                        <span><i style="background:var(--davinci-role-p);"></i> Portiere</span>
+                        <span><i style="background:var(--davinci-role-d);"></i> Difesa</span>
+                        <span><i style="background:var(--davinci-role-c);"></i> Centrocampo</span>
+                        <span><i style="background:var(--davinci-role-a);"></i> Attacco</span>
+                        <span style="color:var(--officina-brass);"><i class="fa-solid fa-hand-pointer" style="border:none; width:auto; height:auto;"></i> Tocca un sigillo per cambiare titolare</span>
                     </div>
                 </div>
 
@@ -4379,34 +4813,30 @@ HTML_TEMPLATE = """
     </div>
 
     <!-- SESSION LOGIN GATE MODAL -->
-    <div id="sessionLoginModal" class="modal-backdrop" style="display:none; z-index:99999; background:rgba(3,4,8,0.92); backdrop-filter:blur(12px);">
-        <div class="modal-box" style="max-width:440px; border:1px solid rgba(56,189,248,0.4); box-shadow:0 0 45px rgba(56,189,248,0.25); text-align:center; padding:28px 24px;">
-            <div style="font-size:2.4rem; margin-bottom:6px; color:var(--gold);"><i class="fa-solid fa-trophy icon-pulse"></i></div>
-            <div class="modal-title" style="justify-content:center; margin-bottom:4px;">
-                <span style="font-size:1.35rem; font-weight:800; color:var(--text-main); font-family:'Outfit',sans-serif;">Asta Live Condivisa</span>
+    <div id="sessionLoginModal" class="modal-backdrop session-login-officina" style="display:none; z-index:99999;">
+        <div class="modal-box session-login-officina__box">
+            <div class="session-login-officina__crest"><i class="fa-solid fa-trophy icon-pulse"></i></div>
+            <div class="modal-title session-login-officina__title">
+                <span>Asta Live Condivisa</span>
             </div>
-            <div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:18px; line-height:1.4;">
+            <div class="session-login-officina__copy">
                 Tutti i partecipanti sono sincronizzati in tempo reale sulla stessa asta. Seleziona la tua squadra e inserisci il PIN di accesso.
             </div>
-
-            <div style="text-align:left; margin-bottom:14px;">
-                <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700; display:block; margin-bottom:5px;">LA TUA FANTASQUADRA:</label>
-                <select id="loginTeamSelect" style="width:100%; font-size:0.95rem; font-weight:700; padding:10px 12px; background:#0b111e; border:1px solid var(--border); color:var(--text-main); border-radius:8px; margin-bottom:0;">
+            <div class="session-login-officina__field">
+                <label>LA TUA FANTASQUADRA:</label>
+                <select id="loginTeamSelect">
                     <!-- Dynamically populated -->
                 </select>
             </div>
-
-            <div style="text-align:left; margin-bottom:16px;">
-                <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700; display:block; margin-bottom:5px;">PIN DI ACCESSO (LEGA O ADMIN):</label>
-                <input type="password" id="loginPinInput" placeholder="Inserisci PIN (es. 2026)" style="width:100%; font-size:1.1rem; letter-spacing:2px; text-align:center; font-weight:700; padding:10px 12px; background:#0b111e; border:1px solid var(--border); color:var(--text-main); border-radius:8px; margin-bottom:4px;" onkeypress="if(event.key==='Enter') submitSessionLogin()">
-                <div id="loginErrorMsg" style="display:none; color:#f87171; font-size:0.8rem; margin-top:6px; font-weight:600; text-align:center;"></div>
+            <div class="session-login-officina__field">
+                <label>PIN DI ACCESSO (LEGA O ADMIN):</label>
+                <input type="password" id="loginPinInput" placeholder="Inserisci PIN (es. 2026)" onkeypress="if(event.key==='Enter') submitSessionLogin()">
+                <div id="loginErrorMsg" style="display:none;"></div>
             </div>
-
-            <button class="btn btn-primary" style="width:100%; padding:12px; font-size:1rem; font-weight:800; border-radius:8px; margin-top:6px;" onclick="submitSessionLogin()">
+            <button class="btn btn-primary session-login-officina__submit" onclick="submitSessionLogin()">
                 <i class="fa-solid fa-bolt" style="margin-right:6px;"></i> Entra nell'Asta Live
             </button>
-
-            <div style="margin-top:16px; font-size:0.72rem; color:var(--text-muted); line-height:1.4;">
+            <div class="session-login-officina__note">
                 Con il <b>PIN Admin</b> hai accesso completo alla battuta, sniffer e reset sessione.
             </div>
         </div>
@@ -4478,36 +4908,36 @@ HTML_TEMPLATE = """
         </div>
     </div>
 
-    <!-- Bottom Navigation (Mobile De-densified 5 Tabs) -->
+    <!-- Bottom Navigation (Officina Vittoriana, 8 Tabs) -->
     <nav class="bottom-nav">
         <button class="nav-item" id="botNav-draft" onclick="switchTab('draft')">
-            <i class="fa-solid fa-gavel icon-pulse"></i>
-            <div>Asta Live</div>
+            <i class="fa-solid fa-gavel icon-pulse nav-item__icon"></i>
+            <span class="nav-item__label">Asta Live</span>
         </button>
         <button class="nav-item active" id="botNav-targets" onclick="switchTab('targets')">
-            <i class="fa-solid fa-bullseye"></i>
-            <div>Target & Piano</div>
+            <i class="fa-solid fa-bullseye nav-item__icon"></i>
+            <span class="nav-item__label">Target & Piano</span>
         </button>
         <button class="nav-item" id="botNav-rosters" onclick="switchTab('rosters')">
-            <i class="fa-solid fa-users"></i>
-            <div>Rose</div>
+            <i class="fa-solid fa-users nav-item__icon"></i>
+            <span class="nav-item__label">Rose</span>
         </button>
         <button class="nav-item" id="botNav-listone" onclick="switchTab('listone')">
-            <i class="fa-solid fa-table-list"></i>
-            <div>Listone</div>
+            <i class="fa-solid fa-table-list nav-item__icon"></i>
+            <span class="nav-item__label">Listone</span>
         </button>
         <button class="nav-item" id="botNav-ai" onclick="switchTab('ai')">
-            <i class="fa-solid fa-robot icon-float"></i>
-            <div>FantaAI</div>
+            <i class="fa-solid fa-robot icon-float nav-item__icon"></i>
+            <span class="nav-item__label">FantaAI</span>
         </button>
         <button class="nav-item" id="botNav-lineup" onclick="switchTab('lineup')">
-            <i class="fa-solid fa-list-check"></i><span>Formazione</span>
+            <i class="fa-solid fa-list-check nav-item__icon"></i><span class="nav-item__label">Formazione</span>
         </button>
         <button class="nav-item" id="botNav-audit" onclick="switchTab('audit')">
-            <i class="fa-solid fa-ranking-star"></i><span>Classifica</span>
+            <i class="fa-solid fa-ranking-star nav-item__icon"></i><span class="nav-item__label">Classifica</span>
         </button>
         <button class="nav-item" id="botNav-trades" onclick="switchTab('trades')">
-            <i class="fa-solid fa-right-left"></i><span>Scambi</span>
+            <i class="fa-solid fa-right-left nav-item__icon"></i><span class="nav-item__label">Scambi</span>
         </button>
     </nav>
 
@@ -4540,6 +4970,206 @@ HTML_TEMPLATE = """
 
         // Active Manager Profile (defaults to team ID 1)
         let activeProfileId = parseInt(localStorage.getItem('fanta_active_profile_id')) || 1;
+
+        let hasStoredProfile = !!localStorage.getItem('fanta_active_profile_id');
+
+        function renderApp() {
+            updateHeader();
+            updateProfileDisplay();
+            updateLiveAdvice();
+            renderTeamSelect();
+            renderRosterTab();
+            renderStrategyTab();
+            renderTargetsTab();
+            renderListone();
+        }
+
+        function renderSplashTeamGrid() {
+            const wrap = document.getElementById('splashTeamGrid');
+            if (!wrap) return;
+            const teams = (auctionState && auctionState.teams) || [];
+            wrap.innerHTML = teams.map((team, idx) => `
+                <button class="splash-team-card" onclick="completeSplashTeamSelection(${team.id})">
+                    <span class="splash-team-card__name">${escapeHTML(team.name)}</span>
+                    <span class="splash-team-card__meta">Profilo locale #${idx + 1} · entra nell'officina</span>
+                </button>
+            `).join('');
+        }
+
+        function showSplashIdentityGate() {
+            const gate = document.getElementById('splashIdentityGate');
+            if (!gate) return;
+            renderSplashTeamGrid();
+            gate.style.display = 'flex';
+            document.body.classList.add('app-locked');
+        }
+
+        function hideSplashIdentityGate() {
+            const gate = document.getElementById('splashIdentityGate');
+            if (!gate) return;
+            gate.style.display = 'none';
+            document.body.classList.remove('app-locked');
+        }
+
+        function showBentornatoGate() {
+            const gate = document.getElementById('bentornatoGate');
+            if (!gate) return;
+            const teams = (auctionState && auctionState.teams) || [];
+            const team = teams.find(t => t.id === activeProfileId);
+            const teamName = team ? team.name : `Squadra ${activeProfileId}`;
+            const titleEl = document.getElementById('bentornatoTitle');
+            if (titleEl) titleEl.textContent = `Ciao! Bentornato, ${teamName}.`;
+            gate.style.display = 'flex';
+            document.body.classList.add('app-locked');
+        }
+
+        function hideBentornatoGate() {
+            const gate = document.getElementById('bentornatoGate');
+            if (!gate) return;
+            gate.style.display = 'none';
+            document.body.classList.remove('app-locked');
+        }
+
+        function handleNotYouClick() {
+            hideBentornatoGate();
+            showSplashIdentityGate();
+        }
+
+        function maybeShowMaestroIntro(forceClose = false) {
+            const overlay = document.getElementById('maestroIntroOverlay');
+            if (!overlay) return;
+            if (forceClose) {
+                localStorage.setItem('fanta_maestro_intro_done', 'true');
+                overlay.style.display = 'none';
+                document.body.classList.remove('app-locked');
+                return;
+            }
+            if (localStorage.getItem('fanta_maestro_intro_done') === 'true') return;
+            overlay.style.display = 'flex';
+            document.body.classList.add('app-locked');
+        }
+
+        function completeSplashTeamSelection(teamId) {
+            activeProfileId = teamId;
+            localStorage.setItem('fanta_active_profile_id', activeProfileId);
+            hasStoredProfile = true;
+            hideSplashIdentityGate();
+            renderApp();
+            maybeShowMaestroIntro();
+        }
+
+        function runBootSplash(onComplete) {
+            const splash = document.getElementById('appBootSplash');
+            if (!splash) {
+                onComplete();
+                return;
+            }
+            setTimeout(() => {
+                splash.classList.add('fade-out');
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                    onComplete();
+                }, 400); // matches the 0.4s CSS transition above
+            }, 1200);
+        }
+
+        function maybeStartIdentityGate() {
+            const loginModal = document.getElementById('sessionLoginModal');
+            const pinModalOpen = !!(loginModal && loginModal.style.display !== 'none');
+
+            if (pinModalOpen) {
+                // PIN gate (Asta Live access) takes precedence when already open;
+                // defer both the returning-user and first-access panels until it closes.
+                hideSplashIdentityGate();
+                hideBentornatoGate();
+                return;
+            }
+
+            if (hasStoredProfile) {
+                hideSplashIdentityGate();
+                showBentornatoGate();
+                return;
+            }
+
+            hideBentornatoGate();
+            showSplashIdentityGate();
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           IL MAESTRO — SPRITE SYSTEM & PERSISTENT AMBIENT MASCOT
+        ───────────────────────────────────────────────────────────── */
+        window.MAESTRO_SPRITES = {
+            neutral: [
+                '..........CC..........','.........oooo.........','.......ooHHHHHHoo......','......oHHHHHHHHHHo.....','......oHHHhhHHhHHHo....','.....oHHHHHHHHHHHHo....','.....oHHHHHHHHHHHHo....','....obBBBBBBBBBBBBbo...','....oBLBBBBBBBBBBLBo...','...oBGGgBBBBBBBBGGgBo..','...oBGGgBBBBBBBBGGgBo..','....obBBBBBBBBBBBBbo...','.....oSSSSSSSSSSSSo....','.....oSSsSSSSSSsSSo....','.....oSooSSSSSSooSo....','.....oSooSSSSSSooSo....','.....oSSSSSssSSSSSo....','......oSSSSssSSSSo.....','......oWwsSSSSswWo.....','.....oWWWWwssWWWWWo....','....oWWWWWWWWWWWWWWo...','...oWWWWWWWWWWWWWWWWo..','...oWWWWwWWWWWWwWWWWo..','...oWWWWWWWWWWWWWWWWo..','....oWWWWWWWWWWWWWWo...','.....oWWWWWwwWWWWWo....','......oWWWWWWWWWWo.....','.......oWWWWWWWWo......','...RR..oWWWWWWWWo..RR..','.RRRRRRoWWWWWWWWoRRRRRR','RRRRRRRRoWWWWWWoRRRRRRR','RRrRRRLBRRRRRRRRBLRRrRR','RRrRRRRRRRRRRRRRRRRrRRR'
+            ],
+            greeting: [
+                '..........CC..........','.........oooo.........','.......ooHHHHHHoo......','......oHHHHHHHHHHo.....','......oHHHhhHHhHHHo....','.....oHHHHHHHHHHHHo....','.....oHHHHHHHHHHHHo....','....obBBBBBBBBBBBBbo...','....oBLBBBBBBBBBBLBo...','...oBGGgBBBBBBBBGGgBo..','...oBGGgBBBBBBBBGGgBo..','....obBBBBBBBBBBBBbo...','.....oSSSSSSSSSSSSo....','.....oSSsSSSSSSsSSo....','.....oSooSSSSSSooSo....','.....oSooSSSSSSooSo....','.....oSSSSSssSSSSSo....','......oSSSSssSSSSo.....','......oWwsSSSSswWo.....','.....oWWWWwssWWWWWo....','....oWWWWWWWWWWWWWWo...','...oWWWWWWWWWWWWWWWWo..','...oWWWWwWWWWWWwWWWWo..','...oWWWWWWWWWWWWWWWWo..','....oWWWWWWWWWWWWWWo...','.....oWWWWWwwWWWWWo....','......oWWWWWWWWWWo..B..','.......oWWWWWWWWo..BB..','...RR..oWWWWWWWWo...B..','.RRRRRRoWWWWWWWWoRRRRRR','RRRRRRRRoWWWWWWoRRRRRRR','RRrRRRLBRRRRRRRRBLRRrRR','RRrRRRRRRRRRRRRRRRRrRRR'
+            ],
+            pointing: [
+                '..........CC..........','.........oooo.........','.......ooHHHHHHoo......','......oHHHHHHHHHHo.....','......oHHHhhHHhHHHo....','.....oHHHHHHHHHHHHo....','.....oHHHHHHHHHHHHo....','....obBBBBBBBBBBBBbo...','....oBLBBBBBBBBBBLBo...','...oBGGgBBBBBBBBGGgBo..','...oBGGgBBBBBBBBGGgBo..','....obBBBBBBBBBBBBbo...','.....oSSSSSSSSSSSSo....','.....oSSsSSSSSSsSSo....','.....oSooSSSSSSooSo....','.....oSooSSSSSSooSo....','.....oSSSSSssSSSSSo....','......oSSSSssSSSSo.....','......oWwsSSSSswWo.....','.....oWWWWwssWWWWWo....','....oWWWWWWWWWWWWWWoBBB','...oWWWWWWWWWWWWWWWWo.B','...oWWWWwWWWWWWwWWWWo..','...oWWWWWWWWWWWWWWWWo..','....oWWWWWWWWWWWWWWo...','.....oWWWWWwwWWWWWo....','......oWWWWWWWWWWo.....','.......oWWWWWWWWo......','...RR..oWWWWWWWWo..RR..','.RRRRRRoWWWWWWWWoRRRRRR','RRRRRRRRoWWWWWWoRRRRRRR','RRrRRRLBRRRRRRRRBLRRrRR','RRrRRRRRRRRRRRRRRRRrRRR'
+            ],
+            thoughtful: [
+                '..........CC..........','.........oooo.........','.......ooHHHHHHoo......','......oHHHHHHHHHHo.....','......oHHHhhHHhHHHo....','.....oHHHHHHHHHHHHo....','.....oHHHHHHHHHHHHo....','....obBBBBBBBBBBBBbo...','....oBLBBBBBBBBBBLBo...','...oBGGgBBBBBBBBGGgBo..','...oBGGgBBBBBBBBGGgBo..','....obBBBBBBBBBBBBbo...','.....oSSSSSSSSSSSSo....','.....oSSsSSSSSSsSSo....','.....oSooSSSSSSooSo....','.....oSooSSSSSSooSo....','.....oSSSSSssSSSSSo....','......oSSSSssSSSSo.....','......oWwsSSSSswWo.....','.....oWWWWwssWWWWWo....','....oWWWWWWWWWWWWWWo...','...oWWWWWWWWWWWWWWWWo..','...oWWWWwWWWWWWwWWWWo..','...oWWWWWWWWWWWWWWWWo..','....oWWWWWWWWWWWWWWo...','.....oWWWWWwwWWWooo....','......oWWWWWWWWWo......','.......oWWWWWWWWo......','...RR..oWWWWWWWWo..RR..','.RRRRRRoWWWWWWWWoRRRRRR','RRRRRRRRoWWWWWWoRRRRRRR','RRrRRRLBRRRRRRRRBLRRrRR','RRrRRRRRRRRRRRRRRRRrRRR'
+            ]
+        };
+
+        const MAESTRO_PALETTE = {
+            '.': null, o: '#241a12', H: '#4a3320', h: '#33230f', B: '#c69a4c', b: '#8a6329',
+            L: '#f2c14e', G: '#8fd0c8', g: '#4f9a91', S: '#e6b184', s: '#c68b5c',
+            W: '#efe9dc', w: '#c3bcaa', R: '#5c4326', r: '#3f2c15', C: '#b5703a'
+        };
+
+        function renderMaestroSprite(containerId, pose = 'neutral', scale = 3.2) {
+            const host = document.getElementById(containerId);
+            const map = window.MAESTRO_SPRITES[pose] || window.MAESTRO_SPRITES.neutral;
+            if (!host || !map) return;
+            const rows = map.length;
+            const cols = map[0].length;
+            let rects = '';
+            map.forEach((row, y) => {
+                row.split('').forEach((token, x) => {
+                    const fill = MAESTRO_PALETTE[token];
+                    if (!fill) return;
+                    rects += `<rect x="${x}" y="${y}" width="1.03" height="1.03" fill="${fill}" />`;
+                });
+            });
+            host.innerHTML = `<svg viewBox="0 0 ${cols} ${rows}" width="${cols * scale}" height="${rows * scale}" shape-rendering="crispEdges" style="display:block">${rects}</svg>`;
+        }
+
+        let maestroCurrentPose = 'neutral';
+
+        function setMaestroPose(pose) {
+            maestroCurrentPose = pose;
+            renderMaestroSprite('maestroAmbientSprite', pose, 2.9);
+            const introVisible = document.getElementById('maestroIntroOverlay');
+            if (introVisible) renderMaestroSprite('maestroIntroSprite', pose === 'neutral' ? 'greeting' : pose, 4.6);
+        }
+
+        function ensureMaestroAmbient() {
+            const el = document.getElementById('maestroAmbient');
+            if (!el) return;
+            el.style.display = 'flex';
+            if (!document.getElementById('maestroAmbientSprite')?.innerHTML) {
+                renderMaestroSprite('maestroAmbientSprite', maestroCurrentPose, 2.9);
+            }
+        }
+
+        function updateMaestroAmbientState(tabId) {
+            ensureMaestroAmbient();
+            const bubble = document.getElementById('maestroAmbientBubble');
+            const state = {
+                draft: { pose: 'pointing', text: 'Segui il lotto: fair price e surplus sono la bussola.' },
+                rosters: { pose: 'thoughtful', text: 'Ogni sigillo titolare resta modificabile con un tocco.' },
+                listone: { pose: 'pointing', text: 'Occhio al surplus, giovane.' },
+                ai: { pose: 'neutral', text: 'Qui gli esperimenti vanno letti con giudizio.' },
+                lineup: { pose: 'thoughtful', text: 'Il solver resta separato: la vera lavagna è nelle Rose.' },
+                audit: { pose: 'neutral', text: 'Una buona officina misura prima di giudicare.' },
+                trades: { pose: 'greeting', text: 'Ogni scambio va pesato come un ingranaggio.' },
+                targets: { pose: 'greeting', text: 'Fissa i tuoi obiettivi prima che il mercato corra.' }
+            }[tabId] || { pose: 'neutral', text: "Bentornato nell'officina." };
+            setMaestroPose(state.pose);
+            if (bubble) bubble.textContent = state.text;
+        }
 
         /* ─────────────────────────────────────────────────────────────
            TOAST NOTIFICATIONS
@@ -4985,6 +5615,7 @@ HTML_TEMPLATE = """
                 }
                 activeProfileId = parseInt(auth.team_id);
                 localStorage.setItem('fanta_active_profile_id', activeProfileId);
+                hasStoredProfile = true;
                 isAdmin = !!auth.is_admin;
                 if (isAdmin) {
                     sessionStorage.setItem('fanta_is_admin', 'true');
@@ -5069,6 +5700,7 @@ HTML_TEMPLATE = """
                 localStorage.setItem('fanta_session_auth', JSON.stringify(sessionData));
                 activeProfileId = teamId;
                 localStorage.setItem('fanta_active_profile_id', activeProfileId);
+                hasStoredProfile = true;
                 isAdmin = !!data.is_admin;
                 if (isAdmin) {
                     sessionStorage.setItem('fanta_is_admin', 'true');
@@ -5086,6 +5718,11 @@ HTML_TEMPLATE = """
                 renderRosterTab();
                 renderStrategyTab();
                 renderTargetsTab();
+
+                // PIN gate has been dismissed; re-evaluate the identity (splash) gate now,
+                // since the login flow already stores fanta_active_profile_id above and
+                // hasStoredProfile is now true, so this will simply keep the splash gate hidden.
+                maybeStartIdentityGate();
 
                 showToast(`Benvenuto ${teamName}! Connesso all'Asta Live (${data.role === 'admin' ? 'Admin' : 'Partecipante'})`, 'success');
             } catch (err) {
@@ -5264,6 +5901,12 @@ HTML_TEMPLATE = """
             renderStrategyTab();
             renderTargetsTab();
             setupSearch();
+            renderAuctionDavinciPitch();
+
+            ensureMaestroAmbient();
+            updateMaestroAmbientState('targets');
+
+            runBootSplash(() => maybeStartIdentityGate());
 
             if (window.location.hash) {
                 const tabName = window.location.hash.replace('#', '');
@@ -5464,6 +6107,8 @@ HTML_TEMPLATE = """
             const sideBtn = document.getElementById('sideNav-' + tabId);
             if (sideBtn) sideBtn.classList.add('active');
 
+            if (typeof updateMaestroAmbientState === 'function') updateMaestroAmbientState(tabId);
+
             // Close mobile drawer if open
             const sb = document.getElementById('appSidebar');
             const bd = document.getElementById('sidebarBackdrop');
@@ -5481,6 +6126,7 @@ HTML_TEMPLATE = """
             }
             if (tabId === 'rosters') renderRosterTab();
             if (tabId === 'listone') renderListone();
+            if (tabId === 'draft') renderAuctionDavinciPitch();
         }
 
         async function loadLineupSolver() {
@@ -7315,6 +7961,98 @@ HTML_TEMPLATE = """
         }
 
         /* ─────────────────────────────────────────────────────────────
+           SHARED DA VINCI PITCH COMPONENT (parchment/sketch SVG)
+        ───────────────────────────────────────────────────────────── */
+        function getDavinciRoleColor(role) {
+            return ({
+                P: 'var(--davinci-role-p)',
+                D: 'var(--davinci-role-d)',
+                C: 'var(--davinci-role-c)',
+                A: 'var(--davinci-role-a)'
+            })[role] || 'var(--davinci-role-c)';
+        }
+
+        function getDavinciPitchSvg(options) {
+            options = options || {};
+            const seed = options.seed || 5;
+            const counts = options.counts || { A: 0, C: 0, D: 0, P: 0 };
+            const labels = options.labels || { A: [], C: [], D: [], P: [] };
+            const tokenMode = options.interactive ? 'interactive' : 'decorative';
+            const rowsY = { A: 96, C: 170, D: 300, P: 392 };
+            let tokens = '';
+            ['A', 'C', 'D', 'P'].forEach(role => {
+                const n = counts[role] || 0;
+                if (!n) return;
+                const left = 52;
+                const right = 288;
+                const span = right - left;
+                for (let i = 0; i < n; i++) {
+                    const x = n === 1 ? 170 : left + span * (i / (n - 1));
+                    const y = rowsY[role];
+                    const rawLabel = (labels[role] && labels[role][i]) || role;
+                    const label = typeof escapeHTML === 'function' ? escapeHTML(rawLabel) : rawLabel;
+                    const className = `davinci-token ${tokenMode === 'interactive' ? '' : 'davinci-token--empty'}`.trim();
+                    tokens += `
+                        <g class="${className}" data-role="${role}" data-slot="${i}" transform="translate(${x},${y})">
+                            <ellipse cx="1.5" cy="16" rx="15" ry="4" fill="#3a2c14" opacity="0.18"></ellipse>
+                            <circle class="davinci-jersey role-${role}" r="14" stroke="#3a2c14" stroke-width="1.6"></circle>
+                            <circle r="14" fill="none" stroke="#efe2c1" stroke-width="0.8" opacity="0.6"></circle>
+                            <circle r="10.5" fill="none" stroke="#efe2c1" stroke-width="0.6" opacity="0.35" stroke-dasharray="1.5 2"></circle>
+                            <text y="4" text-anchor="middle" font-size="12" font-weight="700" fill="#f3e7c8">${role}</text>
+                            <rect x="-28" y="18" width="56" height="13" rx="2" fill="#e9d9b0" stroke="#9c7d47" stroke-width="0.6" opacity="0.94"></rect>
+                            <text y="28" text-anchor="middle" font-size="9" fill="#4a3618" font-style="italic">${label}</text>
+                        </g>`;
+                }
+            });
+            return `
+                <svg viewBox="0 0 340 470" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="'Cormorant Garamond','Georgia',serif">
+                    <defs>
+                        <filter id="davinciWobble${seed}"><feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="${seed}" result="n"></feTurbulence><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"></feDisplacementMap></filter>
+                        <filter id="davinciPaper${seed}"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="f"></feTurbulence><feColorMatrix in="f" type="matrix" values="0 0 0 0 0.42 0 0 0 0 0.31 0 0 0 0 0.16 0 0 0 0.10 0"></feColorMatrix><feComposite operator="over" in2="SourceGraphic"></feComposite></filter>
+                        <radialGradient id="davinciParchment${seed}" cx="42%" cy="34%" r="85%"><stop offset="0%" stop-color="#efe2c1"></stop><stop offset="55%" stop-color="#e4d2a6"></stop><stop offset="100%" stop-color="#c9ac74"></stop></radialGradient>
+                        <linearGradient id="davinciEdge${seed}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9c7d47"></stop><stop offset="100%" stop-color="#7c5f31"></stop></linearGradient>
+                        <pattern id="davinciHatch${seed}" width="6" height="6" patternTransform="rotate(38)" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="0" y2="6" stroke="#7a5c38" stroke-width="0.7" opacity="0.45"></line></pattern>
+                    </defs>
+                    <path filter="url(#davinciPaper${seed})" fill="url(#davinciParchment${seed})" stroke="url(#davinciEdge${seed})" stroke-width="2.5" d="M14,10 L60,7 L120,11 L190,6 L250,12 L300,8 L328,16 L331,80 L326,180 L332,300 L327,400 L330,452 L280,458 L200,452 L120,460 L60,453 L12,458 L9,380 L14,260 L8,150 L11,70 Z"></path>
+                    <g filter="url(#davinciWobble${seed})" fill="none" stroke="#5a4326" stroke-width="1.6" stroke-linecap="round" opacity="0.9">
+                        <rect x="34" y="40" width="272" height="392" rx="4"></rect>
+                        <rect x="36" y="42" width="268" height="388" rx="4" stroke-width="0.7" opacity="0.5"></rect>
+                        <line x1="34" y1="236" x2="306" y2="236"></line>
+                        <circle cx="170" cy="236" r="46"></circle>
+                        <circle cx="170" cy="236" r="2.6" fill="#5a4326"></circle>
+                        <rect x="96" y="40" width="148" height="60"></rect>
+                        <rect x="130" y="40" width="80" height="26"></rect>
+                        <path d="M120,100 A40,30 0 0 0 220,100"></path>
+                        <rect x="96" y="372" width="148" height="60"></rect>
+                        <rect x="130" y="406" width="80" height="26"></rect>
+                        <path d="M120,372 A40,30 0 0 1 220,372"></path>
+                    </g>
+                    <rect x="96" y="40" width="148" height="26" fill="url(#davinciHatch${seed})" opacity="0.5"></rect>
+                    <rect x="96" y="406" width="148" height="26" fill="url(#davinciHatch${seed})" opacity="0.5"></rect>
+                    <g fill="#6f5233" font-style="italic" opacity="0.78">
+                        <text x="300" y="34" font-size="11" text-anchor="end">studio tattico</text>
+                        <text x="42" y="452" font-size="10">porta · custode</text>
+                    </g>
+                    <text x="300" y="450" font-size="10" fill="#6f5233" font-style="italic" opacity="0.55" text-anchor="end" transform="rotate(-3 300 450)">— Cod. FantaLab, f.34r</text>
+                    ${tokens}
+                </svg>`;
+        }
+
+        function renderAuctionDavinciPitch(lot) {
+            const host = document.getElementById('auctionDavinciPitch');
+            if (!host || typeof getDavinciPitchSvg !== 'function') return;
+            const role = lot && lot.role ? lot.role : 'A';
+            const label = lot && lot.player ? lot.player : 'lotto in studio';
+            host.dataset.previewMode = 'decorative';
+            host.innerHTML = getDavinciPitchSvg({
+                seed: 3,
+                counts: { A: role === 'A' ? 1 : 0, C: role === 'C' ? 1 : 0, D: role === 'D' ? 1 : 0, P: role === 'P' ? 1 : 0 },
+                labels: { A: role === 'A' ? [label] : [], C: role === 'C' ? [label] : [], D: role === 'D' ? [label] : [], P: role === 'P' ? [label] : [] },
+                interactive: false
+            });
+        }
+
+        /* ─────────────────────────────────────────────────────────────
            TACTICAL FORMATIONS & INTERACTIVE 2D PITCH
         ───────────────────────────────────────────────────────────── */
         const PITCH_FORMATIONS = {
@@ -7427,6 +8165,15 @@ HTML_TEMPLATE = """
             return { lineup: result, counts };
         }
 
+        function getDavinciPitchLabels(lineup) {
+            return {
+                A: (lineup.A || []).map(slot => slot && slot.player ? ((slot.player.player || '').length > 9 ? slot.player.player.substring(0, 8) + '…' : slot.player.player) : '+ Scegli'),
+                C: (lineup.C || []).map(slot => slot && slot.player ? ((slot.player.player || '').length > 9 ? slot.player.player.substring(0, 8) + '…' : slot.player.player) : '+ Scegli'),
+                D: (lineup.D || []).map(slot => slot && slot.player ? ((slot.player.player || '').length > 9 ? slot.player.player.substring(0, 8) + '…' : slot.player.player) : '+ Scegli'),
+                P: (lineup.P || []).map(slot => slot && slot.player ? ((slot.player.player || '').length > 9 ? slot.player.player.substring(0, 8) + '…' : slot.player.player) : '+ Scegli')
+            };
+        }
+
         function renderTacticalPitch(team, struct) {
             const formation = getActivePitchFormation();
             const formSelect = document.getElementById('pitchFormationSelect');
@@ -7494,54 +8241,29 @@ HTML_TEMPLATE = """
             const hudFieldedCost = document.getElementById('hudFieldedCost');
             if (hudFieldedCost) hudFieldedCost.textContent = `${sumCost} cr`;
 
-            // Function to handle clicking on a pitch node safely
-            window.onPitchNodeClicked = function(el) {
-                const role = el.getAttribute('data-role');
-                const slot = parseInt(el.getAttribute('data-slot'), 10);
-                const playerRaw = el.getAttribute('data-player');
-                const player = (playerRaw && playerRaw.length > 0) ? decodeURIComponent(playerRaw) : null;
-                const formation = el.getAttribute('data-formation');
-                openPitchPlayerPickerModal(role, slot, player, formation);
-            };
-
-            // Render each row on the 2D Pitch
-            const renderPitchRow = (role, containerId) => {
-                const container = document.getElementById(containerId);
-                if (!container) return;
-                const slots = lineup[role] || [];
-                let html = '';
-
-                slots.forEach((s, idx) => {
-                    if (!s.isEmpty && s.player) {
-                        const p = s.player;
-                        const shortName = p.player.length > 9 ? p.player.substring(0, 8) + '…' : p.player;
-                        const pFm = p.mfv || p.mfv_hist || '6.0';
-                        const encPlayer = encodeURIComponent(p.player);
-                        html += `
-                            <div class="pitch-node" data-role="${role}" data-slot="${idx}" data-player="${encPlayer}" data-formation="${formation}" onclick="onPitchNodeClicked(this)" title="${p.player} (${p.team}) - ${p.price} cr - FM: ${pFm} (Clicca per cambiare titolare)">
-                                <div class="pitch-jersey role-${role}">${role}</div>
-                                <div class="pitch-node-name">${shortName}</div>
-                                <div class="pitch-node-price">${p.price} cr <small style="color:#34d399;">(${pFm})</small></div>
-                            </div>
-                        `;
-                    } else {
-                        html += `
-                            <div class="pitch-node pitch-node-empty" data-role="${role}" data-slot="${idx}" data-player="" data-formation="${formation}" onclick="onPitchNodeClicked(this)" title="Clicca per scegliere un calciatore in questo slot">
-                                <div class="pitch-jersey">+</div>
-                                <div class="pitch-node-name">+ Scegli</div>
-                                <div class="pitch-node-price" style="color:var(--text-muted); font-size:0.65rem;">${role} #${idx + 1}</div>
-                            </div>
-                        `;
-                    }
+            const pitchHost = document.getElementById('pitchBoardDavinci');
+            if (pitchHost) {
+                const labels = getDavinciPitchLabels(lineup);
+                pitchHost.innerHTML = getDavinciPitchSvg({
+                    seed: 5,
+                    counts: counts,
+                    labels: labels,
+                    interactive: true
                 });
 
-                container.innerHTML = html;
-            };
-
-            renderPitchRow('A', 'pitchRowA');
-            renderPitchRow('C', 'pitchRowC');
-            renderPitchRow('D', 'pitchRowD');
-            renderPitchRow('P', 'pitchRowP');
+                ['A', 'C', 'D', 'P'].forEach(role => {
+                    const slots = lineup[role] || [];
+                    pitchHost.querySelectorAll(`.davinci-token[data-role="${role}"]`).forEach((node, idx) => {
+                        const slot = slots[idx];
+                        if (!slot || slot.isEmpty || !slot.player) {
+                            node.classList.add('davinci-token--empty');
+                        }
+                        node.addEventListener('click', function () {
+                            openPitchPlayerPickerModal(role, idx, slot && slot.player ? slot.player.player : null, formation);
+                        });
+                    });
+                });
+            }
         }
 
         let currentPitchPicker = { role: null, slotIndex: null, currentAssigned: null, formation: null };
@@ -8131,6 +8853,8 @@ HTML_TEMPLATE = """
                     if (elFascia) elFascia.textContent = `F${lot.fascia || 3}`;
                     if (elPrice) elPrice.textContent = lot.current_price || lot.price || 1;
 
+                    renderAuctionDavinciPitch({ role: lot.role, player: lot.player_name });
+
                     if (elBidder) {
                         let bidderText = '-';
                         try {
@@ -8259,6 +8983,11 @@ HTML_TEMPLATE = """
             }
         };
     </script>
+    <button id="maestroAmbient" class="maestro-ambient" type="button" style="display:none;" onclick="FantaTour && FantaTour.start && FantaTour.start()">
+        <span class="maestro-ambient__halo"></span>
+        <span id="maestroAmbientSprite" class="maestro-ambient__sprite" aria-hidden="true"></span>
+        <span id="maestroAmbientBubble" class="maestro-ambient__bubble">Occhio al surplus, giovane.</span>
+    </button>
     <script src="/static/js/tutorial.js"></script>
 </body>
 </html>
