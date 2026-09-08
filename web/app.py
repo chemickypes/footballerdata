@@ -2,7 +2,7 @@
 """
 footballerdata — Player Data & Statistics Explorer (Serie A)
 Web UI: player list (listone) with filters/sort, Player Detail Drawer, AI copilot Q&A.
-Fork of La FantaOfficina; the fantasy auction/league/team engine has been removed.
+Derived from an upstream fantacalcio analytics framework; the fantasy auction/league/team engine has been removed.
 
 Thin entrypoint: Flask app assembly + blueprint registration.
 Logic lives in: config.py, data.py, pricing.py, players_api.py, ai_api.py.

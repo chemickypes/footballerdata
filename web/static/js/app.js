@@ -2,20 +2,6 @@ let allPlayers = [];
 let currentRoleFilter = 'ALL';
 let currentFasciaFilter = 'ALL';
 
-function maybeShowMaestroIntro(forceClose = false) {
-    const overlay = document.getElementById('maestroIntroOverlay');
-    if (!overlay) return;
-    if (forceClose) {
-        localStorage.setItem('fanta_maestro_intro_done', 'true');
-        overlay.style.display = 'none';
-        document.body.classList.remove('app-locked');
-        return;
-    }
-    if (localStorage.getItem('fanta_maestro_intro_done') === 'true') return;
-    overlay.style.display = 'flex';
-    document.body.classList.add('app-locked');
-}
-
 function runBootSplash(onComplete) {
     const splash = document.getElementById('appBootSplash');
     if (!splash) {
@@ -27,81 +13,8 @@ function runBootSplash(onComplete) {
         setTimeout(() => {
             splash.style.display = 'none';
             onComplete();
-        }, 400); // matches the 0.4s CSS transition above
-    }, 1200);
-}
-
-window.MAESTRO_SPRITES = {
-    neutral: [
-        '..........CC..........','.........oooo.........','.......ooHHHHHHoo......','......oHHHHHHHHHHo.....','......oHHHhhHHhHHHo....','.....oHHHHHHHHHHHHo....','.....oHHHHHHHHHHHHo....','....obBBBBBBBBBBBBbo...','....oBLBBBBBBBBBBLBo...','...oBGGgBBBBBBBBGGgBo..','...oBGGgBBBBBBBBGGgBo..','....obBBBBBBBBBBBBbo...','.....oSSSSSSSSSSSSo....','.....oSSsSSSSSSsSSo....','.....oSooSSSSSSooSo....','.....oSooSSSSSSooSo....','.....oSSSSSssSSSSSo....','......oSSSSssSSSSo.....','......oWwsSSSSswWo.....','.....oWWWWwssWWWWWo....','....oWWWWWWWWWWWWWWo...','...oWWWWWWWWWWWWWWWWo..','...oWWWWwWWWWWWwWWWWo..','...oWWWWWWWWWWWWWWWWo..','....oWWWWWWWWWWWWWWo...','.....oWWWWWwwWWWWWo....','......oWWWWWWWWWWo.....','.......oWWWWWWWWo......','...RR..oWWWWWWWWo..RR..','.RRRRRRoWWWWWWWWoRRRRRR','RRRRRRRRoWWWWWWoRRRRRRR','RRrRRRLBRRRRRRRRBLRRrRR','RRrRRRRRRRRRRRRRRRRrRRR'
-    ],
-    greeting: [
-        '..........CC..........','.........oooo.........','.......ooHHHHHHoo......','......oHHHHHHHHHHo.....','......oHHHhhHHhHHHo....','.....oHHHHHHHHHHHHo....','.....oHHHHHHHHHHHHo....','....obBBBBBBBBBBBBbo...','....oBLBBBBBBBBBBLBo...','...oBGGgBBBBBBBBGGgBo..','...oBGGgBBBBBBBBGGgBo..','....obBBBBBBBBBBBBbo...','.....oSSSSSSSSSSSSo....','.....oSSsSSSSSSsSSo....','.....oSooSSSSSSooSo....','.....oSooSSSSSSooSo....','.....oSSSSSssSSSSSo....','......oSSSSssSSSSo.....','......oWwsSSSSswWo.....','.....oWWWWwssWWWWWo....','....oWWWWWWWWWWWWWWo...','...oWWWWWWWWWWWWWWWWo..','...oWWWWwWWWWWWwWWWWo..','...oWWWWWWWWWWWWWWWWo..','....oWWWWWWWWWWWWWWo...','.....oWWWWWwwWWWWWo....','......oWWWWWWWWWWo..B..','.......oWWWWWWWWo..BB..','...RR..oWWWWWWWWo...B..','.RRRRRRoWWWWWWWWoRRRRRR','RRRRRRRRoWWWWWWoRRRRRRR','RRrRRRLBRRRRRRRRBLRRrRR','RRrRRRRRRRRRRRRRRRRrRRR'
-    ],
-    pointing: [
-        '..........CC..........','.........oooo.........','.......ooHHHHHHoo......','......oHHHHHHHHHHo.....','......oHHHhhHHhHHHo....','.....oHHHHHHHHHHHHo....','.....oHHHHHHHHHHHHo....','....obBBBBBBBBBBBBbo...','....oBLBBBBBBBBBBLBo...','...oBGGgBBBBBBBBGGgBo..','...oBGGgBBBBBBBBGGgBo..','....obBBBBBBBBBBBBbo...','.....oSSSSSSSSSSSSo....','.....oSSsSSSSSSsSSo....','.....oSooSSSSSSooSo....','.....oSooSSSSSSooSo....','.....oSSSSSssSSSSSo....','......oSSSSssSSSSo.....','......oWwsSSSSswWo.....','.....oWWWWwssWWWWWo....','....oWWWWWWWWWWWWWWoBBB','...oWWWWWWWWWWWWWWWWo.B','...oWWWWwWWWWWWwWWWWo..','...oWWWWWWWWWWWWWWWWo..','....oWWWWWWWWWWWWWWo...','.....oWWWWWwwWWWWWo....','......oWWWWWWWWWWo.....','.......oWWWWWWWWo......','...RR..oWWWWWWWWo..RR..','.RRRRRRoWWWWWWWWoRRRRRR','RRRRRRRRoWWWWWWoRRRRRRR','RRrRRRLBRRRRRRRRBLRRrRR','RRrRRRRRRRRRRRRRRRRrRRR'
-    ],
-    thoughtful: [
-        '..........CC..........','.........oooo.........','.......ooHHHHHHoo......','......oHHHHHHHHHHo.....','......oHHHhhHHhHHHo....','.....oHHHHHHHHHHHHo....','.....oHHHHHHHHHHHHo....','....obBBBBBBBBBBBBbo...','....oBLBBBBBBBBBBLBo...','...oBGGgBBBBBBBBGGgBo..','...oBGGgBBBBBBBBGGgBo..','....obBBBBBBBBBBBBbo...','.....oSSSSSSSSSSSSo....','.....oSSsSSSSSSsSSo....','.....oSooSSSSSSooSo....','.....oSooSSSSSSooSo....','.....oSSSSSssSSSSSo....','......oSSSSssSSSSo.....','......oWwsSSSSswWo.....','.....oWWWWwssWWWWWo....','....oWWWWWWWWWWWWWWo...','...oWWWWWWWWWWWWWWWWo..','...oWWWWwWWWWWWwWWWWo..','...oWWWWWWWWWWWWWWWWo..','....oWWWWWWWWWWWWWWo...','.....oWWWWWwwWWWooo....','......oWWWWWWWWWo......','.......oWWWWWWWWo......','...RR..oWWWWWWWWo..RR..','.RRRRRRoWWWWWWWWoRRRRRR','RRRRRRRRoWWWWWWoRRRRRRR','RRrRRRLBRRRRRRRRBLRRrRR','RRrRRRRRRRRRRRRRRRRrRRR'
-    ]
-};
-
-const MAESTRO_PALETTE = {
-    '.': null, o: '#241a12', H: '#4a3320', h: '#33230f', B: '#c69a4c', b: '#8a6329',
-    L: '#f2c14e', G: '#8fd0c8', g: '#4f9a91', S: '#e6b184', s: '#c68b5c',
-    W: '#efe9dc', w: '#c3bcaa', R: '#5c4326', r: '#3f2c15', C: '#b5703a'
-};
-
-function renderMaestroSprite(containerId, pose = 'neutral', scale = 3.2) {
-    const host = document.getElementById(containerId);
-    const map = window.MAESTRO_SPRITES[pose] || window.MAESTRO_SPRITES.neutral;
-    if (!host || !map) return;
-    const rows = map.length;
-    const cols = map[0].length;
-    let rects = '';
-    map.forEach((row, y) => {
-        row.split('').forEach((token, x) => {
-            const fill = MAESTRO_PALETTE[token];
-            if (!fill) return;
-            rects += `<rect x="${x}" y="${y}" width="1.03" height="1.03" fill="${fill}" />`;
-        });
-    });
-    host.innerHTML = `<svg viewBox="0 0 ${cols} ${rows}" width="${cols * scale}" height="${rows * scale}" shape-rendering="crispEdges" style="display:block">${rects}</svg>`;
-}
-
-let maestroCurrentPose = 'neutral';
-
-function setMaestroPose(pose) {
-    maestroCurrentPose = pose;
-    renderMaestroSprite('maestroAmbientSprite', pose, 2.9);
-    const introVisible = document.getElementById('maestroIntroOverlay');
-    if (introVisible) renderMaestroSprite('maestroIntroSprite', pose === 'neutral' ? 'greeting' : pose, 4.6);
-}
-
-function ensureMaestroAmbient() {
-    const el = document.getElementById('maestroAmbient');
-    if (!el) return;
-    el.style.display = 'flex';
-    if (!document.getElementById('maestroAmbientSprite')?.innerHTML) {
-        renderMaestroSprite('maestroAmbientSprite', maestroCurrentPose, 2.9);
-    }
-}
-
-function updateMaestroAmbientState(tabId) {
-    ensureMaestroAmbient();
-    const bubble = document.getElementById('maestroAmbientBubble');
-    const state = {
-        draft: { pose: 'pointing', text: 'Segui il lotto: fair price e surplus sono la bussola.' },
-        rosters: { pose: 'thoughtful', text: 'Ogni sigillo titolare resta modificabile con un tocco.' },
-        listone: { pose: 'pointing', text: 'Occhio al surplus, giovane.' },
-        ai: { pose: 'neutral', text: 'Qui gli esperimenti vanno letti con giudizio.' },
-        lineup: { pose: 'thoughtful', text: 'Il solver resta separato: la vera lavagna è nelle Rose.' },
-        audit: { pose: 'neutral', text: 'Una buona officina misura prima di giudicare.' },
-        trades: { pose: 'greeting', text: 'Ogni scambio va pesato come un ingranaggio.' },
-        targets: { pose: 'greeting', text: 'Fissa i tuoi obiettivi prima che il mercato corra.' }
-    }[tabId] || { pose: 'neutral', text: "Bentornato nell'officina." };
-    setMaestroPose(state.pose);
-    if (bubble) bubble.textContent = state.text;
+        }, 250); // matches the 0.25s CSS transition above
+    }, 400);
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -141,19 +54,19 @@ function openPlayerDetailDrawer(playerName) {
     const surplus = targetPr - clearPr;
     const surpEl = document.getElementById('pdSurplusVal');
     surpEl.textContent = (surplus >= 0 ? '+' : '') + `${surplus} cr`;
-    surpEl.style.color = surplus >= 0 ? '#22c55e' : '#ef4444';
+    surpEl.style.color = surplus >= 0 ? 'var(--success)' : 'var(--danger)';
 
     const flags = p.target_flags || '';
     document.getElementById('pdTargetFlags').textContent = flags ? `Fattori: ${flags.replace(/;/g, ' • ')}` : 'Nessun fattore correttivo applicato';
     const badgeEl = document.getElementById('pdClearingSourceBadge');
     if (flags.includes('asta_xlsx')) {
         badgeEl.textContent = 'Asta Reale (1000cr)';
-        badgeEl.style.background = 'rgba(34,197,94,0.15)';
-        badgeEl.style.color = '#22c55e';
+        badgeEl.style.background = 'rgba(63,185,117,0.15)';
+        badgeEl.style.color = '#3fb975';
     } else if (flags.includes('fantabot_golden')) {
         badgeEl.textContent = 'Aste Storiche (500cr)';
-        badgeEl.style.background = 'rgba(99,102,241,0.15)';
-        badgeEl.style.color = '#818cf8';
+        badgeEl.style.background = 'rgba(94,139,255,0.15)';
+        badgeEl.style.color = '#5e8bff';
     } else {
         badgeEl.textContent = 'Stima Target';
         badgeEl.style.background = 'rgba(255,255,255,0.05)';
@@ -167,14 +80,14 @@ function openPlayerDetailDrawer(playerName) {
 
     const severeEl = document.getElementById('pdSevere');
     severeEl.innerHTML = med.infortunio_grave 
-        ? '<span style="color:#ef4444;"><i class="fa-solid fa-triangle-exclamation icon-pulse" style="margin-right:3px;"></i> Sì</span>' 
-        : '<span style="color:#22c55e;"><i class="fa-solid fa-circle-check" style="margin-right:3px;"></i> No</span>';
+        ? '<span style="color:var(--danger);"><i class="fa-solid fa-triangle-exclamation icon-pulse" style="margin-right:3px;"></i> Sì</span>' 
+        : '<span style="color:var(--success);"><i class="fa-solid fa-circle-check" style="margin-right:3px;"></i> No</span>';
 
     const medBadge = document.getElementById('pdMedBadge');
     medBadge.innerHTML = (med.status_badge || '') + ' ' + (med.status_label || 'N/D');
-    if (med.status === 'safe') { medBadge.style.background = 'rgba(34,197,94,0.15)'; medBadge.style.color = '#22c55e'; }
-    else if (med.status === 'warning') { medBadge.style.background = 'rgba(234,179,8,0.15)'; medBadge.style.color = '#eab308'; }
-    else { medBadge.style.background = 'rgba(239,68,68,0.15)'; medBadge.style.color = '#ef4444'; }
+    if (med.status === 'safe') { medBadge.style.background = 'rgba(63,185,117,0.15)'; medBadge.style.color = '#3fb975'; }
+    else if (med.status === 'warning') { medBadge.style.background = 'rgba(194,147,67,0.15)'; medBadge.style.color = '#c29343'; }
+    else { medBadge.style.background = 'rgba(229,83,75,0.15)'; medBadge.style.color = '#e5534b'; }
 
     const injList = document.getElementById('pdInjuryList');
     const details = med.dettaglio_infortuni || [];
@@ -194,7 +107,7 @@ function openPlayerDetailDrawer(playerName) {
     const deltaEl = document.getElementById('pdDeltaXg');
     const deltaVal = us.delta_goals_xg || 0;
     deltaEl.textContent = (deltaVal >= 0 ? '+' : '') + deltaVal.toFixed(2);
-    deltaEl.style.color = deltaVal >= 0 ? '#22c55e' : '#ef4444';
+    deltaEl.style.color = deltaVal >= 0 ? 'var(--success)' : 'var(--danger)';
 
     // Quantiles
     const q = p.quantiles || {};
@@ -206,8 +119,8 @@ function openPlayerDetailDrawer(playerName) {
 
     const profBadge = document.getElementById('pdProfileBadge');
     profBadge.innerHTML = q.profile_badge || '';
-    if ((q.spread || 0) < 150) { profBadge.style.background = 'rgba(99,102,241,0.15)'; profBadge.style.color = '#818cf8'; }
-    else { profBadge.style.background = 'rgba(245,158,11,0.15)'; profBadge.style.color = '#f59e0b'; }
+    if ((q.spread || 0) < 150) { profBadge.style.background = 'rgba(94,139,255,0.15)'; profBadge.style.color = '#5e8bff'; }
+    else { profBadge.style.background = 'rgba(194,147,67,0.15)'; profBadge.style.color = '#c29343'; }
 
     // Quantile visual bar
     const maxContrib = Math.max(p90, 250);
@@ -217,8 +130,7 @@ function openPlayerDetailDrawer(playerName) {
     const qBar = document.getElementById('pdQuantileBar');
     qBar.style.left = barLeft + '%';
     qBar.style.width = barWidth + '%';
-    qBar.style.background = 'linear-gradient(90deg, #ef4444 0%, var(--gold) 50%, #22c55e 100%)';
-    qBar.style.opacity = '0.3';
+    qBar.style.background = 'rgba(94,139,255,0.25)';
     document.getElementById('pdQuantileP50Mark').style.left = p50Pos + '%';
 
     // Career trajectory (lazy fetch)
@@ -228,8 +140,8 @@ function openPlayerDetailDrawer(playerName) {
     const starterEl = document.getElementById('pdStarter');
     if (starterEl) {
         starterEl.innerHTML = p.is_starter_2627 
-            ? '<span style="color:#22c55e;"><i class="fa-solid fa-circle-check" style="margin-right:3px;"></i> Sì</span>' 
-            : '<span style="color:#ef4444;"><i class="fa-solid fa-circle-xmark" style="margin-right:3px;"></i> No</span>';
+            ? '<span style="color:var(--success);"><i class="fa-solid fa-circle-check" style="margin-right:3px;"></i> Sì</span>' 
+            : '<span style="color:var(--danger);"><i class="fa-solid fa-circle-xmark" style="margin-right:3px;"></i> No</span>';
     }
     document.getElementById('pdStarts').textContent = p.starts_2627 || 0;
     document.getElementById('pdMinutes').textContent = (p.minutes_2627 || 0).toLocaleString();
@@ -298,7 +210,7 @@ function renderTrajectorySVG(hist) {
         const h = pt.h;
         const tip = `${h.season} · ${h.team || '?'} · ${h.pg} presenze · MV ${h.mv.toFixed(2)}` +
             ((h.gol || h.assist) ? ` · ${h.gol || 0}G ${h.assist || 0}A` : '');
-        return `<circle cx="${pt.cx.toFixed(1)}" cy="${pt.cy.toFixed(1)}" r="4" fill="var(--gold)" stroke="#0b111e" stroke-width="1.5"><title>${tip}</title></circle>`;
+        return `<circle cx="${pt.cx.toFixed(1)}" cy="${pt.cy.toFixed(1)}" r="4" fill="var(--primary)" stroke="var(--surface-elevated)" stroke-width="1.5"><title>${tip}</title></circle>`;
     }).join('');
     const seasonLabels = points.map(pt => {
         const s = pt.h.season || '';
@@ -312,7 +224,7 @@ function renderTrajectorySVG(hist) {
     const last = hist[n - 1];
     const trend = n >= 2 ? (mvs[n - 1] - mvs[n - 2]) : 0;
     const trendTxt = n >= 2
-        ? `<span style="color:${trend >= 0 ? '#22c55e' : '#ef4444'}; font-weight:700;">${trend >= 0 ? '▲' : '▼'} ${Math.abs(trend).toFixed(2)}</span> vs stagione precedente`
+        ? `<span style="color:${trend >= 0 ? 'var(--success)' : 'var(--danger)'}; font-weight:600;">${trend >= 0 ? '▲' : '▼'} ${Math.abs(trend).toFixed(2)}</span> vs stagione precedente`
         : '';
 
     return `
@@ -324,7 +236,7 @@ function renderTrajectorySVG(hist) {
             ${pgLabels}
         </svg>
         <div style="margin-top:4px; font-size:0.72rem; color:var(--text-muted);">
-            MV per stagione (presenze sotto) — ultima: <b style="color:var(--text);">${last.mv.toFixed(2)}</b> in ${n} stagioni Serie A ${trendTxt}
+            MV per stagione (presenze sotto) — ultima: <b style="color:var(--text-main);">${last.mv.toFixed(2)}</b> in ${n} stagioni Serie A ${trendTxt}
         </div>
     `;
 }
@@ -363,10 +275,7 @@ async function init() {
     fetchAIStatus();
     renderListone();
 
-    ensureMaestroAmbient();
-    updateMaestroAmbientState('listone');
-
-    runBootSplash(() => maybeShowMaestroIntro());
+    runBootSplash(() => {});
 
     if (window.location.hash) {
         const tabName = window.location.hash.replace('#', '');
@@ -432,8 +341,6 @@ function switchTab(tabId) {
     const sideBtn = document.getElementById('sideNav-' + tabId);
     if (sideBtn) sideBtn.classList.add('active');
 
-    if (typeof updateMaestroAmbientState === 'function') updateMaestroAmbientState(tabId);
-
     // Close mobile drawer if open
     const sb = document.getElementById('appSidebar');
     const bd = document.getElementById('sidebarBackdrop');
@@ -464,7 +371,7 @@ function setFasciaFilter(f) {
 /* ─────────────────────────────────────────────────────────────
    TACTICAL AI CONVERSATIONAL CHATBOT ENGINE
 ───────────────────────────────────────────────────────────── */
-const AI_AVATAR_HTML = `<div class="chat-msg-avatar" style="width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg, #0284c7, #4f46e5); display:flex; align-items:center; justify-content:center; flex-shrink:0; border:1.5px solid var(--primary);"><svg style="width:16px; height:16px; stroke:#ffffff; fill:none; stroke-width:2;" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg></div>`;
+const AI_AVATAR_HTML = `<div class="chat-msg-avatar" style="background:var(--primary); display:flex; align-items:center; justify-content:center;"><svg style="width:15px; height:15px; stroke:#0a0a0b; fill:none; stroke-width:2;" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg></div>`;
 
 function setAIQuery(queryText) {
     document.getElementById('aiInputPrompt').value = queryText;
@@ -478,7 +385,7 @@ function clearAIChat() {
             ${AI_AVATAR_HTML}
             <div class="chat-bubble">
                 <b>Chat azzerata.</b><br>
-                Come posso aiutarti? Chiedimi confronti tra giocatori, diagnosi sul tuo bilancio o scommesse per completare la rosa!
+                Come posso aiutarti? Chiedimi confronti tra giocatori, proiezioni o statistiche.
             </div>
         </div>
     `;
@@ -508,7 +415,7 @@ async function submitAIQuery() {
     loadingMsg.innerHTML = `
         ${AI_AVATAR_HTML}
         <div class="chat-bubble" style="color:var(--text-muted); font-style:italic;">
-            Sto analizzando i dati del listone, VORP e formazioni reali...
+            Sto analizzando statistiche, proiezioni e valori di mercato...
         </div>
     `;
     stream.appendChild(loadingMsg);
@@ -588,11 +495,11 @@ function formatMarkdownText(text) {
             if (!inTable) {
                 inTable = true;
                 tableHtml = '<div style="overflow-x:auto; margin:8px 0;"><table class="ai-table" style="width:100%; border-collapse:collapse; font-size:0.80rem; text-align:left;">';
-                tableHtml += '<thead><tr style="border-bottom:1.5px solid var(--border); background:rgba(255,45,117,0.12); color:var(--text-main);">';
-                cells.forEach(c => { tableHtml += `<th style="padding:6px 8px; font-weight:800;">${c}</th>`; });
+                tableHtml += '<thead><tr style="border-bottom:1px solid var(--border); background:rgba(255,255,255,0.04); color:var(--text-main);">';
+                cells.forEach(c => { tableHtml += `<th style="padding:6px 8px; font-weight:600;">${c}</th>`; });
                 tableHtml += '</tr></thead><tbody>';
             } else {
-                tableHtml += '<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">';
+                tableHtml += '<tr style="border-bottom:1px solid rgba(255,255,255,0.08);">';
                 cells.forEach(c => { tableHtml += `<td style="padding:5px 8px;">${c}</td>`; });
                 tableHtml += '</tr>';
             }
@@ -641,7 +548,7 @@ function renderAIChatContent(data) {
             return `
                 <div>
                     <div style="font-weight:800; font-size:1.02rem; color:var(--primary); margin-bottom:8px;">${data.title || 'Analisi'}</div>
-                    <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; background:#0b111e; padding:8px 10px; border-radius:8px; margin-bottom:10px; font-size:0.82rem;">
+                    <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; background:var(--surface-elevated); padding:8px 10px; border-radius:8px; margin-bottom:10px; font-size:0.82rem;">
                         <div>Crediti Residui: <b style="color:var(--gold);">${s.remaining || 0} cr</b></div>
                         <div>Max Rilancio: <b style="color:var(--danger);">${s.max_bid || 0} cr</b></div>
                         <div>Slot Liberi: <b>${free.total || 0}</b> (P:${free.P || 0} D:${free.D || 0} C:${free.C || 0} A:${free.A || 0})</div>
@@ -650,7 +557,7 @@ function renderAIChatContent(data) {
                     <div style="margin-bottom:8px;">
                         ${(data.advice || []).map(a => `<div style="margin-bottom:4px; font-size:0.85rem;">&bull; ${a}</div>`).join('')}
                     </div>
-                    <div style="background:rgba(56,189,248,0.08); border-left:3px solid var(--primary); padding:8px 10px; border-radius:4px; font-size:0.85rem;">
+                    <div style="background:rgba(94,139,255,0.08); border-left:3px solid var(--primary); padding:8px 10px; border-radius:4px; font-size:0.85rem;">
                         ${data.verdict || ''}
                     </div>
                     ${engineTag}
@@ -662,10 +569,10 @@ function renderAIChatContent(data) {
             const players = data.players || [];
             return `
                 <div>
-                    <div style="font-weight:800; font-size:1rem; color:var(--primary); margin-bottom:10px;">${data.title || 'Confronto'}</div>
+                    <div style="font-weight:600; font-size:1rem; color:var(--primary); margin-bottom:10px;">${data.title || 'Confronto'}</div>
                     <div style="display:grid; grid-template-columns:${players.length > 2 ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)'}; gap:8px; margin-bottom:10px;">
                         ${players.map(p => `
-                            <div style="background:#0b111e; padding:10px 8px; border-radius:8px; border:1px solid var(--border); font-size:0.82rem;">
+                            <div style="background:var(--surface-elevated); padding:10px 8px; border-radius:8px; border:1px solid var(--border); font-size:0.82rem;">
                                 <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
                                     <span class="badge badge-${p.role}">${p.role}</span>
                                     <b>${p.name}</b>
@@ -677,7 +584,7 @@ function renderAIChatContent(data) {
                             </div>
                         `).join('')}
                     </div>
-                    <div style="background:rgba(56,189,248,0.08); border-left:3px solid var(--primary); padding:8px 10px; border-radius:4px; font-size:0.85rem;">
+                    <div style="background:rgba(94,139,255,0.08); border-left:3px solid var(--primary); padding:8px 10px; border-radius:4px; font-size:0.85rem;">
                         ${formatMarkdownText(data.verdict || '')}
                     </div>
                     ${engineTag}
@@ -689,22 +596,22 @@ function renderAIChatContent(data) {
             const p = data.player || {};
             return `
                 <div>
-                    <div style="font-weight:800; font-size:1.02rem; color:var(--gold); margin-bottom:8px;">${data.title}</div>
+                    <div style="font-weight:600; font-size:1rem; color:var(--primary); margin-bottom:8px;">${data.title}</div>
                     <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; text-align:center; margin-bottom:10px;">
-                        <div style="background:#0b111e; padding:8px; border-radius:6px; border:1px solid var(--border);">
-                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:700;">PROIEZIONE P50</div>
-                            <div style="font-size:1.1rem; font-weight:800; color:var(--primary);">${p.contrib_exp || 0}</div>
+                        <div style="background:var(--surface-elevated); padding:8px; border-radius:6px; border:1px solid var(--border);">
+                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:600;">PROIEZIONE P50</div>
+                            <div style="font-size:1.05rem; font-weight:600; color:var(--primary);">${p.contrib_exp || 0}</div>
                         </div>
-                        <div style="background:#0b111e; padding:8px; border-radius:6px; border:1px solid var(--border);">
-                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:700;">FAIR PRICE 1000</div>
-                            <div style="font-size:1.1rem; font-weight:800; color:var(--gold);">${p.fair_1000 || 1} cr</div>
+                        <div style="background:var(--surface-elevated); padding:8px; border-radius:6px; border:1px solid var(--border);">
+                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:600;">FAIR PRICE 1000</div>
+                            <div style="font-size:1.05rem; font-weight:600; color:var(--gold);">${p.fair_1000 || 1} cr</div>
                         </div>
-                        <div style="background:#0b111e; padding:8px; border-radius:6px; border:1px solid var(--border);">
-                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:700;">TITOLARITÀ REALE</div>
-                            <div style="font-size:1.1rem; font-weight:800; color:var(--success);">${p.starts || 0} start</div>
+                        <div style="background:var(--surface-elevated); padding:8px; border-radius:6px; border:1px solid var(--border);">
+                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:600;">TITOLARITÀ REALE</div>
+                            <div style="font-size:1.05rem; font-weight:600; color:var(--success);">${p.starts || 0} start</div>
                         </div>
                     </div>
-                    <div style="background:rgba(56,189,248,0.08); border-left:3px solid var(--gold); padding:8px 10px; border-radius:4px; font-size:0.85rem; margin-bottom:8px;">
+                    <div style="background:rgba(94,139,255,0.08); border-left:3px solid var(--primary); padding:8px 10px; border-radius:4px; font-size:0.85rem; margin-bottom:8px;">
                         ${formatMarkdownText(data.verdict || '')}
                     </div>
                     ${engineTag}
@@ -716,22 +623,22 @@ function renderAIChatContent(data) {
             const players = data.players || [];
             return `
                 <div>
-                    <div style="font-weight:800; font-size:1rem; color:var(--success); margin-bottom:8px;">${data.title}</div>
+                    <div style="font-weight:600; font-size:1rem; color:var(--success); margin-bottom:8px;">${data.title}</div>
                     <div style="margin-bottom:10px;">
                         ${players.map(p => `
-                            <div class="candidate-mini-row" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; margin-bottom:4px; background:#0b111e; border-radius:6px; border:1px solid var(--border);">
+                            <div class="candidate-mini-row" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; margin-bottom:4px; background:var(--surface-elevated); border-radius:6px; border:1px solid var(--border);">
                                 <div style="display:flex; align-items:center; gap:8px;">
                                     <span class="badge badge-${p.role}">${p.role}</span>
                                     <b>${p.name}</b> <small style="color:var(--text-muted);">(${p.team})</small>
                                 </div>
                                 <div style="text-align:right;">
-                                    <span style="color:var(--gold); font-weight:800; font-size:0.95rem;">${p.fair_1000} cr</span>
+                                    <span style="color:var(--gold); font-weight:600; font-size:0.95rem;">${p.fair_1000} cr</span>
                                     <span style="color:var(--primary); font-size:0.78rem; margin-left:6px;">+${p.vorp} vorp</span>
                                 </div>
                             </div>
                         `).join('')}
                     </div>
-                    <div style="background:rgba(16,185,129,0.08); border-left:3px solid var(--success); padding:8px 10px; border-radius:4px; font-size:0.85rem;">
+                    <div style="background:rgba(63,185,117,0.08); border-left:3px solid var(--success); padding:8px 10px; border-radius:4px; font-size:0.85rem;">
                         ${formatMarkdownText(data.verdict || '')}
                     </div>
                     ${engineTag}
@@ -792,9 +699,9 @@ async function openAIDiagnosticsModal() {
     const list = document.getElementById('aiProvidersList');
     if (list && diag.providers) {
         list.innerHTML = Object.entries(diag.providers).map(([k, p]) => `
-            <div style="background:#0b111e; border:1px solid var(--border); border-radius:6px; padding:8px 10px; display:flex; justify-content:space-between; align-items:center;">
+            <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:6px; padding:8px 10px; display:flex; justify-content:space-between; align-items:center;">
                 <div>
-                    <div style="font-weight:700; font-size:0.82rem; color:var(--text-main);">${p.name}</div>
+                    <div style="font-weight:600; font-size:0.82rem; color:var(--text-main);">${p.name}</div>
                     <div style="font-size:0.70rem; color:var(--text-muted);">Env Vercel: <code>${p.env_var}</code></div>
                 </div>
                 <span class="badge ${p.configured ? 'badge-D' : 'badge-P'}" style="font-size:0.72rem;">
@@ -838,8 +745,8 @@ async function testAIConnection() {
 
         if (resBox) {
             resBox.innerHTML = `
-                <div style="background:#090d16; border:1px solid var(--border); border-radius:6px; padding:8px; text-align:left; font-size:0.75rem;">
-                    <div style="font-weight:800; color:var(--text-main); margin-bottom:4px;">Esito Ping (${latency}ms):</div>
+                <div style="background:var(--surface-solid); border:1px solid var(--border); border-radius:6px; padding:8px; text-align:left; font-size:0.75rem;">
+                    <div style="font-weight:600; color:var(--text-main); margin-bottom:4px;">Esito Ping (${latency}ms):</div>
                     ${details}
                 </div>
             `;
@@ -926,19 +833,19 @@ function renderListone() {
                 <div class="player-info">
                     <div class="player-name">
                         <span class="badge badge-${p.role}">${p.role}</span>
-                        <span style="font-family:'Outfit',sans-serif; font-weight:700; font-size:1.05rem; cursor:pointer;" data-player="${encPlayer}" onclick="openPlayerDetailDrawer(decodeURIComponent(this.getAttribute('data-player')))"> ${p.player}</span>
+                        <span style="font-weight:600; font-size:0.98rem; cursor:pointer;" data-player="${encPlayer}" onclick="openPlayerDetailDrawer(decodeURIComponent(this.getAttribute('data-player')))"> ${p.player}</span>
                         <button data-player="${encPlayer}" onclick="openPlayerDetailDrawer(decodeURIComponent(this.getAttribute('data-player')))"
                             title="Dettaglio Giocatore" style="background:transparent; border:none; cursor:pointer; font-size:0.85rem; padding:0 3px; color:var(--primary); opacity:0.75; transition:opacity 0.2s;"
                             onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.75'"><i class="fa-solid fa-circle-info"></i></button>
-                        <small style="color:var(--text-muted); font-weight:600;">(${p.team})</small>
+                        <small style="color:var(--text-muted); font-weight:500;">(${p.team})</small>
                         ${medBadge}
                         ${isStarter ? `<span class="scout-tag-starter">✓ Titolare</span>` : ''}
                     </div>
                     <div class="player-meta" style="display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; margin-top:4px;">
-                        <span style="background:rgba(56,189,248,0.12); color:#38bdf8; padding:2px 7px; border-radius:5px; font-size:0.78rem; font-weight:700;">MV: <b>${p.mv || '6.0'}</b></span>
-                        <span style="background:rgba(16,185,129,0.12); color:#34d399; padding:2px 7px; border-radius:5px; font-size:0.78rem; font-weight:700;">FM: <b>${p.mfv || '6.0'}</b></span>
-                        <span style="color:var(--text-main); font-size:0.78rem; font-weight:600;"><span style="color:var(--gold); font-weight:700;">Bonus:</span> ${p.bonus_range || 'N/D'}</span>
-                        <span class="scout-vorp-badge" style="font-size:0.75rem;">VORP +${p.vorp}</span>
+                        <span style="background:rgba(255,255,255,0.06); color:var(--text-muted); padding:2px 7px; border-radius:6px; font-size:0.76rem; font-weight:500;">MV: <b style="color:var(--text-main);">${p.mv || '6.0'}</b></span>
+                        <span style="background:rgba(255,255,255,0.06); color:var(--text-muted); padding:2px 7px; border-radius:6px; font-size:0.76rem; font-weight:500;">FM: <b style="color:var(--text-main);">${p.mfv || '6.0'}</b></span>
+                        <span style="color:var(--text-muted); font-size:0.76rem; font-weight:500;">Bonus: <b style="color:var(--text-main);">${p.bonus_range || 'N/D'}</b></span>
+                        <span class="scout-vorp-badge" style="font-size:0.74rem;">VORP +${p.vorp}</span>
                         <small style="color:var(--text-muted); font-size:0.72rem; margin-left:auto;">P50: <b>${p.contrib_exp}</b> (~${p.expected_matches || 28}p)</small>
                     </div>
                 </div>

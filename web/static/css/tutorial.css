@@ -1,6 +1,6 @@
 /* ============================================================
-   Tutorial Interattivo Spotlight — fanta-lab
-   Zero-dependency walkthrough overlay styles.
+   Tutorial Interattivo Spotlight — footballerdata
+   Zero-dependency walkthrough overlay styles (neutral enterprise).
    ============================================================ */
 
 .tour-overlay-rect {
@@ -15,7 +15,7 @@
     position: fixed;
     background: transparent;
     border-radius: 8px;
-    box-shadow: 0 0 0 3px var(--gold, #f5b642), 0 0 24px 4px rgba(245, 182, 66, 0.45);
+    box-shadow: 0 0 0 2px var(--primary, #5e8bff);
     z-index: 10001;
     pointer-events: none;
 }
@@ -23,15 +23,15 @@
 .tour-tooltip {
     position: fixed;
     z-index: 10002;
-    background: var(--surface, rgba(12, 15, 25, 0.95));
-    border: 1px solid var(--border, rgba(255, 45, 117, 0.18));
-    border-radius: 12px;
+    background: var(--surface-elevated, #17171a);
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+    border-radius: 8px;
     padding: 16px 18px;
     max-width: 320px;
     min-width: 240px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
-    color: #f1f5f9;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+    color: var(--text-main, #ededf0);
 }
 
 .tour-tooltip-arrow {
@@ -47,33 +47,33 @@
 .tour-tooltip-arrow-top {
     /* tooltip is below the target: arrow points up, sits at top edge */
     top: -9px;
-    border-bottom: 9px solid var(--surface, rgba(12, 15, 25, 0.95));
+    border-bottom: 9px solid var(--surface-elevated, #17171a);
 }
 
 .tour-tooltip-arrow-bottom {
     /* tooltip is above the target: arrow points down, sits at bottom edge */
     bottom: -9px;
-    border-top: 9px solid var(--surface, rgba(12, 15, 25, 0.95));
+    border-top: 9px solid var(--surface-elevated, #17171a);
 }
 
 .tour-tooltip-title {
-    font-size: 1.05rem;
-    font-weight: 700;
+    font-size: 1rem;
+    font-weight: 600;
     margin: 0 0 8px 0;
-    color: #fff;
+    color: var(--text-main, #ededf0);
 }
 
 .tour-tooltip-text {
     font-size: 0.88rem;
     line-height: 1.5;
-    color: var(--text-muted, #94a3b8);
+    color: var(--text-muted, #8b8b93);
     margin: 0 0 14px 0;
 }
 
 .tour-tooltip-progress {
     font-size: 0.72rem;
     font-weight: 600;
-    color: var(--text-muted, #94a3b8);
+    color: var(--text-muted, #8b8b93);
     margin-bottom: 10px;
     letter-spacing: 0.03em;
     text-transform: uppercase;
@@ -88,10 +88,10 @@
 
 .tour-btn {
     border: none;
-    border-radius: 8px;
+    border-radius: 6px;
     padding: 7px 14px;
     font-size: 0.82rem;
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
     font-family: inherit;
     transition: opacity 0.15s ease;
@@ -107,13 +107,13 @@
 }
 
 .tour-btn-primary {
-    background: var(--primary, #ff2d75);
-    color: #fff;
+    background: var(--primary, #5e8bff);
+    color: #0a0a0b;
 }
 
 .tour-btn-secondary {
     background: rgba(255, 255, 255, 0.08);
-    color: #f1f5f9;
+    color: var(--text-main, #ededf0);
 }
 
 .tour-btn-skip {
@@ -122,7 +122,7 @@
     right: 12px;
     background: transparent;
     border: none;
-    color: var(--text-muted, #94a3b8);
+    color: var(--text-muted, #8b8b93);
     font-size: 0.72rem;
     font-weight: 600;
     cursor: pointer;
@@ -130,67 +130,9 @@
 }
 
 .tour-btn-skip:hover {
-    color: #f1f5f9;
+    color: var(--text-main, #ededf0);
 }
 
 #guideNavBtn {
     /* Matches existing .profile-btn sibling styling context; no override needed beyond icon spacing */
-}
-
-.tour-tooltip--officina {
-    background: linear-gradient(180deg, #2a1e13, #1d140c);
-    border: 1px solid rgba(198,154,76,0.34);
-    color: #f1e6cd;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-}
-
-.tour-tooltip--officina .tour-tooltip-title {
-    color: #f6e9cc;
-    font-weight: 800;
-}
-
-.tour-tooltip--officina .tour-tooltip-text {
-    color: #cdb992;
-}
-
-.tour-tooltip-maestro-line {
-    margin: 0 0 12px;
-    font-family: 'Cormorant Garamond', serif;
-    font-style: italic;
-    font-size: 0.94rem;
-    color: #f2c14e;
-}
-
-.tour-maestro {
-    position: fixed;
-    z-index: 10002;
-    width: 96px;
-    height: 138px;
-    pointer-events: none;
-    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.6));
-    animation: tour-maestro-float 4s ease-in-out infinite;
-}
-
-.tour-maestro__sprite {
-    position: relative;
-    z-index: 1;
-}
-
-.tour-maestro__shadow {
-    position: absolute;
-    left: 50%;
-    bottom: -6px;
-    transform: translateX(-50%);
-    width: 70%;
-    height: 8px;
-    border-radius: 50%;
-    background: radial-gradient(ellipse, rgba(0,0,0,0.45), transparent 70%);
-}
-
-.tour-maestro--pointing { transform-origin: bottom center; }
-.tour-maestro--thoughtful { filter: drop-shadow(0 6px 12px rgba(0,0,0,0.72)); }
-
-@keyframes tour-maestro-float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
 }

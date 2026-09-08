@@ -39,7 +39,7 @@ def api_ai_test():
 @ai_bp.route("/api/ai_query", methods=["POST"])
 def api_ai_query():
     """
-    Il Maestro AI — Player Q&A Engine
+    Analista AI — Player Q&A Engine
     Priorità: Ollama locale -> OpenAI-compatible -> Google Gemini -> Local Quantitative Reasoner.
     """
     data = request.json or {}

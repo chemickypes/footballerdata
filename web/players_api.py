@@ -105,15 +105,15 @@ def api_players():
         if days_lost < 15 and not severe_inj:
             med_status = "safe"
             med_label = "Affidabile"
-            med_badge = '<i class="fa-solid fa-circle-check" style="color:#10b981;"></i>'
+            med_badge = '<i class="fa-solid fa-circle-check" style="color:#3fb975;"></i>'
         elif days_lost <= 60 and not severe_inj:
             med_status = "warning"
             med_label = "Da Monitorare"
-            med_badge = '<i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;"></i>'
+            med_badge = '<i class="fa-solid fa-triangle-exclamation" style="color:#c29343;"></i>'
         else:
             med_status = "danger"
             med_label = "Fragile / Alto Rischio"
-            med_badge = '<i class="fa-solid fa-circle-exclamation" style="color:#ef4444;"></i>'
+            med_badge = '<i class="fa-solid fa-circle-exclamation" style="color:#e5534b;"></i>'
 
         # Understat Offensive Metrics
         xg_p90 = round(float(row.get("xg_per90", 0)), 3) if pd.notna(row.get("xg_per90")) else 0.0
@@ -217,7 +217,7 @@ def api_players():
                 "ceiling_p90": p90,
                 "spread": spread,
                 "profile_label": "Regolarista / Basso Rischio" if spread < VOLATILITY_PROFILE_THRESHOLD else "Boom-or-Bust / Alta Volatilità",
-                "profile_badge": '<i class="fa-solid fa-shield" style="margin-right:4px;"></i> Regolarista' if spread < VOLATILITY_PROFILE_THRESHOLD else '<i class="fa-solid fa-bolt icon-pulse" style="margin-right:4px;"></i> Boom-or-Bust'
+                "profile_badge": '<i class="fa-solid fa-shield" style="margin-right:4px;"></i> Regolarista' if spread < VOLATILITY_PROFILE_THRESHOLD else '<i class="fa-solid fa-bolt" style="margin-right:4px;"></i> Boom-or-Bust'
             }
         })
 

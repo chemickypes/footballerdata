@@ -60,13 +60,13 @@ IS_PERSONAL = (APP_ENV == "personal")
 # ──────────────────────────────────────────────────────────────────────
 # BOT IDENTITY & PERSONA
 # ──────────────────────────────────────────────────────────────────────
-BOT_NAME = "Il Maestro"
-BOT_SUBTITLE = "Assistente Tattico Quantitativo"
+BOT_NAME = "Analista"
+BOT_SUBTITLE = "Assistente Analitico Quantitativo"
 BOT_AVATAR_TEXT = "AI"
-BOT_BADGE = "PRO DECISION"
+BOT_BADGE = "DATA"
 BOT_GREETING = (
-    "Ciao! Sono l'assistente quantitativo de **La FantaOfficina**. Chiedimi confronti (es. *Malen vs Lautaro*), "
-    "analisi di reparto o raccomandazioni basate su VORP e proiezioni ML."
+    "Ciao! Sono l'assistente analitico. Chiedimi confronti tra giocatori (es. *Thuram vs Woltemade*), "
+    "proiezioni o statistiche."
 )
 BOT_AVATAR_IMAGE = ""
 

@@ -90,11 +90,11 @@ Standard Flask layout: split backend (Step 4a) + extracted frontend (Step 3):
 - `web/ai_api.py` (~295 lines) — Blueprint `/api/ai_{status,test,query}`: LLM copilot integration + local rule-based reasoner
 - `web/__init__.py` — puts repo root on `sys.path` so `web.*` and `core.*` imports work in script/package/Vercel modes
 - `web/templates/index.html` (~450 lines) — Jinja template; vars: `bot_name`, `bot_subtitle`, `bot_avatar_text`, `bot_avatar_image`, `bot_badge`, `bot_greeting`, `is_personal`
-- `web/static/css/main.css` (~970 lines) — "Officina Vittoriana" dark theme, purged of dead selectors
-- `web/static/js/app.js` (~880 lines) — listone render + filters/sort, Player Detail Drawer, AI chat, boot splash/maestro mascot
+- `web/static/css/main.css` (~862 lines) — "dark professional" theme (Linear/Vercel-style: neutral near-black surfaces, single #5e8bff accent, flat borders; replaced the old pink/brass theme in the UI restyle)
+- `web/static/js/app.js` (~870 lines) — listone render + filters/sort, Player Detail Drawer, AI chat, minimal boot splash (mascot removed in the UI restyle)
 - `web/static/js/tutorial.js` — 3-step guided tour
 
-2 tabs: `listone` (player list — the stats core, default active) and `ai` (copilot chat "Il Maestro").
+2 tabs: `listone` (player list — the stats core, default active) and `ai` (copilot chat "Analista", sober branding).
 
 ### Route map (after Step 1 backend strip)
 
