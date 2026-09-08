@@ -3464,6 +3464,28 @@ HTML_TEMPLATE = """
             letter-spacing: 0.08em;
             color: var(--officina-muted);
         }
+        .bentornato-gate__actions {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+            margin-top: 6px;
+        }
+        .bentornato-gate__continue {
+            padding: 12px 28px;
+        }
+        .bentornato-gate__not-you {
+            background: none;
+            border: none;
+            color: var(--officina-muted);
+            font-size: 0.82rem;
+            text-decoration: underline;
+            cursor: pointer;
+            padding: 4px 0;
+        }
+        .bentornato-gate__not-you:hover {
+            color: var(--officina-gold);
+        }
         .maestro-intro__card {
             display: grid;
             grid-template-columns: 140px 1fr;
@@ -3513,6 +3535,21 @@ HTML_TEMPLATE = """
             <h1 class="splash-gate__title">Seleziona la tua Squadra</h1>
             <p class="splash-gate__copy">Scegli il tuo profilo locale per entrare nell'officina d'asta. Nessun account: il profilo resta salvato solo su questo browser.</p>
             <div id="splashTeamGrid" class="splash-team-grid"></div>
+        </div>
+    </div>
+
+    <div id="bentornatoGate" class="splash-gate" style="display:none;">
+        <div class="splash-gate__backdrop"></div>
+        <div class="splash-gate__panel">
+            <div class="splash-gate__eyebrow"><i class="fa-solid fa-compass-drafting"></i> Officina Vittoriana</div>
+            <h1 class="splash-gate__title" id="bentornatoTitle">Ciao! Bentornato.</h1>
+            <p class="splash-gate__copy">Il tuo profilo locale è già configurato su questo browser. Prosegui per entrare nell'officina d'asta.</p>
+            <div class="bentornato-gate__actions">
+                <button class="btn btn-primary bentornato-gate__continue" onclick="hideBentornatoGate()">
+                    <i class="fa-solid fa-door-open" style="margin-right:6px;"></i> Entra nell'officina
+                </button>
+                <button class="bentornato-gate__not-you" onclick="handleNotYouClick()">Non sei tu?</button>
+            </div>
         </div>
     </div>
 
@@ -4965,6 +5002,30 @@ HTML_TEMPLATE = """
             document.body.classList.remove('app-locked');
         }
 
+        function showBentornatoGate() {
+            const gate = document.getElementById('bentornatoGate');
+            if (!gate) return;
+            const teams = (auctionState && auctionState.teams) || [];
+            const team = teams.find(t => t.id === activeProfileId);
+            const teamName = team ? team.name : `Squadra ${activeProfileId}`;
+            const titleEl = document.getElementById('bentornatoTitle');
+            if (titleEl) titleEl.textContent = `Ciao! Bentornato, ${teamName}.`;
+            gate.style.display = 'flex';
+            document.body.classList.add('app-locked');
+        }
+
+        function hideBentornatoGate() {
+            const gate = document.getElementById('bentornatoGate');
+            if (!gate) return;
+            gate.style.display = 'none';
+            document.body.classList.remove('app-locked');
+        }
+
+        function handleNotYouClick() {
+            hideBentornatoGate();
+            showSplashIdentityGate();
+        }
+
         function maybeShowMaestroIntro(forceClose = false) {
             const overlay = document.getElementById('maestroIntroOverlay');
             if (!overlay) return;
@@ -5004,16 +5065,24 @@ HTML_TEMPLATE = """
         }
 
         function maybeStartIdentityGate() {
+            const loginModal = document.getElementById('sessionLoginModal');
+            const pinModalOpen = !!(loginModal && loginModal.style.display !== 'none');
+
+            if (pinModalOpen) {
+                // PIN gate (Asta Live access) takes precedence when already open;
+                // defer both the returning-user and first-access panels until it closes.
+                hideSplashIdentityGate();
+                hideBentornatoGate();
+                return;
+            }
+
             if (hasStoredProfile) {
                 hideSplashIdentityGate();
+                showBentornatoGate();
                 return;
             }
-            const loginModal = document.getElementById('sessionLoginModal');
-            if (loginModal && loginModal.style.display !== 'none') {
-                // PIN gate is currently showing; defer splash gate until it is dismissed.
-                hideSplashIdentityGate();
-                return;
-            }
+
+            hideBentornatoGate();
             showSplashIdentityGate();
         }
 
