@@ -26,8 +26,13 @@ core/
   models/                    # Docs only (no code)
 modules/
   common/data_provider.py    # Shared data layer for overlay (live feed) access
-web/app.py                   # Flask app (~7.9k lines): player-stats routes + entire
-                             # HTML/CSS/JS frontend as one inline HTML_TEMPLATE string
+web/
+  app.py                    # Flask backend (~720 lines): routes, dataset loading, VORP/fair-price math
+  templates/index.html      # Jinja template (~450 lines): page structure, bot persona vars
+  static/css/main.css       # Theme stylesheet (~970 lines, purged of dead selectors)
+  static/css/tutorial.css   # Guided-tour styles
+  static/js/app.js          # Frontend logic (~880 lines): listone render, drawer, AI chat, tour hooks
+  static/js/tutorial.js     # "FantaTour" guided tour (3 steps)
 data/                        # Generated artifacts (dataset_finale.csv etc.)
 dataset_finale.csv           # Root copy of the master dataset (533 players, 57 cols)
 run_pipeline.py              # CLI: --step N / --from N over ordered stages [1,3,4,5,6,8,9,10,7]
@@ -66,9 +71,15 @@ Column groups: identity (player, role, role_mantra, team) → auction prices (co
 - `score_composito` weights include fantavote/bonus-probability terms (`SCORE_WEIGHTS` in `core/config.py`)
 - Quotazioni xlsx filename hardcoded to season 2026_27; Serie-A-only team maps
 
-## Web App (web/app.py) — critical structure
+## Web App (web/) — structure
 
-**Monolith**: one Python file, ~3.8k lines (after the pivot strip). Flask routes (~1-700) + the entire frontend as `HTML_TEMPLATE = """..."""` (head/CSS ~710-2444, body ~2446-2875, inline JS ~2877-3779). No Jinja files on disk. Dark "Officina Vittoriana" steampunk theme; Italian UI throughout. ~1.7k lines of the inline CSS are dead selectors for removed fantasy UI (inert; cleanup in Step 3).
+Standard Flask layout (after the Step 3 extraction — no more monolithic template string):
+
+- `web/app.py` (~720 lines) — pure Python: config, `load_dataset()` (fascia tiering), `get_dynamic_fair_prices()` (VORP/fair-price quality scores), routes `/`, `/api/players`, `/api/ai_{status,test,query}`
+- `web/templates/index.html` (~450 lines) — Jinja template; vars: `bot_name`, `bot_subtitle`, `bot_avatar_text`, `bot_avatar_image`, `bot_badge`, `bot_greeting`, `is_personal`
+- `web/static/css/main.css` (~970 lines) — "Officina Vittoriana" dark theme, purged of dead selectors
+- `web/static/js/app.js` (~880 lines) — listone render + filters/sort, Player Detail Drawer, AI chat, boot splash/maestro mascot
+- `web/static/js/tutorial.js` — 3-step guided tour
 
 2 tabs: `listone` (player list — the stats core, default active) and `ai` (copilot chat "Il Maestro").
 
@@ -124,8 +135,8 @@ Optional `.env` keys: `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY` (copilot), `API_F
 ### Pivot progress
 - **Step 1 (DONE)**: backend strip of `web/app.py` — removed all league/auction/auth/live/lineup/audit/trades routes, Redis helpers, auction state, TACTICAL_PRESETS, market inflation; decoupled `/api/players` (no is_assigned/is_favorite/market_index; fixed pricing defaults: budget 1000, slots 3/8/8/6, 10 teams for VORP baselines); `/api/ai_query` reduced to player Q&A (squad_diagnostic branch removed); frontend keeps booting via a static `auctionState` stub (no polling, no identity/session gates). Deleted `modules/{lineup,valuation,trades,auction}`, `live_bridge/` and their tests; smoke test `tests/test_dual_track_and_features.py` pruned to kept surface (72 checks, incl. removed-endpoints-404 + node --check).
 - **Step 2 (DONE)**: frontend strip — removed tabs draft/targets/strategy/rosters/lineup/audit/trades, all their modals (target/pitch-picker/profile/custom-tactic/league-settings/inflation/admin/session), identity gates, admin/session JS, FantaLab sniffer JS, target/profile/preset systems, market-badge JS, draft helpers (search/assign/undo/recent); sidebar/bottom-nav reduced to Listone + AI; listone is the default active tab; `tutorial.js` pruned to 3 steps; AI quick-chips retargeted to player queries; branding → footballerdata. `web/app.py` now ~3.8k lines (from 9.1k). Known leftover: ~1.7k lines of inline CSS still contain dead selectors for removed UI (inert; cleanup happens in Step 3 when CSS moves to its own file).
-- **Step 3 (NEXT)**: extract frontend from the Python string into `web/static/` + template files (kills the monolith fragility); purge dead CSS while moving it.
-- **Step 4**: split remaining Python backend; pipeline retargeting (ML target away from fantasy points); new data sources (FBref etc.).
+- **Step 3 (DONE)**: frontend extraction — `HTML_TEMPLATE` string deleted; frontend now lives in `web/templates/index.html` (Jinja), `web/static/css/main.css` (1733 → 968 lines: 130 dead rules + 145 dead selectors + 8 dead keyframes purged), `web/static/js/app.js` (dead `showToast`/toast UI removed). `web/app.py` is pure Python (~720 lines, from 9116 pre-pivot) using `render_template()` + Flask built-in static serving. Smoke test updated to check external assets (78/78).
+- **Step 4 (NEXT)**: split remaining Python backend; pipeline retargeting (ML target away from fantasy points); new data sources (FBref etc.).
 
 ### EXPAND (the fork's actual goal — more player data)
 Candidate new sources/metrics to discuss before implementing:
@@ -135,7 +146,7 @@ Candidate new sources/metrics to discuss before implementing:
 - More leagues beyond Serie A (requires dropping Serie-A-only team maps)
 
 ### Watch out
-- `web/app.py` is one giant string template — a stray unescaped `'` inside the Python triple-quoted string silently breaks the whole JS block (has happened before, see `docs/HANDOFF_UI_GLOWUP.md`)
-- `/api/players` currently reads auction state, favorites, market inflation — decouple first
+- ~~`web/app.py` is one giant string template~~ — fixed in Step 3; frontend is now in real files (Jinja template + static css/js)
+- `/api/players` was decoupled from auction state in Step 1; pricing uses fixed defaults (budget 1000, slots 3/8/8/6, 10 teams)
 - `scripts/generate_value_maps.py` has a hardcoded dev-machine output path
 - Upstream merge history: production served the `ui-glowup` branch which is merged into main here (b7221ec)

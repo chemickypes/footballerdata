@@ -119,11 +119,13 @@ def main():
     r_html = requests.get(f"{BASE_URL}/")
     test("GET / → 200", r_html.status_code == 200)
     html = r_html.text
+    r_appjs = requests.get(f"{BASE_URL}/static/js/app.js", timeout=10)
+    app_js = r_appjs.text
     test("HTML contiene 'playerDetailDrawer'", "playerDetailDrawer" in html)
-    test("HTML contiene 'openPlayerDetailDrawer'", "openPlayerDetailDrawer" in html)
-    test("HTML contiene 'pdMedBadge' (Finestra Medica)", "pdMedBadge" in html)
-    test("HTML contiene 'pdXg90' (Understat)", "pdXg90" in html)
-    test("HTML contiene 'pdProfileBadge' (Quantiles)", "pdProfileBadge" in html)
+    test("app.js contiene 'openPlayerDetailDrawer'", "openPlayerDetailDrawer" in app_js)
+    test("app.js contiene 'pdMedBadge' (Finestra Medica)", "pdMedBadge" in app_js)
+    test("app.js contiene 'pdXg90' (Understat)", "pdXg90" in app_js)
+    test("app.js contiene 'pdProfileBadge' (Quantiles)", "pdProfileBadge" in app_js)
 
     # ── 9. Entity-First Retrieval (Thuram & Woltemade) ────────────────
     print("\n▸ 9. Entity-First Copilot Retrieval — Thuram & Woltemade")
@@ -140,25 +142,37 @@ def main():
     single_json = r_copilot_single.json()
     test("Single player Woltemade riconosciuto", "woltemade" in str(single_json).lower())
 
-    # ── 10. JavaScript Syntax Verification ────────────────────────────
-    print("\n▸ 10. Integrità JavaScript")
+    # ── 10. Static Assets & JavaScript Syntax ─────────────────────────
+    print("\n▸ 10. Static Assets & Integrità JavaScript")
     import re, subprocess, tempfile
-    scripts = re.findall(r'<script\b[^>]*>(.*?)</script>', html, re.DOTALL)
-    test("Tag script presenti in HTML", len(scripts) > 0, f"n={len(scripts)}")
-    for i, s in enumerate(scripts):
+    r_css = requests.get(f"{BASE_URL}/static/css/main.css", timeout=10)
+    test("GET /static/css/main.css → 200", r_css.status_code == 200)
+    test("main.css non vuota", len(r_css.text) > 1000, f"bytes={len(r_css.text)}")
+
+    scripts = []
+    for js_path in ["/static/js/app.js", "/static/js/tutorial.js"]:
+        r_js = requests.get(f"{BASE_URL}{js_path}", timeout=10)
+        test(f"GET {js_path} → 200", r_js.status_code == 200)
+        if r_js.status_code == 200:
+            scripts.append((js_path, r_js.text))
+
+    test("File JS esterni serviti", len(scripts) == 2, f"n={len(scripts)}")
+    for i, (js_path, content) in enumerate(scripts):
         with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False) as tf:
-            tf.write(s)
+            tf.write(content)
             tf_path = tf.name
         res = subprocess.run(['node', '--check', tf_path], capture_output=True, text=True)
         try:
             os.unlink(tf_path)
         except Exception:
             pass
-        test(f"Script #{i+1} validazione sintassi JavaScript (node --check)", res.returncode == 0, res.stderr.strip()[:80] if res.returncode != 0 else "Nessun errore di sintassi")
+        test(f"{js_path} validazione sintassi JavaScript (node --check)", res.returncode == 0, res.stderr.strip()[:80] if res.returncode != 0 else "Nessun errore di sintassi")
 
-    test("Nessun 'cachedPlayers' non definito in HTML", "cachedPlayers" not in html)
-    test("HTML contiene 'medical-badge'", "medical-badge" in html)
-    test("Listone include badge medico integro/infortunato", "Finestra Medica:" in html)
+    test("HTML non contiene script inline", "<script>\n" not in html and "<style>" not in html)
+    test("HTML linka main.css", '/static/css/main.css' in html)
+    test("HTML linka app.js", '/static/js/app.js' in html)
+    test("app.js contiene 'medical-badge'", "medical-badge" in app_js)
+    test("Listone include badge medico integro/infortunato", "Finestra Medica:" in app_js)
 
     # ── 11. Media Voto & Ordinamento ──────────────────────────────────
     print("\n▸ 11. Media Voto & Ordinamento Listone")

@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>footballerdata — Player Data & Statistics Explorer (Serie A)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/tutorial.css">
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+
+    <div id="appBootSplash">
+        <div class="boot-splash__logo">footballerdata</div>
+        <div class="boot-splash__spinner" aria-hidden="true"></div>
+        <div class="boot-splash__version">v.1.00</div>
+    </div>
+
+    <div id="maestroIntroOverlay" class="maestro-intro" style="display:none;">
+        <div class="maestro-intro__scrim"></div>
+        <div class="maestro-intro__card">
+            <div class="maestro-intro__art" id="maestroIntroSprite" aria-hidden="true"></div>
+            <div class="maestro-intro__content">
+                <div class="maestro-intro__kicker"><i class="fa-solid fa-feather"></i> Il Maestro</div>
+                <h2>Benvenuto nell'Officina</h2>
+                <p>Inventore, cartografo del calcio e tua guida analitica: ti mostrerò dove leggere prezzo equo, surplus, proiezioni e finestra medica di ogni calciatore.</p>
+                <button class="btn btn-primary maestro-intro__btn" onclick="maybeShowMaestroIntro(true)">
+                    <i class="fa-solid fa-door-open" style="margin-right:6px;"></i> Entra nella dashboard
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleMobileSidebar()"></div>
+
+    <div class="app-layout">
+
+        <!-- LATERAL SIDEBAR (TACTICAL ASSISTANT & NAVIGATION) -->
+        <aside class="app-sidebar" id="appSidebar">
+            <div class="sidebar-bot-card">
+                <div class="sidebar-avatar-wrap">
+                    {% if bot_avatar_image %}
+                    <img src="{{ bot_avatar_image }}" class="sidebar-avatar" style="width:64px; height:64px; border-radius:50%; object-fit:cover; display:block; margin:0 auto; border:2.5px solid var(--primary); box-shadow:0 0 20px rgba(255,45,117,0.65);" alt="{{ bot_name }}">
+                    {% else %}
+                    <div class="sidebar-avatar" style="width:54px; height:54px; border-radius:50%; background:linear-gradient(135deg, #ff2d75, #a855f7); display:flex; align-items:center; justify-content:center; margin:0 auto; border:2px solid var(--primary); box-shadow: 0 0 16px rgba(255,45,117,0.5); font-family:'Outfit',sans-serif; font-size:1.25rem; font-weight:800; color:#ffffff;">
+                        {{ bot_avatar_text }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="sidebar-bot-name">{{ bot_name }}</div>
+                    <div class="sidebar-bot-sub" style="color:var(--primary); font-style:italic; font-weight:600;">"{{ bot_subtitle }}"</div>
+                </div>
+            </div>
+
+            <div class="sidebar-nav">
+                <button class="sidebar-nav-btn active" id="sideNav-listone" onclick="switchTab('listone')">
+                    <i class="fa-solid fa-table-list" style="color:#10b981; width:20px; font-size:1.1rem;"></i>
+                    <span>Listone Analytics</span>
+                </button>
+                <button class="sidebar-nav-btn" id="sideNav-ai" onclick="switchTab('ai')">
+                    <i class="fa-solid fa-robot icon-float" style="color:#a855f7; width:20px; font-size:1.1rem;"></i>
+                    <span>Chiedi a {{ bot_name }}</span>
+                </button>
+            </div>
+
+            <div style="margin-top:auto; padding:12px 10px; text-align:center;">
+                <a href="https://buymeacoffee.com/blueskies360" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; background:#fbbf24; color:#090d16; font-size:0.75rem; font-weight:800; padding:6px 14px; border-radius:20px; text-decoration:none; box-shadow:0 2px 8px rgba(251,191,36,0.3); width:100%;">
+                    <i class="fa-solid fa-mug-hot"></i>
+                    <span>Offri un Caffè</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT WRAPPER -->
+        <div class="main-wrapper">
+
+            <header>
+                <div class="brand">
+                    <button class="profile-btn mobile-sidebar-toggle" onclick="toggleMobileSidebar()" style="padding:6px 10px; margin-right:2px;" aria-label="Menu">
+                        <i class="fa-solid fa-bars" style="font-size:1.15rem; color:var(--text-main);"></i>
+                    </button>
+                    <div class="header-bot-pill" onclick="toggleMobileSidebar()" title="Menu Tattico">
+                        {% if bot_avatar_image %}
+                        <img src="{{ bot_avatar_image }}" style="width:28px; height:28px; border-radius:50%; object-fit:cover; border:1.5px solid var(--primary); margin-right:6px; box-shadow:0 0 10px rgba(255,45,117,0.55);" alt="{{ bot_name }}">
+                        {% else %}
+                        <div class="header-avatar-img" style="width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg, #ff2d75, #a855f7); display:flex; align-items:center; justify-content:center; border:1px solid var(--primary); margin-right:4px; font-family:'Outfit',sans-serif; font-size:0.75rem; font-weight:800; color:#fff;">
+                            {{ bot_avatar_text }}
+                        </div>
+                        {% endif %}
+                        <span class="header-bot-pill-name">{{ bot_name }}</span>
+                        <span class="header-bot-pill-badge">{{ bot_badge }}</span>
+                    </div>
+
+                    <div class="desktop-brand-title" style="display:none; align-items:center; gap:8px;">
+                        <span style="font-family:'Outfit',sans-serif; font-weight:800; font-size:1.15rem; color:var(--text-main); letter-spacing:-0.3px;"><i class="fa-solid fa-bolt icon-pulse" style="color:var(--primary); margin-right:4px;"></i>{{ bot_name }}</span>
+                        <span class="brand-tag" style="font-size:0.7rem; padding:2px 7px; background:rgba(255,45,117,0.15); border:1px solid rgba(255,45,117,0.35); color:var(--primary); font-weight:800; border-radius:4px;">{{ bot_badge }}</span>
+                    </div>
+                </div>
+
+                <div class="header-actions">
+                    <button id="guideNavBtn" class="profile-btn hide-mobile" onclick="FantaTour.start()" title="Avvia il tour guidato">
+                        <i class="fa-solid fa-circle-question"></i>
+                        <span>Guida</span>
+                    </button>
+                </div>
+            </header>
+
+            <div class="container">
+
+        <div id="tab-ai" class="tab-content">
+            <div class="card" style="border-top:3px solid var(--primary); padding:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        {% if bot_avatar_image %}
+                        <img src="{{ bot_avatar_image }}" style="width:42px; height:42px; border-radius:50%; object-fit:cover; border:2px solid var(--primary); box-shadow:0 0 14px rgba(255,45,117,0.55);" alt="{{ bot_name }}">
+                        {% else %}
+                        <div style="width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg, #ff2d75, #a855f7); display:flex; align-items:center; justify-content:center; border:2px solid var(--primary); box-shadow:0 0 12px rgba(255,45,117,0.45); font-family:'Outfit',sans-serif; font-size:1rem; font-weight:800; color:#fff;">
+                            {{ bot_avatar_text }}
+                        </div>
+                        {% endif %}
+                        <div>
+                            <div style="font-weight:800; font-size:1.15rem; color:var(--text-main); font-family:'Outfit',sans-serif;">{{ bot_name }} Chatbot</div>
+                            <div style="font-size:0.75rem; color:var(--primary); font-weight:600; font-style:italic;">"{{ bot_subtitle }}"</div>
+                        </div>
+                    </div>
+                    <button class="btn-secondary" onclick="clearAIChat()" style="width:auto; padding:6px 12px; font-size:0.78rem; font-weight:700;">
+                        Pulisci Chat
+                    </button>
+                </div>
+
+                <!-- AI Engine Diagnostic Bar -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; background:rgba(15,23,42,0.65); padding:6px 10px; border-radius:8px; border:1px solid var(--border);">
+                    <div style="display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden;">
+                        <span id="aiEngineStatusDot" class="status-dot dot-yellow" style="flex-shrink:0;"></span>
+                        <span style="font-size:0.75rem; color:var(--text-muted); flex-shrink:0;">Motore:</span>
+                        <span id="aiActiveEngineLabel" style="font-size:0.78rem; font-weight:800; color:var(--primary); white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">Verifica in corso...</span>
+                    </div>
+                    <button class="btn-secondary" onclick="openAIDiagnosticsModal()" style="width:auto; padding:3px 8px; font-size:0.70rem; font-weight:700; flex-shrink:0; margin-left:6px;">
+                        <i class="fa-solid fa-stethoscope" style="margin-right:4px;"></i> Diagnostica
+                    </button>
+                </div>
+
+                <!-- Chat Quick Chips -->
+                <div class="pills" style="margin-bottom:10px;">
+                    <div class="ai-pill" onclick="setAIQuery('Malen vs Lautaro Martinez')">Malen vs Lautaro</div>
+                    <div class="ai-pill" onclick="setAIQuery('Migliori centrocampisti sotto 35 crediti')">Centrocampisti < 35cr</div>
+                    <div class="ai-pill" onclick="setAIQuery('Top difensori per modificatore')">Top Difensori</div>
+                    <div class="ai-pill" onclick="setAIQuery('Scommesse attaccanti a 1 credito')">Scommesse a 1cr</div>
+                    <div class="ai-pill" onclick="setAIQuery('Scheda Dimarco')">Analizza Dimarco</div>
+                </div>
+
+                <!-- Conversational Message Stream -->
+                <div id="chatMessagesStream" class="chat-container">
+                    <div class="chat-msg ai">
+                        {% if bot_avatar_image %}
+                        <img src="{{ bot_avatar_image }}" style="width:36px; height:36px; border-radius:50%; object-fit:cover; flex-shrink:0; border:1.5px solid var(--primary); box-shadow:0 0 10px rgba(255,45,117,0.55);" alt="{{ bot_name }}">
+                        {% else %}
+                        <div class="chat-msg-avatar" style="width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg, #ff2d75, #a855f7); display:flex; align-items:center; justify-content:center; flex-shrink:0; border:1.5px solid var(--primary); font-family:'Outfit',sans-serif; font-size:0.85rem; font-weight:800; color:#fff;">
+                            {{ bot_avatar_text }}
+                        </div>
+                        {% endif %}
+                        <div class="chat-bubble">
+                            <b>{{ bot_greeting }}</b>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Row -->
+                <div class="chat-input-row">
+                    <input type="text" id="aiInputPrompt" placeholder="Fai una domanda (es. 'Chi prendo tra Lookman e Thuram?')..." style="margin-bottom:0; flex:1;" onkeypress="if(event.key==='Enter') submitAIQuery()">
+                    <button class="btn btn-primary" id="btnSubmitAI" style="width:auto; min-height:46px; padding:0 18px; font-weight:700;" onclick="submitAIQuery()">
+                        Invia
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 6: LISTONE COMPLETO & ANALYTICS -->
+        <div id="tab-listone" class="tab-content active">
+            <div class="pills" id="rolePills">
+                <div class="pill active" onclick="setRoleFilter('ALL')">Tutti</div>
+                <div class="pill" onclick="setRoleFilter('P')">Portieri <span id="pillRoleCount_P">(4)</span></div>
+                <div class="pill" onclick="setRoleFilter('D')">Difensori <span id="pillRoleCount_D">(9)</span></div>
+                <div class="pill" onclick="setRoleFilter('C')">Centrocampisti <span id="pillRoleCount_C">(9)</span></div>
+                <div class="pill" onclick="setRoleFilter('A')">Attaccanti <span id="pillRoleCount_A">(7)</span></div>
+            </div>
+
+            <div class="pills" id="fasciaPills">
+                <div class="pill active" onclick="setFasciaFilter('ALL')">Tutte le Fasce</div>
+                <div class="pill" onclick="setFasciaFilter('1')">1ª Fascia Top</div>
+                <div class="pill" onclick="setFasciaFilter('2')">2ª Fascia Semi-Top</div>
+                <div class="pill" onclick="setFasciaFilter('3')">3ª Fascia Titolari</div>
+                <div class="pill" onclick="setFasciaFilter('4')">4ª Fascia Scommesse</div>
+            </div>
+
+            <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
+                <input type="text" id="listSearch" placeholder="Cerca calciatore o squadra..." oninput="renderListone()" style="margin-bottom:0; flex:1; min-width:160px;">
+                <select id="listSortBy" onchange="renderListone()" style="width:auto; margin-bottom:0; padding:8px 12px; font-size:0.82rem; font-weight:700; background:#0f172a; color:var(--text-main); border:1px solid var(--border); border-radius:6px; cursor:pointer;" title="Ordina calciatori">
+                    <option value="best" selected>Migliori (Score & VORP)</option>
+                    <option value="mv_desc">Media Voto (Più alta)</option>
+                    <option value="mfv_desc">FantaMedia (Più alta)</option>
+                    <option value="fair_desc">Prezzo Fair (Più alti)</option>
+                    <option value="fair_asc">Prezzo Fair (Più bassi / 1 cr)</option>
+                    <option value="pts_desc">Punti Attesi P50</option>
+                    <option value="vorp_desc">VORP (+ Valore)</option>
+                    <option value="alpha">Alfabetico (A-Z)</option>
+                </select>
+            </div>
+
+            <div id="listoneContainer"></div>
+        </div>
+
+    </div> <!-- end .container -->
+    </div> <!-- end .main-wrapper -->
+    </div> <!-- end .app-layout -->
+
+    <!-- PLAYER DETAIL DRAWER (Finestra Medica & Metriche Avanzate) -->
+    <div id="playerDetailDrawer" class="modal-backdrop" style="display:none; z-index:9999;">
+        <div id="playerDetailPanel" style="
+            position:fixed; top:0; right:-480px; width:min(480px, 96vw); height:100vh;
+            background:var(--bg); border-left:2px solid var(--primary);
+            overflow-y:auto; padding:20px 18px 32px; transition:right 0.35s cubic-bezier(.4,0,.2,1);
+            box-shadow:-8px 0 32px rgba(0,0,0,0.6); z-index:10000;
+        ">
+            <!-- Header -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <div>
+                    <div id="pdName" style="font-size:1.25rem; font-weight:900; color:var(--text);"></div>
+                    <div style="display:flex; gap:6px; align-items:center; margin-top:3px;">
+                        <span id="pdRole" class="role-badge" style="font-size:0.72rem; padding:2px 8px;"></span>
+                        <span id="pdTeam" style="font-size:0.82rem; color:var(--text-muted); font-weight:600;"></span>
+                    </div>
+                </div>
+                <button onclick="closePlayerDetailDrawer()" style="background:transparent; border:none; color:var(--text-muted); font-size:1.4rem; cursor:pointer; padding:4px 8px;">✕</button>
+            </div>
+
+            <!-- Price & Value Summary Bar -->
+            <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; margin-bottom:16px;">
+                <div style="background:#0b111e; border:1px solid var(--border); border-radius:8px; padding:8px 6px; text-align:center;">
+                    <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Fair Value</div>
+                    <div id="pdFairPrice" style="font-size:1.1rem; font-weight:900; color:var(--gold);"></div>
+                </div>
+                <div style="background:#0b111e; border:1px solid var(--border); border-radius:8px; padding:8px 6px; text-align:center;">
+                    <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">VORP</div>
+                    <div id="pdVorp" style="font-size:1.1rem; font-weight:900; color:var(--primary);"></div>
+                </div>
+                <div style="background:#0b111e; border:1px solid var(--border); border-radius:8px; padding:8px 6px; text-align:center;">
+                    <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Score</div>
+                    <div id="pdScore" style="font-size:1.1rem; font-weight:900; color:var(--accent);"></div>
+                </div>
+                <div style="background:#0b111e; border:1px solid var(--border); border-radius:8px; padding:8px 6px; text-align:center;">
+                    <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Fascia</div>
+                    <div id="pdFascia" style="font-size:1.1rem; font-weight:900; color:var(--primary);"></div>
+                </div>
+            </div>
+
+            <!-- SECTION: Econometria Aste (Target & Clearing Pricing) -->
+            <div style="background:#0b111e; border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <b style="font-size:0.86rem; color:var(--primary);"><i class="fa-solid fa-scale-balanced" style="color:var(--gold); margin-right:6px;"></i>Prezzo Target & Clearing (Modello Econometrico)</b>
+                    <span id="pdClearingSourceBadge" style="font-size:0.70rem; font-weight:700; padding:2px 8px; border-radius:10px; background:rgba(99,102,241,0.15); color:var(--primary);"></span>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; text-align:center; margin-bottom:8px;">
+                    <div style="background:rgba(255,255,255,0.02); padding:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                        <div style="font-size:0.60rem; color:var(--text-muted); font-weight:700;">TARGET ECONOMETRICO</div>
+                        <div id="pdTargetPrice" style="font-size:1.1rem; font-weight:900; color:var(--gold);"></div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.02); padding:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                        <div style="font-size:0.60rem; color:var(--text-muted); font-weight:700;">CLEARING STORICO</div>
+                        <div id="pdClearingPrice" style="font-size:1.1rem; font-weight:900; color:var(--text);"></div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.02); padding:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                        <div style="font-size:0.60rem; color:var(--text-muted); font-weight:700;">SURPLUS / SCONTO</div>
+                        <div id="pdSurplusVal" style="font-size:1.1rem; font-weight:900;"></div>
+                    </div>
+                </div>
+                <div id="pdTargetFlags" style="font-size:0.72rem; color:var(--text-muted); font-family:monospace; word-break:break-all;"></div>
+            </div>
+
+            <!-- SECTION: Finestra Medica -->
+            <div style="background:#0b111e; border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <b style="font-size:0.88rem; color:var(--primary);"><i class="fa-solid fa-heart-pulse icon-pulse" style="color:var(--danger); margin-right:6px;"></i>Finestra Medica</b>
+                    <span id="pdMedBadge" style="font-size:0.78rem; font-weight:800; padding:3px 10px; border-radius:12px;"></span>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:10px;">
+                    <div style="text-align:center;">
+                        <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700;">GIORNI PERSI (3Y)</div>
+                        <div id="pdDaysLost" style="font-size:1.3rem; font-weight:900; color:var(--text);"></div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700;">N° INFORTUNI</div>
+                        <div id="pdInjCount" style="font-size:1.3rem; font-weight:900; color:var(--text);"></div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700;">INF. GRAVE</div>
+                        <div id="pdSevere" style="font-size:1.3rem; font-weight:900;"></div>
+                    </div>
+                </div>
+                <div id="pdInjuryList" style="max-height:120px; overflow-y:auto; font-size:0.76rem; color:var(--text-muted); line-height:1.6;"></div>
+            </div>
+
+            <!-- SECTION: Understat Offensive Metrics -->
+            <div style="background:#0b111e; border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:14px;">
+                <b style="font-size:0.88rem; color:var(--primary); display:block; margin-bottom:10px;"><i class="fa-solid fa-futbol" style="color:var(--gold); margin-right:6px;"></i>Volumi Offensivi (Understat)</b>
+                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:8px;">
+                    <div style="text-align:center;">
+                        <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700;">xG / 90'</div>
+                        <div id="pdXg90" style="font-size:1.15rem; font-weight:900; color:var(--gold);"></div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700;">npxG / 90'</div>
+                        <div id="pdNpxg90" style="font-size:1.15rem; font-weight:900; color:var(--gold);"></div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700;">xA / 90'</div>
+                        <div id="pdXa90" style="font-size:1.15rem; font-weight:900; color:var(--accent);"></div>
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:8px;">
+                    <div style="text-align:center;">
+                        <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700;">TIRI / 90'</div>
+                        <div id="pdShots90" style="font-size:1.15rem; font-weight:900; color:var(--text);"></div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700;">Δ GOL vs xG</div>
+                        <div id="pdDeltaXg" style="font-size:1.15rem; font-weight:900;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION: Quantile Volatility Profile -->
+            <div style="background:#0b111e; border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <b style="font-size:0.88rem; color:var(--primary);"><i class="fa-solid fa-chart-column" style="color:var(--primary); margin-right:6px;"></i>Profilo Quantilico</b>
+                    <span id="pdProfileBadge" style="font-size:0.75rem; font-weight:800; padding:3px 10px; border-radius:12px;"></span>
+                </div>
+                <!-- Visual Bar P10 → P50 → P90 -->
+                <div style="position:relative; background:var(--bg-card); border-radius:8px; height:32px; margin-bottom:10px; overflow:hidden;">
+                    <div id="pdQuantileBar" style="position:absolute; top:0; height:100%; border-radius:8px; transition:all 0.5s;"></div>
+                    <div id="pdQuantileP50Mark" style="position:absolute; top:0; height:100%; width:3px; background:var(--gold); border-radius:2px; z-index:2;"></div>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px;">
+                    <div style="text-align:center;">
+                        <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700;">FLOOR P10</div>
+                        <div id="pdP10" style="font-size:1.1rem; font-weight:900; color:#ef4444;"></div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700;">MEDIANA P50</div>
+                        <div id="pdP50" style="font-size:1.1rem; font-weight:900; color:var(--gold);"></div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700;">CEILING P90</div>
+                        <div id="pdP90" style="font-size:1.1rem; font-weight:900; color:#22c55e;"></div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700;">SPREAD</div>
+                        <div id="pdSpread" style="font-size:1.1rem; font-weight:900; color:var(--primary);"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION: Starter Status / Minutes -->
+            <div style="background:#0b111e; border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:14px;">
+                <b style="font-size:0.88rem; color:var(--primary); display:block; margin-bottom:10px;"><i class="fa-solid fa-clipboard-user" style="color:var(--primary); margin-right:6px;"></i>Titolarità & Minuti 26/27</b>
+                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px;">
+                    <div style="text-align:center;">
+                        <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700;">TITOLARE</div>
+                        <div id="pdStarter" style="font-size:1.1rem; font-weight:900;"></div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700;">PRESENZE DA TITOLARE</div>
+                        <div id="pdStarts" style="font-size:1.1rem; font-weight:900; color:var(--text);"></div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700;">MINUTI</div>
+                        <div id="pdMinutes" style="font-size:1.1rem; font-weight:900; color:var(--text);"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="aiDiagnosticsModal" class="modal-backdrop">
+        <div class="modal-box" style="max-width:480px;">
+            <div class="modal-title">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span><i class="fa-solid fa-stethoscope" style="margin-right:6px;"></i>Diagnostica AI Copilot</span>
+                    <span id="modalAiBadge" class="brand-tag">STATUS</span>
+                </div>
+                <button style="background:transparent; border:none; color:var(--text-muted); font-size:1.2rem; cursor:pointer;" onclick="closeAIDiagnosticsModal()">✕</button>
+            </div>
+
+            <div style="margin-bottom:12px; font-size:0.80rem; color:var(--text-muted); line-height:1.4;">
+                Qui puoi verificare quale motore AI sta alimentando le risposte e configurare le API gratuite (Groq o Gemini) su Vercel a costo zero.
+            </div>
+
+            <div id="aiDiagStatusBox" style="background:#0b111e; border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
+                <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700; margin-bottom:6px;">MOTORE ATTIVO CORRENTE:</div>
+                <div id="diagActiveEngine" style="font-size:0.95rem; font-weight:800; color:var(--primary); margin-bottom:6px;">-</div>
+                <div id="diagActiveEngineDesc" style="font-size:0.74rem; color:var(--text-muted);">-</div>
+            </div>
+
+            <div style="font-size:0.78rem; font-weight:700; color:var(--text-main); margin-bottom:8px;">STATO PROVIDER DISPONIBILI:</div>
+            <div id="aiProvidersList" style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;"></div>
+
+            <div style="background:rgba(255,45,117,0.06); border:1px solid rgba(255,45,117,0.25); border-radius:8px; padding:10px; margin-bottom:14px;">
+                <div style="font-size:0.75rem; font-weight:800; color:var(--primary); margin-bottom:4px;"><i class="fa-regular fa-lightbulb" style="color:var(--gold); margin-right:4px;"></i>Come attivare Groq Free (0$) su Vercel:</div>
+                <div style="font-size:0.72rem; color:var(--text-muted); line-height:1.4;">
+                    1. Crea una chiave gratis su <a href="https://console.groq.com/keys" target="_blank" style="color:var(--primary); font-weight:700;">console.groq.com</a> (nessuna carta richiesta).<br>
+                    2. Nel tuo pannello Vercel &rarr; <i>Settings &rarr; Environment Variables</i>.<br>
+                    3. Aggiungi la variabile: <b>GROQ_API_KEY</b> = <code>gsk_...</code>.<br>
+                    4. Il bot passerà istantaneamente a <b>Llama 3.3 70B</b> gratis con risposte complete e veloci.
+                </div>
+            </div>
+
+            <div style="display:flex; gap:8px;">
+                <button class="btn btn-secondary" style="width:40%;" onclick="closeAIDiagnosticsModal()">Chiudi</button>
+                <button class="btn btn-primary" style="width:60%;" id="btnTestAI" onclick="testAIConnection()">Test Connessione Live</button>
+            </div>
+            <div id="testAIResult" style="margin-top:8px; font-size:0.75rem; text-align:center; display:none;"></div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" id="botNav-listone" onclick="switchTab('listone')">
+            <i class="fa-solid fa-table-list nav-item__icon"></i>
+            <span class="nav-item__label">Listone</span>
+        </button>
+        <button class="nav-item" id="botNav-ai" onclick="switchTab('ai')">
+            <i class="fa-solid fa-robot icon-float nav-item__icon"></i>
+            <span class="nav-item__label">{{ bot_name }}</span>
+        </button>
+    </nav>
+
+    <script src="/static/js/app.js"></script>
+    <button id="maestroAmbient" class="maestro-ambient" type="button" style="display:none;" onclick="FantaTour && FantaTour.start && FantaTour.start()">
+        <span class="maestro-ambient__halo"></span>
+        <span id="maestroAmbientSprite" class="maestro-ambient__sprite" aria-hidden="true"></span>
+        <span id="maestroAmbientBubble" class="maestro-ambient__bubble">Occhio al surplus, giovane.</span>
+    </button>
+    <script src="/static/js/tutorial.js"></script>
+</body>
+</html>
