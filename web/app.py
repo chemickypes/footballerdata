@@ -2038,35 +2038,42 @@ HTML_TEMPLATE = """
         }
 
         .sidebar-nav {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
         }
 
         .sidebar-nav-btn {
             display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 14px;
-            border-radius: 8px;
-            border: none;
-            background: transparent;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px;
+            aspect-ratio: 1 / 1;
+            min-height: 74px;
+            border-radius: 12px;
+            border: 1px solid rgba(198,154,76,0.16);
+            background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.10));
             color: var(--text-muted);
-            font-size: 0.95rem;
-            font-weight: 600;
+            font-size: 0.82rem;
+            font-weight: 700;
             cursor: pointer;
             text-align: left;
-            transition: all 0.15s ease;
+            transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+        }
+        .sidebar-nav-btn i {
+            font-size: 1.4rem !important;
         }
         .sidebar-nav-btn:hover {
-            background: var(--surface-elevated);
+            transform: translateY(-2px);
+            border-color: rgba(198,154,76,0.4);
             color: var(--text-main);
         }
         .sidebar-nav-btn.active {
-            background: rgba(56, 189, 248, 0.15);
-            color: var(--primary);
-            font-weight: 700;
-            border: 1px solid rgba(56, 189, 248, 0.4);
+            border-color: var(--officina-gold);
+            box-shadow: inset 0 0 0 1px rgba(242,193,78,0.25), 0 0 20px rgba(242,193,78,0.16);
+            color: var(--officina-gold);
         }
 
         .sidebar-profile-card {
@@ -2241,28 +2248,30 @@ HTML_TEMPLATE = """
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            gap: 4px;
+            gap: 5px;
+            margin: 6px 3px;
             border: none;
             background: transparent;
             color: var(--officina-muted);
             text-decoration: none;
-            font-size: 0.66rem;
+            font-size: 0.62rem;
             font-weight: 700;
             cursor: pointer;
             position: relative;
-            transition: color 0.18s ease, transform 0.18s ease;
+            border-radius: 10px;
+            transition: color 0.18s ease, transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
         }
         .nav-item::before {
             content: '';
             position: absolute;
-            inset: 6px 4px 8px;
-            border-radius: 12px;
-            border: 1px solid transparent;
+            inset: 2px;
+            border-radius: 10px;
+            border: 1px solid rgba(198,154,76,0.14);
             background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.08));
             pointer-events: none;
         }
         .nav-item__icon {
-            font-size: 1.08rem;
+            font-size: 1.3rem;
             line-height: 1;
         }
         .nav-item__label {
@@ -2273,11 +2282,11 @@ HTML_TEMPLATE = """
         }
         .nav-item.active {
             color: var(--officina-gold);
-            transform: translateY(-1px);
+            transform: translateY(-2px) scale(1.04);
         }
         .nav-item.active::before {
-            border-color: rgba(198,154,76,0.5);
-            box-shadow: inset 0 0 0 1px rgba(242,193,78,0.2), 0 0 18px rgba(242,193,78,0.18);
+            border-color: rgba(198,154,76,0.55);
+            box-shadow: inset 0 0 0 1px rgba(242,193,78,0.25), 0 0 18px rgba(242,193,78,0.2);
         }
         .nav-item.active .nav-item__icon {
             filter: drop-shadow(0 0 8px rgba(242,193,78,0.4));
