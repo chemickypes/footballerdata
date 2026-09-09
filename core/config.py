@@ -14,6 +14,20 @@ DATA_DIR    = os.path.join(PROJECT_DIR, "data")
 EXAMPLES_DIR = os.path.join(PROJECT_DIR, "examples")
 os.makedirs(DATA_DIR, exist_ok=True)
 
+# Carica il .env locale (se presente) con semantica setdefault: non sovrascrive
+# le variabili d'ambiente gia' definite (CI, Vercel, shell).
+_ENV_PATH = os.path.join(PROJECT_DIR, ".env")
+if os.path.exists(_ENV_PATH):
+    try:
+        with open(_ENV_PATH, "r", encoding="utf-8") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
+    except Exception:
+        pass
+
 # File quotazioni ufficiali — aggiornare ad ogni nuova release
 QUOTAZIONI_FILENAME = "Quotazioni_Fantacalcio_Stagione_2026_27_latest.xlsx"
 QUOTAZIONI_PATH     = os.path.join(DATA_DIR, QUOTAZIONI_FILENAME)
@@ -24,6 +38,11 @@ INJURIES_CACHE_JSON  = os.path.join(DATA_DIR, "tm_injuries_cache.json")
 INJURIES_CSV         = os.path.join(DATA_DIR, "storico_infortuni.csv")
 FORMAZIONI_CSV       = os.path.join(DATA_DIR, "formazioni_2627.csv")
 OUTPUT_EXCEL         = os.path.join(DATA_DIR, "analisi_fantacalcio_completa.xlsx")
+MATCH_RESULTS_CSV    = os.path.join(DATA_DIR, "match_results.csv")
+TEAM_FORM_JSON       = os.path.join(DATA_DIR, "team_form.json")
+PLAYER_MATCH_STATS_CSV = os.path.join(DATA_DIR, "player_match_stats.csv")
+PLAYER_HEATMAPS_JSON  = os.path.join(DATA_DIR, "player_heatmaps.json")
+PLAYER_ADVANCED_JSON  = os.path.join(DATA_DIR, "player_advanced.json")
 
 # Storico
 STORICO_RAW_CSV      = os.path.join(DATA_DIR, "storico_giocatori_raw.csv")
@@ -92,6 +111,63 @@ TEAM_FD_MAP = {
     "Udinese": "UDI", "Venezia": "VEN", "Verona": "VER",
 }
 
+# api-football: nome squadra → sigla (inclusi i principali alias noti)
+TEAM_APIFB_MAP = {
+    "Atalanta": "ATA", "Atalanta BC": "ATA",
+    "Bologna": "BOL", "Bologna FC 1909": "BOL",
+    "Cagliari": "CAG", "Cagliari Calcio": "CAG",
+    "Como": "COM", "Como 1907": "COM",
+    "Cremonese": "CRE",
+    "Empoli": "EMP", "Empoli FC": "EMP",
+    "Fiorentina": "FIO", "ACF Fiorentina": "FIO",
+    "Frosinone": "FRO", "Frosinone Calcio": "FRO",
+    "Genoa": "GEN", "Genoa CFC": "GEN",
+    "Hellas Verona": "VER", "Verona": "VER",
+    "Inter": "INT", "Internazionale": "INT",
+    "Juventus": "JUV",
+    "Lazio": "LAZ", "SS Lazio": "LAZ",
+    "Lecce": "LEC", "US Lecce": "LEC",
+    "AC Milan": "MIL", "Milan": "MIL",
+    "Monza": "MON", "AC Monza": "MON",
+    "Napoli": "NAP", "SSC Napoli": "NAP",
+    "Parma": "PAR", "Parma Calcio 1913": "PAR",
+    "Pisa": "PIS", "Pisa Sporting Club": "PIS",
+    "AS Roma": "ROM", "Roma": "ROM",
+    "Salernitana": "SAL",
+    "Sampdoria": "SAM",
+    "Sassuolo": "SAS", "US Sassuolo": "SAS", "US Sassuolo Calcio": "SAS",
+    "Spezia": "SPE",
+    "Torino": "TOR", "Torino FC": "TOR",
+    "Udinese": "UDI", "Udinese Calcio": "UDI",
+    "Venezia": "VEN", "Venezia FC": "VEN",
+}
+
+# Sofascore: nome squadra → sigla (con varianti comuni; usata da stage 4b e 11)
+TEAM_SOFASCORE_MAP = {
+    "AS Roma": "ROM", "Roma": "ROM",
+    "Inter": "INT", "Internazionale": "INT",
+    "AC Milan": "MIL", "Milan": "MIL",
+    "Juventus": "JUV",
+    "SSC Napoli": "NAP", "Napoli": "NAP",
+    "Atalanta": "ATA",
+    "Lazio": "LAZ", "SS Lazio": "LAZ",
+    "Fiorentina": "FIO", "ACF Fiorentina": "FIO",
+    "Bologna": "BOL",
+    "Torino": "TOR",
+    "Udinese": "UDI",
+    "Genoa": "GEN",
+    "Cagliari": "CAG",
+    "Parma": "PAR", "Parma Calcio 1913": "PAR",
+    "Como": "COM", "Como 1907": "COM",
+    "Monza": "MON",
+    "Lecce": "LEC", "US Lecce": "LEC",
+    "Venezia": "VEN", "Venezia FC": "VEN",
+    "Sassuolo": "SAS", "US Sassuolo": "SAS",
+    "Frosinone": "FRO",
+    "Empoli": "EMP",
+    "Verona": "VER", "Hellas Verona": "VER",
+}
+
 # ──────────────────────────────────────────────────────────────────────
 # MATCH FUZZY MANUALI
 # ──────────────────────────────────────────────────────────────────────
@@ -112,6 +188,15 @@ MANUAL_FUZZY_MAP = {
     "Rrahmani Al.":  "Rrahmani",
     "Stankovic A.":  "Stankovic F.",
     "Traore Hj.":    "Traore' Hj.",
+}
+
+# Alias espliciti Sofascore → nome dataset, per casi che il fuzzy non risolve
+# chiave: (nome_sofascore, sigla_squadra)
+SOFASCORE_PLAYER_ALIASES = {
+    ("Nico Paz", "COM"): "Paz N.",
+    ("Kenan Yıldız", "JUV"): "Yildiz",
+    ("Josep Martínez", "INT"): "Martinez Jo.",
+    ("Filippo Terracciano", "MIL"): "Terracciano F.",
 }
 
 # ──────────────────────────────────────────────────────────────────────

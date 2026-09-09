@@ -19,16 +19,47 @@ def _headers():
     return {"x-apisports-key": config.API_FOOTBALL_KEY}
 
 
+def _parse_fixture(item):
+    """Normalizza una fixture dal payload api-football in un dict piatto.
+
+    Required fields: fixture.id, fixture.date, teams.home.name, teams.away.name.
+    Missing/malformed fields cause the item to be skipped (None returned).
+    Optional fields: goals.home/away/halftime, league.round, fixture.status.short.
+    """
+    fixture = item.get("fixture", {}) or {}
+    teams = item.get("teams", {}) or {}
+    goals = item.get("goals", {}) or {}
+    halftime = goals.get("halftime") if isinstance(goals.get("halftime"), dict) else {}
+
+    fixture_id = fixture.get("id")
+    date = fixture.get("date")
+    home_team = (teams.get("home", {}) or {}).get("name")
+    away_team = (teams.get("away", {}) or {}).get("name")
+
+    if fixture_id is None or not date or not home_team or not away_team:
+        return None
+
+    return {
+        "fixture_id": fixture_id,
+        "date": date,
+        "home_team": home_team,
+        "away_team": away_team,
+        "home_score": goals.get("home"),
+        "away_score": goals.get("away"),
+        "ht_home_score": halftime.get("home"),
+        "ht_away_score": halftime.get("away"),
+        "round": (item.get("league", {}) or {}).get("round"),
+        "status": (fixture.get("status", {}) or {}).get("short"),
+    }
+
+
 def get_fixtures(round_hint=None, status_filter=None):
     """Ritorna le fixture Serie A. Ritorna lista vuota se la chiave manca o la richiesta fallisce.
 
     Di default ritorna le prossime fixture non ancora giocate ('next'). Se status_filter e'
     valorizzato (es. 'FT' per le partite concluse/terminate), interroga invece le fixture
     concluse piu' recenti ('last') filtrate per quello stato, utile per aggiornare la forma
-    EWMA post-turno.
-
-    Required fields: fixture.id, fixture.date, teams.home.name, teams.away.name.
-    Missing/malformed fields cause the item to be skipped.
+    EWMA post-turno. Ogni fixture include anche punteggi (FT/HT), giornata e stato.
     """
     if not config.API_FOOTBALL_KEY:
         return []
@@ -58,18 +89,56 @@ def get_fixtures(round_hint=None, status_filter=None):
         return []
 
     for item in response_data:
-        fixture_id = item.get("fixture", {}).get("id")
-        date = item.get("fixture", {}).get("date")
-        home_team = item.get("teams", {}).get("home", {}).get("name")
-        away_team = item.get("teams", {}).get("away", {}).get("name")
-        
-        if fixture_id is not None and date and home_team and away_team:
-            fixtures.append({
-                "fixture_id": fixture_id,
-                "date": date,
-                "home_team": home_team,
-                "away_team": away_team,
-            })
+        parsed = _parse_fixture(item)
+        if parsed is not None:
+            fixtures.append(parsed)
+    return fixtures
+
+
+def get_season_fixtures(season=None):
+    """Ritorna tutte le fixture Serie A della stagione (giocate e non) in un'unica richiesta.
+
+    Ogni fixture include punteggi FT/HT, giornata ('Regular Season - N') e stato
+    ('FT'/'NS'/...). Gestisce il paging di sicurezza dell'endpoint. Ritorna lista
+    vuota se la chiave manca o la richiesta fallisce.
+    """
+    if not config.API_FOOTBALL_KEY:
+        return []
+
+    season = season or config.API_FOOTBALL_SEASON
+    fixtures = []
+    page = 1
+    while True:
+        resp = fetch_with_retry(
+            f"{API_FOOTBALL_BASE}/fixtures",
+            headers=_headers(),
+            params={
+                "league": config.API_FOOTBALL_LEAGUE_ID,
+                "season": season,
+                "page": page,
+            },
+        )
+        if resp is None:
+            return []
+
+        try:
+            body = resp.json()
+        except json.JSONDecodeError:
+            return []
+
+        for item in body.get("response", []):
+            parsed = _parse_fixture(item)
+            if parsed is not None:
+                fixtures.append(parsed)
+
+        try:
+            total_pages = int((body.get("paging", {}) or {}).get("total", 1) or 1)
+        except (TypeError, ValueError):
+            total_pages = 1
+        if page >= total_pages:
+            break
+        page += 1
+
     return fixtures
 
 

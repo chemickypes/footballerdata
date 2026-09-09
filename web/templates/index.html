@@ -45,6 +45,10 @@
                     <i class="fa-solid fa-table-list"></i>
                     <span>Listone Analytics</span>
                 </button>
+                <button class="sidebar-nav-btn" id="sideNav-partite" onclick="switchTab('partite')">
+                    <i class="fa-solid fa-calendar-days"></i>
+                    <span>Partite &amp; Risultati</span>
+                </button>
                 <button class="sidebar-nav-btn" id="sideNav-ai" onclick="switchTab('ai')">
                     <i class="fa-solid fa-chart-line"></i>
                     <span>Chiedi a {{ bot_name }}</span>
@@ -190,6 +194,31 @@
             </div>
 
             <div id="listoneContainer"></div>
+        </div>
+
+        <!-- TAB: PARTITE & RISULTATI -->
+        <div id="tab-partite" class="tab-content">
+            <div class="card" style="padding:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid var(--border); padding-bottom:10px; flex-wrap:wrap; gap:8px;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <i class="fa-solid fa-calendar-days" style="color:var(--primary); font-size:1.05rem;"></i>
+                        <div>
+                            <div style="font-weight:600; font-size:1.1rem; color:var(--text-main);">Partite &amp; Risultati</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted);" id="matchesSeasonLabel">Serie A</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <button class="btn-secondary" id="roundPrevBtn" style="width:auto; padding:6px 12px; font-size:0.85rem;" onclick="changeMatchdayRound(-1)" title="Giornata precedente" aria-label="Giornata precedente">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <span id="matchdayLabel" style="font-weight:600; font-size:0.92rem; color:var(--text-main); min-width:120px; text-align:center;">Giornata —</span>
+                        <button class="btn-secondary" id="roundNextBtn" style="width:auto; padding:6px 12px; font-size:0.85rem;" onclick="changeMatchdayRound(1)" title="Giornata successiva" aria-label="Giornata successiva">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="matchesContainer"></div>
+            </div>
         </div>
 
     </div> <!-- end .container -->
@@ -367,6 +396,30 @@
                 </div>
             </div>
 
+            <!-- SECTION: Team Form (Risultati Squadra) -->
+            <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:14px;">
+                <b style="font-size:0.88rem; font-weight:600; color:var(--text-main); display:block; margin-bottom:10px;"><i class="fa-solid fa-calendar-day" style="color:var(--text-muted); margin-right:6px;"></i>Forma Squadra (Serie A)</b>
+                <div id="pdTeamForm" style="font-size:0.78rem; color:var(--text-muted);">N/D</div>
+            </div>
+
+            <!-- SECTION: Ultime Partite (per-match stats) -->
+            <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:14px;">
+                <b style="font-size:0.88rem; font-weight:600; color:var(--text-main); display:block; margin-bottom:10px;"><i class="fa-solid fa-clock-rotate-left" style="color:var(--text-muted); margin-right:6px;"></i>Ultime Partite (Serie A)</b>
+                <div id="pdRecentMatches" style="font-size:0.78rem; color:var(--text-muted);">Caricamento…</div>
+            </div>
+
+            <!-- SECTION: Mappa di Gioco (heatmap stagione) -->
+            <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:14px;">
+                <b style="font-size:0.88rem; font-weight:600; color:var(--text-main); display:block; margin-bottom:10px;"><i class="fa-solid fa-map-location-dot" style="color:var(--text-muted); margin-right:6px;"></i>Mappa di Gioco (Stagione)</b>
+                <div id="pdHeatmap" style="font-size:0.78rem; color:var(--text-muted);">Caricamento…</div>
+            </div>
+
+            <!-- SECTION: Statistiche Avanzate (per 90, stage 14) -->
+            <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:14px;">
+                <b style="font-size:0.88rem; font-weight:600; color:var(--text-main); display:block; margin-bottom:10px;"><i class="fa-solid fa-chart-simple" style="color:var(--text-muted); margin-right:6px;"></i>Statistiche Avanzate (Stagione)</b>
+                <div id="pdAdvanced" style="font-size:0.78rem; color:var(--text-muted);">Caricamento…</div>
+            </div>
+
             <!-- SECTION: Player Attributes / Contract -->
             <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:14px;">
                 <b style="font-size:0.88rem; font-weight:600; color:var(--text-main); display:block; margin-bottom:10px;"><i class="fa-solid fa-id-card" style="color:var(--text-muted); margin-right:6px;"></i>Profilo &amp; Contratto</b>
@@ -442,6 +495,10 @@
         <button class="nav-item active" id="botNav-listone" onclick="switchTab('listone')">
             <i class="fa-solid fa-table-list nav-item__icon"></i>
             <span class="nav-item__label">Listone</span>
+        </button>
+        <button class="nav-item" id="botNav-partite" onclick="switchTab('partite')">
+            <i class="fa-solid fa-calendar-days nav-item__icon"></i>
+            <span class="nav-item__label">Partite</span>
         </button>
         <button class="nav-item" id="botNav-ai" onclick="switchTab('ai')">
             <i class="fa-solid fa-chart-line nav-item__icon"></i>

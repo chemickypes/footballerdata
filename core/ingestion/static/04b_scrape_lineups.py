@@ -35,30 +35,8 @@ SERIE_A_TOURNAMENT_ID = 23  # Serie A unique tournament ID on Sofascore
 MAX_ROUNDS = 3
 
 # Mapping Sofascore team names → 3-letter abbreviations used in our pipeline
-SOFASCORE_TEAM_MAP = {
-    "AS Roma": "ROM", "Roma": "ROM",
-    "Inter": "INT", "Internazionale": "INT",
-    "AC Milan": "MIL", "Milan": "MIL",
-    "Juventus": "JUV",
-    "SSC Napoli": "NAP", "Napoli": "NAP",
-    "Atalanta": "ATA",
-    "Lazio": "LAZ", "SS Lazio": "LAZ",
-    "Fiorentina": "FIO", "ACF Fiorentina": "FIO",
-    "Bologna": "BOL",
-    "Torino": "TOR",
-    "Udinese": "UDI",
-    "Genoa": "GEN",
-    "Cagliari": "CAG",
-    "Parma": "PAR", "Parma Calcio 1913": "PAR",
-    "Como": "COM", "Como 1907": "COM",
-    "Monza": "MON",
-    "Lecce": "LEC", "US Lecce": "LEC",
-    "Venezia": "VEN", "Venezia FC": "VEN",
-    "Sassuolo": "SAS", "US Sassuolo": "SAS",
-    "Frosinone": "FRO",
-    "Empoli": "EMP",
-    "Verona": "VER", "Hellas Verona": "VER",
-}
+# (mappa condivisa in core/config.py: TEAM_SOFASCORE_MAP)
+SOFASCORE_TEAM_MAP = config.TEAM_SOFASCORE_MAP
 
 FORMAZIONI_CSV = os.path.join(config.DATA_DIR, "formazioni_2627.csv")
 
@@ -195,12 +173,7 @@ def aggregate_player_stats(df_raw):
     return agg
 
 
-SOFASCORE_ALIASES = {
-    ("Nico Paz", "COM"): "Paz N.",
-    ("Kenan Yıldız", "JUV"): "Yildiz",
-    ("Josep Martínez", "INT"): "Martinez Jo.",
-    ("Filippo Terracciano", "MIL"): "Terracciano F.",
-}
+SOFASCORE_ALIASES = config.SOFASCORE_PLAYER_ALIASES
 
 
 def match_to_dataset(df_lineups, df_dataset):

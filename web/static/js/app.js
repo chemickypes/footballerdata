@@ -1,6 +1,8 @@
 let allPlayers = [];
 let currentRoleFilter = 'ALL';
 let currentFasciaFilter = 'ALL';
+let matchesData = null;
+let currentMatchdayView = null;
 
 function runBootSplash(onComplete) {
     const splash = document.getElementById('appBootSplash');
@@ -146,6 +148,19 @@ function openPlayerDetailDrawer(playerName) {
     document.getElementById('pdStarts').textContent = p.starts_2627 || 0;
     document.getElementById('pdMinutes').textContent = (p.minutes_2627 || 0).toLocaleString();
 
+    // Team form (Serie A results, stage 11)
+    renderTeamForm(p.team);
+
+    // Per-match stats (Serie A match log, stage 12) — lazy fetch
+    loadPlayerMatches(p.player);
+
+    // Season heatmap (stage 13) — lazy fetch
+    window.__pdPlayerName = p.player;
+    loadPlayerHeatmap(p.player);
+
+    // Advanced season stats (stage 14) — lazy fetch
+    loadPlayerAdvanced(p.player);
+
     // Attributes / contract (Transfermarkt)
     const fmtMV = v => v == null ? 'N/D' : (v >= 1e6 ? `€${(v / 1e6).toFixed(v % 1e6 === 0 ? 0 : 1)}M` : `€${Math.round(v / 1e3)}K`);
     document.getElementById('pdAge').textContent = p.age != null ? p.age : 'N/D';
@@ -273,13 +288,14 @@ function toggleMobileSidebar() {
 async function init() {
     await fetchPlayers();
     fetchAIStatus();
+    fetchMatches();
     renderListone();
 
     runBootSplash(() => {});
 
     if (window.location.hash) {
         const tabName = window.location.hash.replace('#', '');
-        if (['ai', 'listone'].includes(tabName)) {
+        if (['ai', 'listone', 'partite'].includes(tabName)) {
             switchTab(tabName);
         }
     }
@@ -327,6 +343,441 @@ async function fetchPlayers() {
     renderListone();
 }
 
+/* ─────────────────────────────────────────────────────────────
+   PARTITE & RISULTATI TAB (Serie A match results & team form)
+   ───────────────────────────────────────────────────────────── */
+async function fetchMatches() {
+    try {
+        const res = await fetch('/api/matches');
+        matchesData = await res.json();
+        if (matchesData && matchesData.available && !currentMatchdayView) {
+            const rounds = (matchesData.rounds || []).map(r => r.round);
+            currentMatchdayView = matchesData.current_round || rounds[0] || 1;
+        }
+        if (document.getElementById('tab-partite') && document.getElementById('tab-partite').classList.contains('active')) {
+            renderMatches();
+        }
+    } catch (e) {
+        matchesData = null;
+    }
+}
+
+function changeMatchdayRound(delta) {
+    if (!matchesData || !matchesData.available || !matchesData.rounds || !matchesData.rounds.length) return;
+    const rounds = matchesData.rounds.map(r => r.round);
+    let idx = rounds.indexOf(currentMatchdayView);
+    if (idx === -1) idx = 0;
+    idx = Math.min(rounds.length - 1, Math.max(0, idx + delta));
+    currentMatchdayView = rounds[idx];
+    renderMatches();
+}
+
+function formatMatchDate(dateStr) {
+    const d = new Date(dateStr);
+    if (isNaN(d)) return '';
+    const date = d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
+    const time = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    return `${date} · ${time}`;
+}
+
+function renderMatchCard(m) {
+    const finished = m.finished && m.home_score != null && m.away_score != null;
+    const homeWin = finished && m.home_score > m.away_score;
+    const awayWin = finished && m.away_score > m.home_score;
+
+    const scoreHtml = finished
+        ? `<span class="match-score">${m.home_score}<span class="match-score-sep">–</span>${m.away_score}</span>`
+        : `<span class="match-score match-score-tbd">vs</span>`;
+
+    const htHtml = (finished && m.ht_home_score != null && m.ht_away_score != null)
+        ? `<div class="match-ht">HT ${m.ht_home_score}–${m.ht_away_score}</div>` : '';
+
+    const meta = finished
+        ? `<div class="match-meta">Finale${(m.status && m.status !== 'FT') ? ` (${m.status})` : ''}</div>`
+        : `<div class="match-meta">${formatMatchDate(m.date)}</div>`;
+
+    return `
+        <div class="match-card" data-finished="${finished ? 1 : 0}">
+            <div class="match-team match-team-home ${homeWin ? 'win' : ''}">
+                <span class="match-team-name">${m.home_display || m.home_team || '?'}</span>
+                <span class="match-team-code">${m.home_code || ''}</span>
+            </div>
+            <div class="match-center">
+                ${scoreHtml}
+                ${htHtml}
+                ${meta}
+            </div>
+            <div class="match-team match-team-away ${awayWin ? 'win' : ''}">
+                <span class="match-team-code">${m.away_code || ''}</span>
+                <span class="match-team-name">${m.away_display || m.away_team || '?'}</span>
+            </div>
+        </div>
+    `;
+}
+
+function renderMatches() {
+    const container = document.getElementById('matchesContainer');
+    if (!container) return;
+    const label = document.getElementById('matchdayLabel');
+
+    if (!matchesData || !matchesData.available || !matchesData.rounds || !matchesData.rounds.length) {
+        if (label) label.textContent = 'Giornata —';
+        container.innerHTML = `
+            <div style="text-align:center; color:var(--text-muted); padding:28px 16px; font-size:0.85rem; line-height:1.6;">
+                <i class="fa-solid fa-database" style="font-size:1.3rem; display:block; margin-bottom:8px; opacity:0.6;"></i>
+                Risultati non ancora importati.<br>
+                Esegui lo stage 11 della pipeline:<br>
+                <code style="color:var(--primary); background:rgba(94,139,255,0.08); padding:2px 8px; border-radius:6px; font-size:0.78rem;">python run_pipeline.py --step 11</code>
+            </div>`;
+        return;
+    }
+
+    const seasonLabel = document.getElementById('matchesSeasonLabel');
+    if (seasonLabel && matchesData.season) seasonLabel.textContent = 'Serie A ' + matchesData.season;
+
+    const lastRound = matchesData.rounds[matchesData.rounds.length - 1].round;
+    if (label) label.textContent = `Giornata ${currentMatchdayView} / ${lastRound}`;
+
+    const rnd = matchesData.rounds.find(r => r.round === currentMatchdayView);
+    if (!rnd || !rnd.matches.length) {
+        container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:24px; font-size:0.85rem;">Nessuna partita trovata per questa giornata.</div>';
+        return;
+    }
+
+    container.innerHTML = rnd.matches.map(m => renderMatchCard(m)).join('');
+}
+
+function renderTeamForm(teamCode) {
+    const el = document.getElementById('pdTeamForm');
+    if (!el) return;
+    const form = (matchesData && matchesData.team_form) || {};
+    const entry = form[teamCode];
+    if (!entry) {
+        el.innerHTML = '<div style="font-style:italic; font-size:0.78rem;">Nessun dato disponibile (esegui lo stage 11: risultati Serie A)</div>';
+        return;
+    }
+    const chipClass = { W: 'form-w', D: 'form-d', L: 'form-l' };
+    const chips = (entry.last5 || []).map(x => {
+        const tip = `Giornata ${x.round || '?'} vs ${x.opponent || '?'} (${x.venue === 'home' ? 'Casa' : 'Fuori'}) — ${x.gf}-${x.ga}`;
+        return `<span class="form-chip ${chipClass[x.result] || ''}" title="${tip}">${x.result}</span>`;
+    }).join('');
+    el.innerHTML = `
+        <div style="display:flex; gap:4px; margin-bottom:6px; flex-wrap:wrap;">
+            ${chips || '<span style="font-style:italic; font-size:0.76rem;">Nessuna partita disputata</span>'}
+        </div>
+        <div style="font-size:0.72rem; color:var(--text-muted);">
+            Stagione: <b style="color:var(--text-main);">${entry.wins}V ${entry.draws}N ${entry.losses}P</b> · ${entry.points} punti · GF ${entry.gf} / GA ${entry.ga}
+        </div>
+    `;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   ULTIME PARTITE (per-match player stats, stage 12)
+   ───────────────────────────────────────────────────────────── */
+function loadPlayerMatches(playerName) {
+    const el = document.getElementById('pdRecentMatches');
+    if (!el) return;
+    el.innerHTML = '<div style="font-style:italic;">Caricamento…</div>';
+    fetch(`/api/player_matches?player=${encodeURIComponent(playerName)}`)
+        .then(r => r.ok ? r.json() : Promise.reject(new Error(r.status === 404 ? 'no-data' : 'error')))
+        .then(data => { el.innerHTML = renderRecentMatches(data); })
+        .catch(() => {
+            el.innerHTML = '<div style="font-style:italic; font-size:0.76rem;">Nessuna partita registrata (giocatore fuori quota o stage 12 non eseguito)</div>';
+        });
+}
+
+function _pmRatingColor(rating) {
+    if (rating == null) return 'var(--text-muted)';
+    if (rating >= 7.3) return '#3fb975';
+    if (rating >= 6.8) return 'var(--primary)';
+    if (rating >= 6.2) return 'var(--text-main)';
+    return '#e5534b';
+}
+
+function _pmRatingSparkline(matches) {
+    const rated = matches.filter(m => m.rating != null).slice(0, 5).reverse();
+    if (rated.length < 2) return '';
+    const W = 380, H = 46, padB = 12;
+    const lo = Math.min(5.8, Math.min(...rated.map(m => m.rating)) - 0.2);
+    const hi = Math.max(7.6, Math.max(...rated.map(m => m.rating)) + 0.2);
+    const x = i => (i + 0.5) * (W / rated.length);
+    const y = v => padB + (1 - (v - lo) / (hi - lo)) * (H - padB - 4);
+    const bars = rated.map((m, i) => {
+        const bw = Math.min(26, (W / rated.length) - 6);
+        return `<rect x="${(x(i) - bw / 2).toFixed(1)}" y="${y(m.rating).toFixed(1)}" width="${bw}" height="${(H - padB - y(m.rating)).toFixed(1)}" rx="2" fill="rgba(94,139,255,0.35)"><title>G${m.round} · ${m.rating.toFixed(1)} vs ${m.opponent_display}</title></rect>` +
+            `<text x="${x(i).toFixed(1)}" y="${(y(m.rating) - 3).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="600" fill="${_pmRatingColor(m.rating)}">${m.rating.toFixed(1)}</text>`;
+    }).join('');
+    const labels = rated.map((m, i) =>
+        `<text x="${x(i).toFixed(1)}" y="${H - 1}" text-anchor="middle" font-size="7.5" fill="rgba(255,255,255,0.35)">G${m.round}</text>`
+    ).join('');
+    return `
+        <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto; display:block; margin-bottom:8px;" role="img" aria-label="Rating ultime partite">
+            ${bars}${labels}
+        </svg>
+    `;
+}
+
+function renderRecentMatches(data) {
+    const ms = (data.matches || []).slice(0, 8);
+    if (!ms.length) {
+        return '<div style="font-style:italic; font-size:0.76rem;">Nessuna partita registrata in questa stagione</div>';
+    }
+    const s = data.summary || {};
+
+    const sparkline = _pmRatingSparkline(ms);
+    const summaryTxt = [
+        s.played != null ? `${s.played} presenze` : null,
+        s.starts != null ? `${s.starts} da titolare` : null,
+        s.avg_rating != null ? `rating medio <b style="color:${_pmRatingColor(s.avg_rating)};">${s.avg_rating.toFixed(2)}</b>` : null,
+        s.goals ? `${s.goals}G` : null,
+        s.assists ? `${s.assists}A` : null,
+        s.xg ? `xG ${s.xg.toFixed(1)}` : null,
+        s.minutes != null ? `${Math.round(s.minutes / Math.max(1, s.played))}' media` : null,
+    ].filter(Boolean).join(' · ');
+
+    const rows = ms.map(m => {
+        const venueTag = m.venue === 'home' ? 'Casa' : 'Fuori';
+        const ratingTxt = m.rating != null ? m.rating.toFixed(1) : '–';
+        const chips = [];
+        if (m.goals) chips.push(`<span class="pm-chip pm-chip-g">${m.goals}G</span>`);
+        if (m.assists) chips.push(`<span class="pm-chip pm-chip-a">${m.assists}A</span>`);
+        if (m.xg && m.xg >= 0.3) chips.push(`<span class="pm-chip pm-chip-x">xG ${m.xg.toFixed(1)}</span>`);
+        return `
+            <div class="pm-row">
+                <span class="pm-round">G${m.round || '?'}</span>
+                <span class="pm-opp">${m.opponent_display || m.opponent || '?'} <span style="color:var(--text-muted); font-weight:400;">· ${venueTag}</span></span>
+                <span class="pm-min">${m.minutes != null ? m.minutes + "'" : '–'}</span>
+                <span class="pm-rating" style="color:${_pmRatingColor(m.rating)};">${ratingTxt}</span>
+                <span class="pm-chips">${chips.join('')}</span>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        ${sparkline}
+        <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:8px;">${summaryTxt}</div>
+        <div class="pm-list">${rows}</div>
+    `;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   MAPPA DI GIOCO (season heatmap, stage 13)
+   ───────────────────────────────────────────────────────────── */
+let heatmapRoundState = { player: null, until: '' };
+
+function loadPlayerHeatmap(playerName, untilRound) {
+    const el = document.getElementById('pdHeatmap');
+    if (!el) return;
+    if (heatmapRoundState.player !== playerName) {
+        heatmapRoundState = { player: playerName, until: untilRound || '' };
+    } else if (untilRound !== undefined) {
+        heatmapRoundState.until = untilRound || '';
+    }
+    el.innerHTML = '<div style="font-style:italic;">Caricamento…</div>';
+    const q = heatmapRoundState.until ? `&until_round=${encodeURIComponent(heatmapRoundState.until)}` : '';
+    fetch(`/api/player_heatmap?player=${encodeURIComponent(playerName)}${q}`)
+        .then(r => r.ok ? r.json() : Promise.reject(new Error(r.status === 404 ? 'no-data' : 'error')))
+        .then(data => { el.innerHTML = renderPlayerHeatmap(data); })
+        .catch(() => {
+            el.innerHTML = '<div style="font-style:italic; font-size:0.76rem;">Nessun dato mappa (stage 13 non eseguito o giocatore senza posizioni registrate)</div>';
+        });
+}
+
+function _heatColor(t) {
+    // Scala blu → rossa stile heatmap (t = 0 freddo, 1 caldo)
+    const lerp = (a, b, k) => Math.round(a + (b - a) * k);
+    return `rgb(${lerp(56, 255, t)},${lerp(108, 92, t)},${lerp(255, 61, t)})`;
+}
+
+function renderPlayerHeatmap(data) {
+    const cols = data.grid.cols, rowsN = data.grid.rows;
+    const cells = data.cells || [];
+    if (!cells.length || !data.points) {
+        return '<div style="font-style:italic; font-size:0.76rem;">Nessuna posizione registrata</div>';
+    }
+    const maxCount = Math.max(...cells);
+    if (!maxCount) {
+        return '<div style="font-style:italic; font-size:0.76rem;">Nessuna posizione registrata</div>';
+    }
+
+    const W = 300, H = 200, cw = W / cols, ch = H / rowsN;
+    const lineStroke = 'rgba(255,255,255,0.14)';
+
+    let rects = '';
+    for (let i = 0; i < cells.length; i++) {
+        const c = cells[i];
+        if (!c) continue;
+        const t = Math.pow(c / maxCount, 0.75);
+        const x = (i % cols) * cw, y = Math.floor(i / cols) * ch;
+        rects += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${cw.toFixed(1)}" height="${ch.toFixed(1)}" fill="${_heatColor(t)}" fill-opacity="0.62"/>`;
+    }
+
+    const pitch = `
+        <g fill="none" stroke="${lineStroke}" stroke-width="1.2">
+            <rect x="1.5" y="1.5" width="${W - 3}" height="${H - 3}" rx="1"/>
+            <line x1="${W / 2}" y1="1.5" x2="${W / 2}" y2="${H - 1.5}"/>
+            <circle cx="${W / 2}" cy="${H / 2}" r="20"/>
+            <rect x="1.5" y="${H / 2 - 48}" width="36" height="96"/>
+            <rect x="${W - 37.5}" y="${H / 2 - 48}" width="36" height="96"/>
+            <rect x="1.5" y="${H / 2 - 24}" width="14" height="48"/>
+            <rect x="${W - 15.5}" y="${H / 2 - 24}" width="14" height="48"/>
+        </g>`;
+
+    // Selettore "fino alla giornata N" (solo se il player ha >= 2 giornate)
+    let roundSel = '';
+    const rounds = data.available_rounds || [];
+    if (rounds.length >= 2) {
+        const opts = ['<option value="">Stagione completa</option>']
+            .concat(rounds.map(r =>
+                `<option value="${r}"${String(r) === String(heatmapRoundState.until) ? ' selected' : ''}>Fino alla G${r}</option>`));
+        roundSel = `
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px; font-size:0.72rem; color:var(--text-muted);">
+                <span>Periodo:</span>
+                <select id="pdHeatmapRoundSel" onchange="loadPlayerHeatmap(window.__pdPlayerName, this.value)"
+                        style="background:var(--surface-elevated); color:var(--text-main); border:1px solid var(--border); border-radius:6px; padding:2px 6px; font-size:0.72rem;">
+                    ${opts.join('')}
+                </select>
+            </div>`;
+    }
+
+    return `
+        ${roundSel}
+        <svg viewBox="0 0 ${W} ${H + 4}" style="width:100%; height:auto; display:block; background:rgba(255,255,255,0.02); border-radius:6px;" role="img" aria-label="Mappa di gioco stagionale">
+            <defs>
+                <filter id="pmHeatBlur" x="-5%" y="-5%" width="110%" height="110%">
+                    <feGaussianBlur stdDeviation="2.2"/>
+                </filter>
+            </defs>
+            ${pitch}
+            <g filter="url(#pmHeatBlur)">${rects}</g>
+        </svg>
+        <div style="display:flex; justify-content:space-between; margin-top:5px; font-size:0.68rem; color:var(--text-muted);">
+            <span>◀ porta propria</span>
+            <span>${data.matches} partite · ${data.points} tocchi</span>
+            <span>porta avversaria ▶</span>
+        </div>
+    `;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   STATISTICHE AVANZATE (season aggregates per-90 + percentili, stage 14)
+   ───────────────────────────────────────────────────────────── */
+function loadPlayerAdvanced(playerName) {
+    const el = document.getElementById('pdAdvanced');
+    if (!el) return;
+    el.innerHTML = '<div style="font-style:italic;">Caricamento…</div>';
+    fetch(`/api/player_advanced?player=${encodeURIComponent(playerName)}`)
+        .then(r => r.ok ? r.json() : Promise.reject(new Error(r.status === 404 ? 'no-data' : 'error')))
+        .then(data => { el.innerHTML = renderPlayerAdvanced(data); })
+        .catch(() => {
+            el.innerHTML = '<div style="font-style:italic; font-size:0.76rem;">Nessun dato (stage 14 non eseguito o giocatore senza minuti giocati)</div>';
+        });
+}
+
+const ADV_GROUPS = [
+    ['Attacco', [
+        ['goals_per90', 'Gol', 'per90'], ['assists_per90', 'Assist', 'per90'],
+        ['xg_per90', 'xG', 'per90'], ['xa_per90', 'xA', 'per90'],
+        ['shots_per90', 'Tiri', 'per90'], ['shots_on_target_per90', 'Tiri in porta', 'per90'],
+        ['key_passes_per90', 'Passaggi chiave', 'per90'], ['big_chances_created_per90', 'Occasioni grosse create', 'per90'],
+    ]],
+    ['Passaggi', [
+        ['passes_pct', 'Passaggi riusciti', 'pct'], ['passes_final_third_per90', 'In ultimo terzo', 'per90'],
+        ['long_balls_pct', 'Lunghi riusciti', 'pct'], ['crosses_per90', 'Cross', 'per90'],
+    ]],
+    ['Possesso', [
+        ['touches_per90', 'Tocchi', 'per90'], ['dribbles_per90', 'Dribbling riusciti', 'per90'],
+        ['dribbles_pct', 'Dribbling riusciti', 'pct'], ['possession_won_att_third', 'Recuperi zona offensiva', 'total'],
+        ['dispossessed', 'Palla persa (contrastata)', 'total'], ['possession_lost', 'Possessi persi', 'total'],
+    ]],
+    ['Difesa', [
+        ['tackles_per90', 'Contrasti', 'per90'], ['interceptions_per90', 'Intercetti', 'per90'],
+        ['clearances_per90', 'Respingimenti', 'per90'], ['blocks_per90', 'Tiri bloccati', 'per90'],
+        ['aerials_won_per90', 'Duelli aerei vinti', 'per90'], ['aerials_pct', 'Duelli aerei vinti', 'pct'],
+        ['duels_pct', 'Duelli totali vinti', 'pct'], ['ball_recoveries_per90', 'Palla recuperata', 'per90'],
+        ['fouls', 'Falli', 'total'],
+    ]],
+    ['Portiere', [
+        ['saves_per90', 'Parate', 'per90'], ['saves_caught', 'Parate trattenute', 'total'],
+        ['high_claims_per90', 'Uscite alte', 'per90'], ['punches_per90', 'Respinti di pugno', 'per90'],
+        ['clean_sheets', 'Porte inviolate', 'total'], ['goals_prevented', 'Gol prevenuti', 'total'],
+        ['goals_conceded', 'Gol subiti', 'total'],
+    ]],
+];
+
+function _advBar(pct) {
+    if (pct == null) return '';
+    const w = Math.max(2, Math.min(100, pct));
+    const color = pct >= 70 ? '#4ade80' : (pct >= 40 ? 'var(--accent)' : 'var(--text-muted)');
+    return `
+        <div style="flex:1; height:5px; background:rgba(255,255,255,0.07); border-radius:3px; overflow:hidden; margin:0 8px;">
+            <div style="width:${w}%; height:100%; background:${color}; border-radius:3px;"></div>
+        </div>
+        <span style="font-size:0.66rem; color:var(--text-muted); width:28px; text-align:right;">${Math.round(pct)}</span>`;
+}
+
+function _advRow(key, label, kind, data) {
+    let value, pct = null;
+    if (kind === 'per90') {
+        value = (data.per90 || {})[key];
+        pct = (data.percentiles || {})[key];
+    } else if (kind === 'pct') {
+        value = (data.pcts || {})[key];
+        pct = (data.percentiles || {})[key];
+        if (value != null) value = value.toFixed(1) + '%';
+    } else {
+        value = (data.totals || {})[key];
+        if (key === 'goals_prevented' && value != null) {
+            value = value.toFixed(2);
+            pct = (data.percentiles || {})['goals_prevented'];
+        }
+    }
+    if (value == null) return '';
+    if (kind === 'total' && typeof value === 'number' && !Number.isInteger(value)) {
+        value = Math.round(value);
+    }
+    return `
+        <div style="display:flex; align-items:center; padding:3px 0; font-size:0.74rem;">
+            <span style="width:150px; flex-shrink:0; color:var(--text-muted);">${label}</span>
+            <span style="width:44px; flex-shrink:0; text-align:right; font-weight:600; color:var(--text-main);">${value}</span>
+            ${_advBar(pct)}
+        </div>`;
+}
+
+function renderPlayerAdvanced(data) {
+    if (!data || !data.minutes) {
+        return '<div style="font-style:italic; font-size:0.76rem;">Nessun dato disponibile</div>';
+    }
+    const isKeeper = data.role === 'P';
+    const started = data.matches_started || 0;
+    const cards = data.cards || {};
+    const cardsTxt = [cards.yellow ? `${cards.yellow} 🟨` : '', (cards.red || cards.direct_red) ? `${(cards.red || 0) + (cards.direct_red || 0)} 🟥` : '']
+        .filter(Boolean).join(' · ');
+
+    const metaBits = [
+        `${data.appearances} presenze (${started} titolare)`,
+        `${data.minutes} min`,
+        data.rating != null ? `voto ${Number(data.rating).toFixed(2)}` : null,
+        cardsTxt || null,
+    ].filter(Boolean).join(' · ');
+
+    const groups = ADV_GROUPS
+        .filter(([title]) => title !== 'Portiere' || isKeeper)
+        .map(([title, rows]) => {
+            const body = rows.map(([key, label, kind]) => _advRow(key, label, kind, data)).join('');
+            if (!body) return '';
+            return `
+                <div style="font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-muted); margin:10px 0 3px;">${title}</div>
+                ${body}`;
+        }).join('');
+
+    return `
+        <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:4px;">${metaBits}</div>
+        <div style="font-size:0.68rem; color:var(--text-muted); margin-bottom:6px; font-style:italic;">Barre = percentile vs pari ruolo Serie A (min. 60')</div>
+        ${groups}
+    `;
+}
+
 function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -350,6 +801,7 @@ function switchTab(tabId) {
     }
 
     if (tabId === 'listone') renderListone();
+    if (tabId === 'partite') renderMatches();
 }
 
 function setRoleFilter(role) {

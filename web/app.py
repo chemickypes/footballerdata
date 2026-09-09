@@ -23,6 +23,7 @@ from web.config import (
     BOT_NAME, BOT_SUBTITLE, BOT_AVATAR_TEXT, BOT_AVATAR_IMAGE, BOT_BADGE,
     BOT_GREETING, IS_PERSONAL,
 )
+from web.matches_api import matches_bp
 from web.players_api import players_bp
 
 app = Flask(__name__)
@@ -51,6 +52,7 @@ def index():
 
 
 app.register_blueprint(players_bp)
+app.register_blueprint(matches_bp)
 app.register_blueprint(ai_bp)
 
 

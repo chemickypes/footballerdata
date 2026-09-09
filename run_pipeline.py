@@ -32,6 +32,10 @@ STEPS = {
     9:  ("09_vorp_auction_pricing",  "Stage 6 — Sabermetric VORP & Fair Auction Valuation"),
     10: ("10_roster_optimizer",      "Stage 7 — Mathematical MILP 25-Player Roster Optimizer"),
     7:  ("07_generate_excel",        "Stage 8 — Formatted Multi-Tab Excel Spreadsheet Export"),
+    11: ("11_scrape_match_results",  "Stage 9 — Serie A Match Results & Team Form (api-football)"),
+    12: ("12_harvest_player_match_stats", "Stage 10 — Per-Match Player Stats (Sofascore lineups)"),
+    13: ("13_scrape_heatmaps",       "Stage 11 — Season Player Heatmaps (Sofascore)"),
+    14: ("14_scrape_advanced_stats", "Stage 12 — Advanced Season Stats (Sofascore)"),
 }
 
 
@@ -62,7 +66,7 @@ def run_all(from_step=1):
     print("=" * 70)
 
     # Execution sequence
-    ordered_steps = [1, 3, 4, 5, 6, 8, 9, 10, 7]
+    ordered_steps = [1, 3, 4, 5, 6, 8, 9, 10, 7, 11, 12, 13, 14]
     steps_to_run = [s for s in ordered_steps if s >= from_step]
 
     for i, step_num in enumerate(steps_to_run, 1):
@@ -98,6 +102,10 @@ Available Pipeline Stages:
   9   Stage 6   Value Over Replacement Player (VORP) & Fair Pricing Engine
   10  Stage 7   Mathematical MILP 25-Player Roster Optimizer
   7   Stage 8   Formatted Multi-Tab Excel Workbook Export
+  11  Stage 9   Serie A Match Results & Team Form (api-football)
+  12  Stage 10  Per-Match Player Stats (Sofascore lineups)
+  13  Stage 11  Season Player Heatmaps (Sofascore)
+  14  Stage 12  Advanced Season Stats (Sofascore)
 
 Examples:
   python run_pipeline.py              # Full end-to-end execution
