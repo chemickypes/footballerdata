@@ -1,11 +1,18 @@
 """
-Spectre - FantaMoneyball Copilot — LLM Provider Implementations.
+footballerdata Copilot — LLM Provider Implementations.
 
 Provider priority (first available wins):
-1. OllamaProvider   — LLM_BASE_URL set (default http://localhost:11434/v1)
-2. OpenAIProvider   — LLM_API_KEY set without LLM_BASE_URL pointing to Ollama
+1. Local endpoint   — LLM_BASE_URL set: OllamaProvider (no key, native /api/chat)
+                      or OpenAIProvider (key, /v1 chat completions)
+2. GroqProvider     — GROQ_API_KEY set
 3. GeminiProvider   — GEMINI_API_KEY set
-4. None             — Falls back to HeuristicProvider in app.py
+4. OpenAIProvider   — LLM_API_KEY set without LLM_BASE_URL (cloud endpoint)
+5. None             — Falls back to HeuristicProvider in app.py
+
+Local models default to gemma4:e4b via LLM_MODEL. Env knobs:
+- LLM_TIMEOUT (seconds): per-request read timeout — generous on CPU-only inference
+- LLM_REASONING_EFFORT: off (default) disables thinking, low/medium/high caps it
+- LLM_NUM_CTX: optional context-window override
 """
 
 import os
@@ -36,16 +43,22 @@ class CopilotProvider:
 
 
 class OllamaProvider(CopilotProvider):
-    """Local Ollama via OpenAI-compatible /v1/chat/completions endpoint."""
+    """Local Ollama via native /api/chat endpoint (full control over `think`)."""
 
-    def __init__(self, base_url: str, model: str, api_key: str | None = None):
-        self.base_url = base_url.rstrip("/")
+    def __init__(self, base_url: str, model: str, api_key: str | None = None, timeout: float | None = None):
+        base = base_url.rstrip("/")
+        if base.endswith("/v1"):
+            base = base[:-3]
+        self.base_url = base
         self.model = model
         self.api_key = api_key
+        # Non-streaming replies arrive only at the end of generation: on CPU
+        # inference a full answer can take minutes of socket silence.
+        self.timeout = timeout or float(os.environ.get("LLM_TIMEOUT", "300"))
         self.engine_name = f"ollama/{model}"
 
     def query(self, system_prompt: str, user_prompt: str, temperature: float = 0.35, max_tokens: int = 650) -> str | None:
-        endpoint = f"{self.base_url}/chat/completions"
+        endpoint = f"{self.base_url}/api/chat"
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -56,14 +69,38 @@ class OllamaProvider(CopilotProvider):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            "temperature": temperature,
-            "max_tokens": max_tokens
+            "stream": False,
+            "options": {"temperature": temperature, "num_predict": max_tokens}
         }
+        num_ctx = os.environ.get("LLM_NUM_CTX")
+        if num_ctx and num_ctx.isdigit():
+            payload["options"]["num_ctx"] = int(num_ctx)
 
-        resp = requests.post(endpoint, json=payload, headers=headers, timeout=4)
-        if resp.status_code == 200:
-            return resp.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-        return None
+        # Reasoning models (e.g. gemma4:e4b) emit a hidden thinking trace that eats
+        # into the token budget and truncates the visible answer. The copilot's RAG
+        # prompt already supplies every number, so thinking is pure CPU waste.
+        # NOTE: the OpenAI-compatible /v1 endpoint IGNORES think:false on current
+        # Ollama builds — only the native /api/chat honors it. LLM_REASONING_EFFORT:
+        #   off (default) -> think:false | low/minimal/medium/high -> cap effort
+        #   default -> model default behavior
+        effort = (os.environ.get("LLM_REASONING_EFFORT") or "off").strip().lower()
+        if effort == "off":
+            payload["think"] = False
+        elif effort in ("minimal", "low", "medium", "high"):
+            payload["think"] = True
+            payload["reasoning_effort"] = effort
+
+        try:
+            resp = requests.post(endpoint, json=payload, headers=headers, timeout=self.timeout)
+        except requests.RequestException:
+            return None
+        if resp.status_code != 200:
+            return None
+        msg = resp.json().get("message", {})
+        content = (msg.get("content") or "").strip()
+        if not content:
+            return None
+        return content
 
 
 class OpenAIProvider(CopilotProvider):
@@ -207,42 +244,44 @@ class CascadeProvider(CopilotProvider):
 def get_copilot_provider() -> CopilotProvider | None:
     """
     Factory: returns a cascading failover chain based on available free tiers and env vars.
-    Cascade Order:
-      1. Groq Free Tier (if GROQ_API_KEY present)
-      2. Gemini Free Tier (if GEMINI_API_KEY present)
-      3. Ollama local (if LLM_BASE_URL present and not on Vercel)
-      4. None -> Fallback to Local Quantitative Reasoner in app.py (0$ Cost)
+    Cascade Order (local machine first):
+      1. Local endpoint (if LLM_BASE_URL present and not on Vercel):
+         Ollama when no LLM_API_KEY, authenticated OpenAI-compatible otherwise
+      2. Groq Free Tier (if GROQ_API_KEY present)
+      3. Gemini Free Tier (if GEMINI_API_KEY present)
+      4. Cloud OpenAI-compatible (if LLM_API_KEY set without LLM_BASE_URL)
+      5. None -> Fallback to Local Quantitative Reasoner in app.py (0$ Cost)
     """
     is_vercel = bool(os.environ.get("VERCEL"))
     available_providers: list[CopilotProvider] = []
 
-    # 1. Groq Free Tier (Ultra-fast, 0 token cost, no credit card required)
-    groq_key = os.environ.get("GROQ_API_KEY")
-    groq_model = os.environ.get("GROQ_MODEL") or "openai/gpt-oss-120b"
-    if groq_key:
-        available_providers.append(GroqProvider(api_key=groq_key, model=groq_model))
-
-    # 2. Google Gemini Free Tier
-    gemini_key = os.environ.get("GEMINI_API_KEY")
-    gemini_model = os.environ.get("GEMINI_MODEL") or "gemini-3.6-flash"
-    if gemini_key:
-        available_providers.append(GeminiProvider(api_key=gemini_key, model=gemini_model))
-
-    # 3. Generic OpenAI-compatible / Remote endpoint (if explicitly set and different from Groq)
     llm_api_key = os.environ.get("LLM_API_KEY") or os.environ.get("OPENAI_API_KEY")
     llm_base_url = os.environ.get("LLM_BASE_URL") or os.environ.get("OPENAI_BASE_URL")
-    llm_model = os.environ.get("LLM_MODEL", "qwen2.5:3b")
+    llm_model = os.environ.get("LLM_MODEL", "gemma4:e4b")
+    groq_key = os.environ.get("GROQ_API_KEY")
 
     if is_vercel and llm_base_url and ("localhost" in llm_base_url or "127.0.0.1" in llm_base_url):
         llm_base_url = None
 
-    if llm_api_key and llm_api_key != groq_key:
-        base = llm_base_url or "https://api.openai.com/v1"
-        available_providers.append(OpenAIProvider(base_url=base, api_key=llm_api_key, model=llm_model))
+    # 1. Local / custom endpoint — primary engine on personal machines
+    if llm_base_url and not is_vercel:
+        if llm_api_key and llm_api_key != groq_key:
+            available_providers.append(OpenAIProvider(base_url=llm_base_url, api_key=llm_api_key, model=llm_model))
+        else:
+            available_providers.append(OllamaProvider(base_url=llm_base_url, model=llm_model))
 
-    # 4. Ollama / Local inference (only when running on local machine, not on Vercel)
-    if llm_base_url and not llm_api_key and not is_vercel:
-        available_providers.append(OllamaProvider(base_url=llm_base_url, model=llm_model))
+    # 2. Groq Free Tier (Ultra-fast, 0 token cost, no credit card required)
+    if groq_key:
+        available_providers.append(GroqProvider(api_key=groq_key, model=os.environ.get("GROQ_MODEL") or "openai/gpt-oss-120b"))
+
+    # 3. Google Gemini Free Tier
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    if gemini_key:
+        available_providers.append(GeminiProvider(api_key=gemini_key, model=os.environ.get("GEMINI_MODEL") or "gemini-3.6-flash"))
+
+    # 4. Cloud OpenAI-compatible (explicit key, no endpoint configured)
+    if llm_api_key and llm_api_key != groq_key and not llm_base_url:
+        available_providers.append(OpenAIProvider(base_url="https://api.openai.com/v1", api_key=llm_api_key, model=llm_model))
 
     if not available_providers:
         # None -> app.py activates the zero-cost local quantitative engine
@@ -290,7 +329,7 @@ def get_copilot_diagnostics() -> dict:
             },
             "ollama": {
                 "configured": bool(ollama_url and not is_vercel),
-                "name": "Ollama Locale (11434)",
+                "name": "Ollama Locale (gemma4:e4b default)",
                 "env_var": "LLM_BASE_URL",
                 "status": "Non supportato su Vercel (solo localhost)" if is_vercel else ("Attivo" if ollama_url else "Disattivato")
             }
@@ -333,5 +372,26 @@ def test_all_providers() -> dict:
             results["gemini"] = {"ok": False, "status_code": None, "msg": f"Eccezione: {str(e)}"}
     else:
         results["gemini"] = {"ok": False, "status_code": None, "msg": "GEMINI_API_KEY non presente"}
+
+    # 3. Test Ollama locale (ping minimo; il cold-start del modello su CPU puo' richiedere tempo)
+    ollama_url = os.environ.get("LLM_BASE_URL")
+    ollama_model = os.environ.get("LLM_MODEL", "gemma4:e4b")
+    if ollama_url:
+        try:
+            base = ollama_url.rstrip("/")
+            if base.endswith("/v1"):
+                base = base[:-3]
+            resp = requests.post(
+                f"{base}/api/chat",
+                json={"model": ollama_model, "messages": [{"role": "user", "content": "ping"}], "stream": False, "think": False, "options": {"num_predict": 5}},
+                headers={"Content-Type": "application/json"},
+                timeout=120
+            )
+            ok = resp.status_code == 200 and bool((resp.json().get("message", {}).get("content") or "").strip())
+            results["ollama"] = {"ok": ok, "status_code": resp.status_code, "msg": f"{resp.status_code}: {resp.text[:200]}"}
+        except Exception as e:
+            results["ollama"] = {"ok": False, "status_code": None, "msg": f"Eccezione: {str(e)}"}
+    else:
+        results["ollama"] = {"ok": False, "status_code": None, "msg": "LLM_BASE_URL non presente"}
 
     return results

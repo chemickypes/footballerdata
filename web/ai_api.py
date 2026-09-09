@@ -40,7 +40,7 @@ def api_ai_test():
 def api_ai_query():
     """
     Analista AI — Player Q&A Engine
-    Priorità: Ollama locale -> OpenAI-compatible -> Google Gemini -> Local Quantitative Reasoner.
+    Priorità: endpoint locale (Ollama/gemma4:e4b) -> Groq -> Gemini -> OpenAI cloud -> Local Quantitative Reasoner.
     """
     data = request.json or {}
     prompt = str(data.get("prompt", "")).strip()

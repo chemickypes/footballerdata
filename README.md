@@ -20,7 +20,7 @@ While the scientific pipeline computes optimal baselines in peace, fantasy draft
 - **Independent Manager Isolation**: Select your franchise with client-side `localStorage` isolation (private target wishlists, customized max credit caps, personal notes).
 - **5 Dynamic Tactical Blueprints**: Real-time budget allocation (*Trazione Anteriore, Modificatore di Ferro, Centrocampo Dominante, Moneyball, Custom*) with mathematical **Stop-Loss ceilings** that adapt as players leave the board.
 - **Admin-Gated Live Draft (Battitore)**: Password-protected admin engine (`ADMIN_PASSWORD` or `fanta2026`) allowing the commissioner to call, bid, and assign players with real-time budget synchronization across all participants.
-- **Conversational AI Tactical Copilot**: RAG-powered chat assistant supporting **any LLM** (local Ollama with Llama 3.1 / Qwen 2.5, OpenAI, vLLM, DeepSeek, Gemini, or built-in local quantitative reasoner) to run comparisons, squad diagnostics, and anti-panic audits.
+- **Conversational AI Copilot ("Analista")**: RAG-powered chat assistant over player data & statistics, running on **local Ollama (`gemma4:e4b` by default)** with cloud fallbacks (Groq/Gemini/OpenAI) and a built-in local quantitative reasoner when no LLM is available.
 - **Anti-Clutter Live Filters**: 1-click **Solo Svincolati** toggle to instantly hide drafted players, alongside assignment opacity tagging and mobile-first touch controls.
 
 ![Fanta-Lab Command Center](docs/assets/command_center_overview.png)
