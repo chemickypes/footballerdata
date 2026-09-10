@@ -200,6 +200,38 @@ SOFASCORE_PLAYER_ALIASES = {
 }
 
 # ──────────────────────────────────────────────────────────────────────
+# ENTITY RESOLUTION — COPILOT / RAG
+# ──────────────────────────────────────────────────────────────────────
+# Parole chiave (lowercase) → sigla squadra, per la risoluzione di entità
+# "squadra" nei prompt del copilot e nelle query partite.
+TEAM_KEYWORD_MAP = {
+    "inter": "INT", "internazionale": "INT",
+    "milan": "MIL",
+    "juve": "JUV", "juventus": "JUV",
+    "roma": "ROM", "lazio": "LAZ", "atalanta": "ATA", "napoli": "NAP",
+    "fiorentina": "FIO", "bologna": "BOL", "torino": "TOR", "udinese": "UDI",
+    "genoa": "GEN", "cagliari": "CAG", "parma": "PAR", "como": "COM",
+    "monza": "MON", "lecce": "LEC", "venezia": "VEN", "sassuolo": "SAS",
+    "frosinone": "FRO", "empoli": "EMP", "verona": "VER",
+    "cremonese": "CRE", "pisa": "PIS",
+}
+
+# Alias giocatore (lowercase) → termine dataset: espansi nel prompt prima del
+# token matching, così "lautaro" o "kvara" risolvono al nome dataset corretto.
+PLAYER_NAME_ALIASES = {
+    "lautaro": "martinez l.",
+    "lautaro martinez": "martinez l.",
+    "kvara": "kvaratskhelia",
+    "calha": "calhanoglu",
+    "chalanoglu": "calhanoglu",
+    "dimash": "dimarco",
+    "douglas": "douglas luiz",
+    "marcus thuram": "thuram",
+    "khephren thuram": "thuram k.",
+    "moise kean": "kean",
+}
+
+# ──────────────────────────────────────────────────────────────────────
 # SCORE COMPOSITO — PESI
 # ──────────────────────────────────────────────────────────────────────
 # Pesi dei componenti dello score composito (somma = 1.0)

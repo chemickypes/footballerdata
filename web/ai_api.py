@@ -1,16 +1,20 @@
 """
 footballerdata — AI copilot endpoints
 /api/ai_status, /api/ai_test: copilot diagnostics.
-/api/ai_query: player Q&A — LLM copilot first (Ollama/OpenAI/Gemini),
-then a zero-dependency local quantitative reasoner.
+/api/ai_query: player & match Q&A — LLM copilot first (Ollama/OpenAI/Gemini)
+with retrieved context blocks (web.retrieval, structured RAG), then a
+zero-dependency local quantitative reasoner.
 """
 
 import re
+
 from flask import Blueprint, jsonify, request
 
+from core.config import TEAM_KEYWORD_MAP
 from web.config import DEFAULT_BUDGET, DEFAULT_ROSTER_SLOTS, DEFAULT_N_TEAMS, IS_PERSONAL
 from web.data import load_dataset
 from web.pricing import get_dynamic_fair_prices
+from web import retrieval
 
 ai_bp = Blueprint("ai", __name__)
 
@@ -39,7 +43,9 @@ def api_ai_test():
 @ai_bp.route("/api/ai_query", methods=["POST"])
 def api_ai_query():
     """
-    Analista AI — Player Q&A Engine
+    Analista AI — Player & Match Q&A Engine
+    Contesto: blocchi RAG strutturati (profilo giocatore, partita, aggregati)
+    da web.retrieval, iniettati nel prompt LLM.
     Priorità: endpoint locale (Ollama/gemma4:e4b) -> Groq -> Gemini -> OpenAI cloud -> Local Quantitative Reasoner.
     """
     data = request.json or {}
@@ -53,41 +59,17 @@ def api_ai_query():
     prompt_lower = prompt.lower()
 
     # ─────────────────────────────────────────────────────────────
-    # ENTITY EXTRACTION & QUERY NORMALIZATION
+    # ENTITY EXTRACTION & CONTEXT RETRIEVAL (web.retrieval)
     # ─────────────────────────────────────────────────────────────
-    aliases = {
-        'lautaro': 'martinez l.',
-        'lautaro martinez': 'martinez l.',
-        'kvara': 'kvaratskhelia',
-        'calha': 'calhanoglu',
-        'chalanoglu': 'calhanoglu',
-        'dimash': 'dimarco',
-        'douglas': 'douglas luiz',
-        'thuram': 'thuram',
-        'woltemade': 'woltemade',
-    }
-    expanded_prompt = prompt_lower
-    for k_alias, v_target in aliases.items():
-        if k_alias in expanded_prompt and v_target not in expanded_prompt:
-            expanded_prompt += f" {v_target}"
-
-    def player_matches_query(p_name_str, query_str):
-        p_clean = str(p_name_str).lower().strip()
-        if p_clean in query_str:
-            return True
-        tokens = [t for t in re.split(r'[\s\.\-]+', p_clean) if len(t) >= 3]
-        for tok in tokens:
-            if re.search(rf'\b{re.escape(tok)}\b', query_str):
-                return True
-        return False
-
     explicit_matches = []
     seen_explicit = set()
-    for _, row in df.iterrows():
-        p_name = row['player']
-        if player_matches_query(p_name, expanded_prompt) and p_name not in seen_explicit:
+    for p_name in retrieval.resolve_players(prompt, df):
+        rows = df[df["player"] == p_name]
+        if not rows.empty and p_name not in seen_explicit:
             seen_explicit.add(p_name)
-            explicit_matches.append(row)
+            explicit_matches.append(rows.iloc[0])
+
+    context_blocks = retrieval.build_llm_context(prompt, df=df)
 
     # ─────────────────────────────────────────────────────────────
     # 1. MODULAR COPILOT INTEGRATION (Ollama / OpenAI / Gemini)
@@ -114,14 +96,7 @@ def api_ai_query():
                 sample_df = sample_df[sample_df['role'] == r_code]
                 break
 
-        team_kw = {
-            'como': 'COM', 'milan': 'MIL', 'juve': 'JUV', 'juventus': 'JUV',
-            'inter': 'INT', 'roma': 'ROM', 'lazio': 'LAZ', 'atalanta': 'ATA',
-            'napoli': 'NAP', 'bologna': 'BOL', 'fiorentina': 'FIO', 'torino': 'TOR',
-            'genoa': 'GEN', 'lecce': 'LEC', 'udinese': 'UDI', 'parma': 'PAR',
-            'sassuolo': 'SAS', 'monza': 'MON', 'venezia': 'VEN', 'cagliari': 'CAG'
-        }
-        for t_k, t_c in team_kw.items():
+        for t_k, t_c in TEAM_KEYWORD_MAP.items():
             if re.search(rf'\b{re.escape(t_k)}\b', prompt_lower):
                 sample_df = sample_df[sample_df['team'] == t_c]
                 break
@@ -164,7 +139,8 @@ def api_ai_query():
         llm_reply = get_copilot_response(
             prompt, {}, top_sample,
             budget_total=DEFAULT_BUDGET,
-            is_personal=IS_PERSONAL
+            is_personal=IS_PERSONAL,
+            context_blocks=context_blocks,
         )
         if llm_reply:
             return jsonify(llm_reply)
@@ -203,10 +179,17 @@ def api_ai_query():
         })
 
     # C. Specific Player Analysis
-    target_matches = explicit_matches if explicit_matches else [row for _, row in df.iterrows() if player_matches_query(row['player'], expanded_prompt)]
-    if target_matches:
-        row = target_matches[0]
+    if explicit_matches:
+        row = explicit_matches[0]
         starter_txt = "Titolare confermato 2026/27" if row.get('is_starter_2627') else "Rotazione / Non ancora titolare fisso"
+        xg90 = retrieval._fnum(row.get('xg_per90'), 3)
+        xa90 = retrieval._fnum(row.get('xa_per90'), 3)
+        understat_txt = ""
+        if xg90 is not None:
+            understat_txt = f" Sottoporta: xG/90 **{xg90:.3f}**, xA/90 **{xa90 or 0:.3f}**."
+        yel = int(row.get('yellow_cards_espn') or 0)
+        red = int(row.get('red_cards_espn') or 0)
+        cards_txt = f" Cartellini ESPN: 🟨{yel} 🟥{red}." if (yel or red) else ""
         return jsonify({
             "type": "player_deepdive",
             "title": f"Scheda Analitica: {row['player']} ({row['team']})",
@@ -224,12 +207,40 @@ def api_ai_query():
                 "vorp": float(row.get('vorp_points', 0)),
                 "starts": int(row.get('starts_2627', 0)),
                 "minutes": int(row.get('minutes_2627', 0)),
-                "injury_days": int(row.get('giorni_infortunio_3y', 0))
+                "injury_days": int(row.get('giorni_infortunio_3y', 0)),
+                "xg_per90": xg90,
+                "xa_per90": xa90,
+                "yellow_cards_espn": yel,
+                "red_cards_espn": red
             },
-            "verdict": f"Valutazione Modello: Prezzo fair stimato a 1000cr: **{row.get('prezzo_fair_1000', 1)} cr**. {starter_txt} con proiezione P50 di **{row.get('predicted_contrib_p50', 0):.1f} punti-rating attesi (pg×MV)** e VORP **+{row.get('vorp_points', 0):.1f}**."
+            "verdict": f"Valutazione Modello: Prezzo fair stimato a 1000cr: **{row.get('prezzo_fair_1000', 1)} cr**. {starter_txt} con proiezione P50 di **{row.get('predicted_contrib_p50', 0):.1f} punti-rating attesi (pg×MV)** e VORP **+{row.get('vorp_points', 0):.1f}**.{understat_txt}{cards_txt}"
         })
 
-    # D. Recommendations by Role, Team, Budget, or Modificatore
+    # D. Match answers (partite citate, nessun giocatore) — testo markdown pronto
+    resolved_matches = retrieval.resolve_matches(prompt)
+    if resolved_matches:
+        match_blocks = [b for b in context_blocks if b.startswith("### PARTITA")]
+        text = "\n\n".join(match_blocks) if match_blocks else "\n\n".join(
+            retrieval.build_match_block(m) for m in resolved_matches[:2]
+        )
+        return jsonify({
+            "type": "match_summary",
+            "title": f"Partite: {' · '.join((m.get('home_display') or '') + '-' + (m.get('away_display') or '') for m in resolved_matches[:2])}",
+            "engine": "Database Locale (Stage 11/12 + ESPN)",
+            "text": text,
+        })
+
+    # E. Aggregates (marcatori / cartellini) — testo markdown pronto
+    aggregate_text = retrieval.build_aggregate_block(prompt, df=df)
+    if aggregate_text:
+        return jsonify({
+            "type": "aggregate_answer",
+            "title": "Classifica dal database",
+            "engine": "Database Locale (Stage 12 + ESPN)",
+            "text": aggregate_text,
+        })
+
+    # F. Recommendations by Role, Team, Budget, or Modificatore
     role_map = {'portier': 'P', 'difensor': 'D', 'centrocampist': 'C', 'attaccant': 'A'}
     target_role = None
     for k, v in role_map.items():
@@ -237,16 +248,8 @@ def api_ai_query():
             target_role = v
             break
 
-    team_map = {
-        'como': 'COM', 'milan': 'MIL', 'juve': 'JUV', 'juventus': 'JUV',
-        'inter': 'INT', 'roma': 'ROM', 'lazio': 'LAZ', 'atalanta': 'ATA',
-        'napoli': 'NAP', 'bologna': 'BOL', 'fiorentina': 'FIO', 'torino': 'TOR',
-        'genoa': 'GEN', 'lecce': 'LEC', 'udinese': 'UDI', 'parma': 'PAR',
-        'sassuolo': 'SAS', 'monza': 'MON', 'venezia': 'VEN', 'frosinone': 'FRO',
-        'cagliari': 'CAG'
-    }
     target_team = None
-    for k_team, v_code in team_map.items():
+    for k_team, v_code in TEAM_KEYWORD_MAP.items():
         if re.search(rf'\b{re.escape(k_team)}\b', prompt_lower):
             target_team = v_code
             break

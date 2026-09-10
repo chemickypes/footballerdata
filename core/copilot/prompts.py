@@ -49,29 +49,47 @@ def build_system_prompt(team_context: dict, budget_total: int = 1000, is_persona
         "   - Titolarità 2026/27: minuti/starts da dati Sofascore delle prime giornate.\n"
         "3. Rispondi SEMPRE in italiano, in formato Markdown strutturato (elenchi puntati, grassetto per cifre e nomi).\n"
         "4. Per confronti: tabella comparativa + verdetto finale con motivazione numerica.\n"
-        "5. Se i dati forniti non contengono la risposta, dillo chiaramente invece di speculare."
+        "5. Se i dati forniti non contengono la risposta, dillo chiaramente invece di speculare.\n"
+        "6. Per domande di fatto (gol, xG/xA, cartellini, voti, risultati, minuti): risposta BREVE e "
+        "numerica (2-5 righe), presa SOLO dai blocchi CONTESTO RECUPERATO. Nessuna divagazione."
     )
 
 
-def build_user_prompt(prompt: str, top_players: list) -> str:
-    """Build user prompt with grounded player data context in clean readable table format."""
-    lines = [TABLE_HEADER, "|---|---|---|---|---|---|---|"]
+def build_user_prompt(prompt: str, top_players: list, context_blocks: list | None = None) -> str:
+    """Build user prompt: blocchi di contesto recuperato (RAG strutturato)
+    + tabella giocatori di supporto, in formato leggibile."""
+    lines = []
+
+    blocks = [b for b in (context_blocks or []) if b]
+    if blocks:
+        lines.append("CONTESTO RECUPERATO DAL DATABASE (dati ufficiali, più freschi della tabella):")
+        lines.extend(blocks)
+        lines.append("─" * 40)
+
+    table_lines = [TABLE_HEADER, "|---|---|---|---|---|---|---|"]
     for p in (top_players or [])[:35]:
         starter = "SI" if p.get("is_starter_2627") else "No"
         p50 = float(p.get("predicted_contrib_p50", 0))
         fair = int(p.get("prezzo_fair_1000", 1))
         vorp = float(p.get("vorp_points", 0))
-        lines.append(f"| {p.get('player')} | {p.get('role')} | {p.get('team')} | {p50:.1f} | {fair} cr | +{vorp:.1f} | {starter} |")
+        table_lines.append(
+            f"| {p.get('player')} | {p.get('role')} | {p.get('team')} | {p50:.1f} | {fair} cr | +{vorp:.1f} | {starter} |"
+        )
 
-    table_str = "\n".join(lines)
+    table_str = "\n".join(table_lines)
 
-    return (
+    lines.append(
         f"DATI UFFICIALI CALCIATORI DAL MODELLO ML:\n"
         f"{table_str}\n\n"
         f"Domanda: {prompt}\n\n"
         f"ISTRUZIONI CHIAVE:\n"
-        f"- Basa la tua risposta esclusivamente sui giocatori presenti nella tabella sopra.\n"
+        f"- Basa la tua risposta esclusivamente sui giocatori presenti nella tabella "
+        f"o nei blocchi di contesto recuperato sopra.\n"
+        f"- Se nei blocchi di contesto c'è la risposta alla domanda, usa QUELLI e "
+        f"rispondi in modo breve e numerico; la tabella serve solo per classifiche/consigli.\n"
         f"- Se la domanda riguarda ruoli, squadre o profili low cost, evidenzia i giocatori rilevanti "
         f"ordinandoli per titolarità, Contributo Atteso e VORP.\n"
         f"- Ricorda il caveat VORP: confronti numerici solo tra giocatori dello stesso ruolo."
     )
+
+    return "\n".join(lines)
