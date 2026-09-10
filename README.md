@@ -30,7 +30,7 @@ A modular pipeline that scrapes, models and serves **player data & statistics fo
   - **Mappa di Gioco**: season touch heatmap (30×20 grid on an SVG pitch, own goal left) with "fino alla giornata N" period selector (stage 13)
   - **Statistiche Avanzate**: season totals/per-90/percentages with role-relative percentile bars, cards included (stage 14)
   - **Forma Squadra**: last-5 W/D/L chips + season record for the player's team
-- **Partite tab** — Serie A results & schedule with matchday navigation; match cards open a dedicated **Match Page** (`/match/<id>`) with lineups, scorers and MOTM (player names link to the player page; a "run stage 11" hint shows when results data is absent).
+- **Partite tab** — three views: **Partite** (results & schedule with matchday navigation), **Classifica** (standings) and **Marcatori** (top scorers, linked to the player statistics pages). Match cards open a dedicated **Match Page** (`/match/<id>`) with lineups, scorers and MOTM (player names link to the player page). Live data (team logos, live scores/clock, goal assists, yellow/red cards, substitutions, formations) comes from ESPN's public API fetched **directly in your browser** (ESPN blocks server-side calls) — loaded lazily only when you open the tab, no polling — and everything degrades gracefully to stage-11/12 data when ESPN is unreachable. Match events fetched from ESPN are also **saved to a local cache** (`data/espn_match_events.json`) so repeat visits render instantly and work even when ESPN is unreachable; an "ESPN" button on the match page forces a refresh. Yellow/red cards collected this way can be merged into the dataset with `python export_player_cards.py` (columns `yellow_cards_espn` / `red_cards_espn`, shown as a 🟨/🟥 badge on the player page).
 - **"Analista" AI chat** — grounded Q&A over the dataset (see below).
 
 ### Conversational AI Copilot ("Analista")
@@ -110,6 +110,7 @@ python run_pipeline.py --step 6     # single stage
 python run_pipeline.py --from 8     # ML stages onward
 
 python export_player_history.py     # data/player_history.json (career trajectories)
+python export_player_cards.py       # cartellini ESPN (cache crowdsourced) -> colonne dataset
 python export_dataset.py            # dataset_finale_{500,1000}.csv exports
 python demo.py                      # zero-config terminal demo (no scraping needed)
 

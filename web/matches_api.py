@@ -8,6 +8,7 @@ stats (stage-14), from the data/ artifacts.
 import csv
 import json
 import os
+from datetime import datetime, timezone
 
 import pandas as pd
 from flask import Blueprint, jsonify, request
@@ -572,3 +573,192 @@ def api_match_detail():
     if payload is None:
         return jsonify({"error": "match not found"}), 404
     return jsonify(payload)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ESPN match-events store (crowdsourced cache)
+#
+# Le statistiche di gara (gol/assist/cartellini/cambi/moduli) arrivano da ESPN
+# SOLO dal browser del visitatore (ESPN blocca le richieste server-side).
+# Quando una pagina partita le scarica, il client le POSTa qui: vengono
+# salvate in data/espn_match_events.json (chiave = fixture_id stage 11) e le
+# visite successive le leggono dalla cache senza toccare ESPN. Merge senza
+# downgrade: una versione con meno eventi non sostituisce una piu' ricca.
+# ─────────────────────────────────────────────────────────────────────────────
+ESPN_EVENTS_JSON = os.environ.get(
+    "ESPN_EVENTS_JSON", os.path.join(PROJECT_ROOT, "data", "espn_match_events.json")
+)
+VALID_KINDS = {"goal", "penalty", "own", "yellow", "red", "sub"}
+VALID_SIDES = {"home", "away"}
+VALID_STATES = {"pre", "in", "post"}
+
+
+def _load_espn_store():
+    if not os.path.exists(ESPN_EVENTS_JSON):
+        return {}
+    try:
+        with open(ESPN_EVENTS_JSON, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_espn_store(store):
+    """Scrittura atomica (tmp + replace) per non troncare il file su crash."""
+    os.makedirs(os.path.dirname(ESPN_EVENTS_JSON), exist_ok=True)
+    tmp = ESPN_EVENTS_JSON + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(store, f, ensure_ascii=False, separators=(",", ":"))
+    os.replace(tmp, ESPN_EVENTS_JSON)
+
+
+def _clean_str(value, cap):
+    s = str(value or "").strip()
+    return s[:cap] if s else ""
+
+
+def sanitize_espn_payload(data):
+    """Valida e normalizza il payload POSTato dal client. None se illegittimo."""
+    if not isinstance(data, dict):
+        return None
+    event_id = _int_or_none(data.get("event_id"))
+    if event_id is None or event_id <= 0:
+        return None
+    match_state = data.get("match_state")
+    if match_state not in VALID_STATES:
+        match_state = None
+    form_raw = data.get("form") or {}
+    form = {
+        "home": _clean_str(form_raw.get("home"), 12) if isinstance(form_raw, dict) else "",
+        "away": _clean_str(form_raw.get("away"), 12) if isinstance(form_raw, dict) else "",
+    }
+    events = []
+    raw_events = data.get("events")
+    if isinstance(raw_events, list):
+        for e in raw_events[:200]:
+            if not isinstance(e, dict):
+                continue
+            kind = e.get("kind")
+            side = e.get("side")
+            if kind not in VALID_KINDS or side not in VALID_SIDES:
+                continue
+            minute = _int_or_none(e.get("minute"))
+            if minute is not None and not 0 <= minute <= 130:
+                minute = None
+            events.append({
+                "minute": minute,
+                "side": side,
+                "kind": kind,
+                "player": _clean_str(e.get("player"), 80),
+                "assist": _clean_str(e.get("assist"), 80),
+            })
+    espn_link = _clean_str(data.get("espn_link"), 250)
+    if espn_link and not espn_link.startswith("https://www.espn.com/"):
+        espn_link = ""
+    return {
+        "event_id": event_id,
+        "espn_event_id": _clean_str(data.get("espn_event_id"), 20),
+        "match_state": match_state,
+        "form": form,
+        "events": events,
+        "espn_link": espn_link,
+    }
+
+
+def merge_espn_payload(store, clean):
+    """Inserisce/aggiorna la chiave senza mai degradare i dati: una versione
+    con meno eventi non sostituisce una piu' ricca. Unico upgrade consentito
+    a parita' di eventi: aggiungere il link canonico ESPN a una voce che non
+    lo ha (gli eventi piu' ricchi restano invariati). True se scritta."""
+    key = str(clean["event_id"])
+    prev = store.get(key)
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    if prev is not None:
+        try:
+            prev_count = len(prev.get("events") or [])
+        except Exception:
+            prev_count = 0
+        link_upgrade = bool(clean.get("espn_link")) and not (prev.get("espn_link") or "")
+        if prev_count > len(clean["events"]):
+            if not link_upgrade:
+                return False
+            # solo upgrade del link: gli eventi piu' ricchi restano
+            entry = dict(prev)
+            entry["espn_link"] = clean["espn_link"]
+            entry["fetched_at"] = now
+            store[key] = entry
+            return True
+        if prev_count == len(clean["events"]) and not link_upgrade:
+            return False
+    entry = dict(clean)
+    entry["fetched_at"] = now
+    store[key] = entry
+    return True
+
+
+_espn_store_cache = {"mtime": None, "data": None}
+
+
+def _espn_store_cached():
+    """Store in cache per le GET: rilettura solo se il file e' cambiato."""
+    if not os.path.exists(ESPN_EVENTS_JSON):
+        return {}
+    mtime = os.path.getmtime(ESPN_EVENTS_JSON)
+    if _espn_store_cache["data"] is None or _espn_store_cache["mtime"] != mtime:
+        _espn_store_cache["mtime"] = mtime
+        _espn_store_cache["data"] = _load_espn_store()
+    return _espn_store_cache["data"]
+
+
+@matches_bp.route("/api/match_events")
+def api_match_events_get():
+    """Eventi ESPN cachati per una partita (gol/cartellini/cambi/moduli)."""
+    event_id = request.args.get("event", type=int)
+    if not event_id:
+        return jsonify({"error": "event parameter required"}), 400
+    entry = _espn_store_cached().get(str(event_id))
+    if not entry:
+        return jsonify({"error": "no cached events for this match"}), 404
+    return jsonify({
+        "available": True,
+        "event_id": event_id,
+        "espn_event_id": entry.get("espn_event_id"),
+        "espn_link": entry.get("espn_link"),
+        "match_state": entry.get("match_state"),
+        "fetched_at": entry.get("fetched_at"),
+        "form": entry.get("form") or {},
+        "events": entry.get("events") or [],
+    })
+
+
+@matches_bp.route("/api/espn_events", methods=["POST"])
+def api_espn_events_post():
+    """Salva gli eventi ESPN raccolti dal browser di un visitatore."""
+    payload = sanitize_espn_payload(request.get_json(silent=True))
+    if payload is None:
+        return jsonify({"error": "invalid payload"}), 400
+    # rileggi dal disco (non dalla cache di lettura) per non perdere chiavi
+    store = _load_espn_store()
+    written = merge_espn_payload(store, payload)
+    if written:
+        _save_espn_store(store)
+        _espn_store_cache["mtime"] = None  # forza rilettura alla prossima GET
+    return jsonify({"saved": written, "event_id": payload["event_id"],
+                    "events": len(payload["events"])})
+
+
+@matches_bp.route("/api/espn_events", methods=["DELETE"])
+def api_espn_events_delete():
+    """Rimuove una chiave dalla cache (es. dati errati da correggere)."""
+    event_id = request.args.get("event", type=int)
+    if not event_id:
+        return jsonify({"error": "event parameter required"}), 400
+    store = _load_espn_store()
+    key = str(event_id)
+    if key not in store:
+        return jsonify({"error": "no cached events for this match"}), 404
+    del store[key]
+    _save_espn_store(store)
+    _espn_store_cache["mtime"] = None
+    return jsonify({"deleted": key})

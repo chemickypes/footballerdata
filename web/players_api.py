@@ -195,6 +195,8 @@ def api_players():
             "contract_until": str(row["contract_until"]) if "contract_until" in row.index and pd.notna(row.get("contract_until")) else None,
             "xg_3y": float(row.get("xg_media_3y", 0)) if pd.notna(row.get("xg_media_3y")) else None,
             "xa_3y": float(row.get("xa_media_3y", 0)) if pd.notna(row.get("xa_media_3y")) else None,
+            "yellow_cards_espn": int(row["yellow_cards_espn"]) if "yellow_cards_espn" in row.index and pd.notna(row.get("yellow_cards_espn")) else 0,
+            "red_cards_espn": int(row["red_cards_espn"]) if "red_cards_espn" in row.index and pd.notna(row.get("red_cards_espn")) else 0,
             "medical": {
                 "days_lost_3y": days_lost,
                 "injuries_count_3y": inj_count,

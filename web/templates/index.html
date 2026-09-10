@@ -207,7 +207,7 @@
                             <div style="font-size:0.75rem; color:var(--text-muted);" id="matchesSeasonLabel">Serie A</div>
                         </div>
                     </div>
-                    <div style="display:flex; align-items:center; gap:6px;">
+                    <div id="matchdayNav" style="display:flex; align-items:center; gap:6px;">
                         <button class="btn-secondary" id="roundPrevBtn" style="width:auto; padding:6px 12px; font-size:0.85rem;" onclick="changeMatchdayRound(-1)" title="Giornata precedente" aria-label="Giornata precedente">
                             <i class="fa-solid fa-chevron-left"></i>
                         </button>
@@ -217,7 +217,14 @@
                         </button>
                     </div>
                 </div>
+                <div id="partiteViewsBar" style="display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap;">
+                    <button class="pill active" id="pvBtn-partite" onclick="showPartiteView('partite')">Partite</button>
+                    <button class="pill" id="pvBtn-classifica" onclick="showPartiteView('classifica')">Classifica</button>
+                    <button class="pill" id="pvBtn-marcatori" onclick="showPartiteView('marcatori')">Marcatori</button>
+                </div>
                 <div id="matchesContainer"></div>
+                <div id="espClassifica" style="display:none;"></div>
+                <div id="espMarcatori" style="display:none;"></div>
             </div>
         </div>
 
@@ -233,9 +240,10 @@
                 <button class="pv-back" onclick="closePlayerDetailDrawer()"><i class="fa-solid fa-arrow-left"></i> Listone</button>
                 <div class="pv-identity">
                     <div id="pdName" style="font-size:1.5rem; font-weight:700; color:var(--text-main); line-height:1.2;"></div>
-                    <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
+                    <div style="display:flex; gap:8px; align-items:center; margin-top:4px; flex-wrap:wrap;">
                         <span id="pdRole" class="role-badge" style="font-size:0.74rem; padding:2px 9px; border-radius:6px;"></span>
                         <span id="pdTeam" style="font-size:0.88rem; color:var(--text-muted); font-weight:600;"></span>
+                        <span id="pdCardsEspn" style="display:none; font-size:0.74rem; font-weight:600; color:var(--text-muted);" title="Cartellini stagione (dati ESPN raccolti dal browser)"></span>
                     </div>
                 </div>
             </div>
@@ -455,17 +463,23 @@
                     <div id="mdSub" style="font-size:0.78rem; color:var(--text-muted); font-weight:600; margin-bottom:2px;"></div>
                     <div id="mdScoreline" style="font-size:1.5rem; font-weight:700; color:var(--text-main); line-height:1.25;"></div>
                 </div>
+                <button id="mdEspnRefresh" onclick="refreshMatchEspn()" title="Ricarica i dati live ESPN (gol, cartellini, cambi, modulo)"
+                        style="margin-left:auto; flex:0 0 auto; background:var(--surface-elevated); color:var(--text-muted); border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:0.74rem; font-weight:600; cursor:pointer;">
+                    <i class="fa-solid fa-rotate"></i> ESPN
+                </button>
             </div>
 
             <div id="mdScorersStrip" style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:0.8rem; color:var(--text-muted); display:none;"></div>
 
+            <div id="mdEspnSection" style="display:none; background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-bottom:14px;"></div>
+
             <div class="pv-grid" id="mdLineups">
                 <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:14px;">
-                    <b style="font-size:0.9rem; font-weight:600; color:var(--text-main); display:block; margin-bottom:10px;"><i class="fa-solid fa-shield-halved" style="color:var(--text-muted); margin-right:6px;"></i><span id="mdHomeName">—</span></b>
+                    <b style="font-size:0.9rem; font-weight:600; color:var(--text-main); display:block; margin-bottom:10px;"><i class="fa-solid fa-shield-halved" style="color:var(--text-muted); margin-right:6px;"></i><span id="mdHomeName">—</span><span id="mdHomeForm" class="md-form" style="display:none;"></span></b>
                     <div id="mdHomeLineup" style="font-size:0.78rem; color:var(--text-muted);">Caricamento…</div>
                 </div>
                 <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:14px;">
-                    <b style="font-size:0.9rem; font-weight:600; color:var(--text-main); display:block; margin-bottom:10px;"><i class="fa-solid fa-shield-halved" style="color:var(--text-muted); margin-right:6px;"></i><span id="mdAwayName">—</span></b>
+                    <b style="font-size:0.9rem; font-weight:600; color:var(--text-main); display:block; margin-bottom:10px;"><i class="fa-solid fa-shield-halved" style="color:var(--text-muted); margin-right:6px;"></i><span id="mdAwayName">—</span><span id="mdAwayForm" class="md-form" style="display:none;"></span></b>
                     <div id="mdAwayLineup" style="font-size:0.78rem; color:var(--text-muted);">Caricamento…</div>
                 </div>
             </div>
@@ -531,6 +545,7 @@
 
     <script>window.__initialPlayer = {{ initial_player|tojson if initial_player is not none else 'null' }};</script>
     <script>window.__initialMatch = {{ initial_match|tojson if initial_match is not none else 'null' }};</script>
+    <script src="/static/js/espn.js"></script>
     <script src="/static/js/app.js"></script>
     <script src="/static/js/tutorial.js"></script>
 </body>

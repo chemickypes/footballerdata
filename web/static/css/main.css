@@ -1140,3 +1140,158 @@ input:focus, select:focus, textarea:focus {
     padding: 2px 0;
     border-radius: 6px;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   PARTITE: enrichment ESPN (loghi, live, classifica, marcatori, eventi)
+   ════════════════════════════════════════════════════════════════ */
+
+.match-logo {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    flex: 0 0 auto;
+}
+
+.match-score-live {
+    background: rgba(229, 83, 75, 0.14);
+    color: #e5534b;
+}
+
+.match-meta-live {
+    color: #e5534b;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+.live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #e5534b;
+    animation: esp-blink 1.4s infinite;
+    flex: 0 0 auto;
+}
+
+@keyframes esp-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+}
+
+/* tabelle classifica e marcatori (ESPN) */
+.esp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.esp-table th {
+    text-align: right;
+    color: var(--text-muted);
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.esp-table th.l { text-align: left; }
+
+.esp-table td {
+    padding: 8px 6px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-main);
+}
+
+.esp-table td.l { text-align: left; }
+
+.esp-table tbody tr:last-child td { border-bottom: 0; }
+
+.esp-table tbody tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+.esp-table .esp-pos {
+    color: var(--text-muted);
+    font-weight: 700;
+    width: 26px;
+}
+
+.esp-table tr.esp-cut td { border-bottom: 2px solid var(--primary); }
+
+.esp-note {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 8px;
+    line-height: 1.5;
+}
+
+/* timeline eventi partita (gol, cartellini, cambi) */
+.md-ev-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px 16px;
+}
+
+.md-ev {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    padding: 3px 0;
+    font-size: 0.78rem;
+    color: var(--text-main);
+}
+
+.md-ev.away {
+    grid-column: 2;
+    flex-direction: row-reverse;
+    text-align: right;
+}
+
+.md-ev.home { grid-column: 1; }
+
+.md-ev-min {
+    font-weight: 700;
+    color: var(--text-muted);
+    min-width: 32px;
+    font-size: 0.7rem;
+}
+
+.ev-card {
+    display: inline-block;
+    width: 10px;
+    height: 13px;
+    border-radius: 2px;
+    transform: translateY(1px);
+}
+
+.ev-card-y { background: #f5c518; }
+.ev-card-r { background: #e5534b; }
+
+.md-form {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1px 7px;
+    margin-left: 8px;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+@media (max-width: 560px) {
+    .md-ev-grid { grid-template-columns: 1fr; }
+    .md-ev.away { grid-column: 1; flex-direction: row; text-align: left; }
+}

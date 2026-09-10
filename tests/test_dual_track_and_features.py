@@ -165,13 +165,14 @@ def main():
     check("main.css non vuota", len(r_css.text) > 1000, f"bytes={len(r_css.text)}")
 
     scripts = []
-    for js_path in ["/static/js/app.js", "/static/js/tutorial.js"]:
+    for js_path in ["/static/js/espn.js", "/static/js/app.js", "/static/js/tutorial.js"]:
         r_js = requests.get(f"{BASE_URL}{js_path}", timeout=10)
         check(f"GET {js_path} → 200", r_js.status_code == 200)
         if r_js.status_code == 200:
             scripts.append((js_path, r_js.text))
 
-    check("File JS esterni serviti", len(scripts) == 2, f"n={len(scripts)}")
+    espn_js = next((c for p, c in scripts if p.endswith("espn.js")), "")
+    check("File JS esterni serviti", len(scripts) == 3, f"n={len(scripts)}")
     for i, (js_path, content) in enumerate(scripts):
         with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False) as tf:
             tf.write(content)
@@ -384,6 +385,72 @@ def main():
     check("HTML contiene 'matchPage'", "matchPage" in html)
     check("app.js contiene 'openMatchPage'", "openMatchPage" in app_js)
     check("app.js contiene 'renderMatchDetail'", "renderMatchDetail" in app_js)
+
+    # ── 15. ESPN live enrichment (client-side) ────────────────────────
+    print("\n▸ 15. ESPN Live Enrichment (viste Partite, client-side)")
+    check("HTML linka espn.js", '/static/js/espn.js' in html)
+    check("espn.js contiene endpoint ESPN", "site.api.espn.com" in espn_js)
+    check("espn.js contiene 'ensureSeason'", "ensureSeason" in espn_js)
+    check("espn.js contiene 'standings'", "standings" in espn_js)
+    check("espn.js contiene 'scorers'", "scorers" in espn_js)
+    check("espn.js contiene rimappa codici ROMA/COMO", "ROMA" in espn_js and "COMO" in espn_js)
+    check("app.js usa ESPNX", "ESPNX" in app_js)
+    check("app.js contiene 'showPartiteView'", "showPartiteView" in app_js)
+    check("app.js contiene 'renderEspClassifica'", "renderEspClassifica" in app_js)
+    check("app.js contiene 'renderEspMarcatori'", "renderEspMarcatori" in app_js)
+    check("app.js contiene 'enrichMatchDetailEspn'", "enrichMatchDetailEspn" in app_js)
+    check("app.js contiene 'loadMatchDetailFallback'", "loadMatchDetailFallback" in app_js)
+    check("app.js contiene '_resolveDatasetPlayer' (link marcatori)", "_resolveDatasetPlayer" in app_js)
+    check("espn.js contiene 'codeFromLabel'", "codeFromLabel" in espn_js)
+    check("HTML contiene viste Partite (partiteViewsBar)", "partiteViewsBar" in html)
+    check("HTML contiene container 'espClassifica'", "espClassifica" in html)
+    check("HTML contiene container 'espMarcatori'", "espMarcatori" in html)
+    check("HTML contiene 'mdEspnSection' (eventi partita)", "mdEspnSection" in html)
+
+    # ── 16. ESPN match-events store (cache crowdsourced) ──────────────
+    print("\n▸ 16. ESPN Match-Events Store (POST/GET/DELETE)")
+    STORE_PROBE = 999999001  # fixture fittizia: pulita con DELETE a fine sezione
+    payload = {
+        "event_id": STORE_PROBE, "espn_event_id": "555001", "match_state": "post",
+        "form": {"home": "3-4-2-1", "away": "4-3-3"},
+        "events": [
+            {"minute": 12, "side": "home", "kind": "goal", "player": "Test Gol", "assist": "Test Assist"},
+            {"minute": 70, "side": "away", "kind": "yellow", "player": "Test Giallo", "assist": ""},
+        ],
+    }
+    r_post = requests.post(f"{BASE_URL}/api/espn_events", json=payload, timeout=10)
+    check("POST /api/espn_events → 200 saved", r_post.status_code == 200 and r_post.json().get("saved") is True,
+          f"status={r_post.status_code} body={r_post.text[:80]}")
+    r_get = requests.get(f"{BASE_URL}/api/match_events?event={STORE_PROBE}", timeout=10)
+    check("GET /api/match_events → 200 con eventi", r_get.status_code == 200 and len(r_get.json().get("events", [])) == 2,
+          f"status={r_get.status_code}")
+    check("Cache: match_state e form presenti", r_get.json().get("match_state") == "post"
+          and r_get.json().get("form", {}).get("home") == "3-4-2-1")
+    # merge senza downgrade: POST con meno eventi non sovrascrive
+    r_post2 = requests.post(f"{BASE_URL}/api/espn_events",
+                            json={"event_id": STORE_PROBE, "match_state": "post", "events": []}, timeout=10)
+    check("POST senza downgrade (0 eventi non svuota la cache)",
+          r_post2.status_code == 200 and r_post2.json().get("saved") is False)
+    r_get2 = requests.get(f"{BASE_URL}/api/match_events?event={STORE_PROBE}", timeout=10)
+    check("Cache ancora intatta dopo POST debole", len(r_get2.json().get("events", [])) == 2)
+    r_bad = requests.post(f"{BASE_URL}/api/espn_events", json={"event_id": -5, "events": []}, timeout=10)
+    check("POST payload illegittimo → 400", r_bad.status_code == 400, f"status={r_bad.status_code}")
+    r_del = requests.delete(f"{BASE_URL}/api/espn_events?event={STORE_PROBE}", timeout=10)
+    check("DELETE /api/espn_events → 200", r_del.status_code == 200)
+    r_get3 = requests.get(f"{BASE_URL}/api/match_events?event={STORE_PROBE}", timeout=10)
+    check("GET dopo DELETE → 404", r_get3.status_code == 404, f"status={r_get3.status_code}")
+    r_get4 = requests.get(f"{BASE_URL}/api/match_events?event=1", timeout=10)
+    check("GET senza evento in cache → 404", r_get4.status_code == 404)
+
+    # ── 17. Refresh ESPN + link canonico + cartellini giocatore ───────
+    print("\n▸ 17. Refresh ESPN, link canonico, cartellini nel dataset")
+    check("HTML contiene bottone 'mdEspnRefresh'", "mdEspnRefresh" in html)
+    check("app.js contiene 'refreshMatchEspn'", "refreshMatchEspn" in app_js)
+    check("espn.js contiene 'refreshEvent'", "refreshEvent" in espn_js)
+    check("espn.js usa links canonicali (rel summary)", "'summary'" in espn_js and "links" in espn_js)
+    check("HTML contiene badge 'pdCardsEspn'", "pdCardsEspn" in html)
+    check("Payload giocatori con yellow/red_cards_espn",
+          all(k in sample for k in ("yellow_cards_espn", "red_cards_espn")))
 
     # ── SUMMARY ───────────────────────────────────────────────────────
     print("\n" + "=" * 72)

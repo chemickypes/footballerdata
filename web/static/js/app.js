@@ -42,6 +42,19 @@ function openPlayerDetailDrawer(playerName, opts) {
     roleEl.className = 'role-badge role-' + p.role.toLowerCase();
     document.getElementById('pdTeam').textContent = p.team || '';
 
+    // Cartellini stagione (aggregati dalla cache ESPN, export_player_cards.py)
+    const cardsEl = document.getElementById('pdCardsEspn');
+    if (cardsEl) {
+        const yc = parseInt(p.yellow_cards_espn || 0, 10);
+        const rc = parseInt(p.red_cards_espn || 0, 10);
+        if (yc > 0 || rc > 0) {
+            cardsEl.innerHTML = `<span title="${yc} ammonizioni">${yc ? '🟨 ' + yc : ''}</span>${yc && rc ? ' ' : ''}<span title="${rc} espulsioni">${rc ? '🟥 ' + rc : ''}</span> <span style="font-weight:400;">(ESPN)</span>`;
+            cardsEl.style.display = '';
+        } else {
+            cardsEl.style.display = 'none';
+        }
+    }
+
     // Summary bar
     document.getElementById('pdFairPrice').textContent = `${getPlayerFairPrice(p)} cr`;
     document.getElementById('pdVorp').textContent = (p.vorp || 0).toFixed(1);
@@ -295,6 +308,7 @@ function closePlayerDetailDrawer() {
    MATCH PAGE (dettaglio partita: formazioni, marcatori, MOTM)
    ───────────────────────────────────────────────────────────── */
 let _currentMatchDetailId = null;
+let _currentDetailPlayer = null;
 
 function openMatchPage(eventId, opts) {
     opts = opts || {};
@@ -321,6 +335,7 @@ function _hideMatchPage() {
     const page = document.getElementById('matchPage');
     if (page) page.style.display = 'none';
     _currentMatchDetailId = null;
+    _mdCurrentMatch = null;
 }
 
 function closeMatchPage() {
@@ -334,16 +349,203 @@ function closeMatchPage() {
 function loadMatchDetail(eventId) {
     const el = document.getElementById('mdScoreline');
     if (el) el.textContent = 'Caricamento…';
+    _mdEspnReset();
     fetch(`/api/match_detail?event=${parseInt(eventId, 10)}`)
         .then(r => r.ok ? r.json() : Promise.reject(new Error(r.status === 404 ? 'no-data' : 'error')))
-        .then(data => renderMatchDetail(data))
+        .then(data => {
+            _mdCurrentMatch = data.match || null;
+            renderMatchDetail(data);
+            enrichMatchDetailEspn(data);
+        })
         .catch(() => {
-            if (el) el.textContent = 'Partita';
-            ['mdHomeLineup', 'mdAwayLineup'].forEach(id => {
-                const c = document.getElementById(id);
-                if (c) c.innerHTML = '<div style="font-style:italic;">Dati non disponibili (esegui gli stage 11 e 12)</div>';
-            });
+            loadMatchDetailFallback(eventId);
         });
+}
+
+/* ─────────────────────────────────────────────────────────────
+   MATCH PAGE: enrichment ESPN (gol/assist/cartellini/cambi/moduli)
+   + cache crowdsourced (POST /api/espn_events) + refresh manuale
+   ───────────────────────────────────────────────────────────── */
+let _mdCurrentMatch = null;
+let _mdRefreshing = false;
+
+function _mdEspnReset() {
+    const box = document.getElementById('mdEspnSection');
+    if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+    ['mdHomeForm', 'mdAwayForm'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.style.display = 'none'; el.textContent = ''; }
+    });
+}
+
+function _mdEspnRender(parsed, link) {
+    const form = parsed.form || {};
+    [['mdHomeForm', form.home], ['mdAwayForm', form.away]].forEach(([id, f]) => {
+        const el = document.getElementById(id);
+        if (el && f) { el.textContent = f; el.style.display = ''; }
+    });
+    const box = document.getElementById('mdEspnSection');
+    if (!box) return;
+    if ((parsed.events || []).length) {
+        box.innerHTML = _mdEspnEventsHTML(parsed, link);
+        box.style.display = '';
+    } else if (link) {
+        box.innerHTML = `<a href="${link}" target="_blank" rel="noopener" style="color:var(--primary); font-size:0.74rem; font-weight:600; text-decoration:none;">Dettagli completi su ESPN <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.62rem;"></i></a>`;
+        box.style.display = '';
+    }
+}
+
+function _mdPostEspnEvents(fixtureId, ev, parsed) {
+    try {
+        fetch('/api/espn_events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                event_id: parseInt(fixtureId, 10),
+                espn_event_id: String(ev.id),
+                match_state: ESPNX.statusOf(ev).state,
+                events: parsed.events,
+                form: parsed.form,
+                espn_link: ESPNX.espnLink(ev),
+            }),
+        }).catch(() => { /* salvataggio best-effort */ });
+    } catch (_) { /* noop */ }
+}
+
+async function enrichMatchDetailEspn(data) {
+    if (!window.ESPNX || !data || !data.match) return;
+    const m = data.match;
+    const fixtureId = parseInt(m.event_id, 10);
+    if (!fixtureId) return;
+    let shownCount = 0;
+    // 1) cache locale: le visite precedenti hanno salvato gli eventi ESPN
+    try {
+        const r = await fetch(`/api/match_events?event=${fixtureId}`);
+        if (r.ok) {
+            const c = await r.json();
+            if (c && c.available && (c.events || []).length) {
+                const link = c.espn_link || (c.espn_event_id ? 'https://www.espn.com/soccer/match/_/gameId/' + c.espn_event_id : '');
+                _mdEspnRender({ events: c.events, form: c.form || {} }, link);
+                shownCount = c.events.length;
+                if (c.match_state === 'post') return; // gara finita: cache completa
+            }
+        }
+    } catch (_) { /* cache non disponibile: si prosegue con ESPN */ }
+    // 2) live ESPN (se la cache era parziale o assente)
+    try {
+        await ESPNX.ensureSeason();
+        const ev = ESPNX.lookup(m.date, m.home_code, m.away_code);
+        if (!ev) return;
+        const sm = await ESPNX.summary(ev.id);
+        const parsed = ESPNX.extractEvents(sm);
+        if (parsed.events.length >= shownCount) {
+            _mdEspnRender(parsed, ESPNX.espnLink(ev));
+            shownCount = parsed.events.length;
+        }
+        // 3) persisti per le prossime visite (merge lato server senza downgrade)
+        _mdPostEspnEvents(fixtureId, ev, parsed);
+    } catch (_) { /* ESPN non raggiungibile: resta quanto mostrato */ }
+}
+
+function refreshMatchEspn() {
+    const m = _mdCurrentMatch;
+    const btn = document.getElementById('mdEspnRefresh');
+    if (!m || !window.ESPNX || _mdRefreshing) return;
+    _mdRefreshing = true;
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i> Aggiorno…'; }
+    const done = () => {
+        _mdRefreshing = false;
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate"></i> ESPN'; }
+    };
+    (async () => {
+        await ESPNX.ensureSeason();
+        // scoreboard del giorno + summary freschi (bypass della cache di sessione)
+        const ev = await ESPNX.refreshEvent(m.date, m.home_code, m.away_code);
+        if (!ev) { done(); return; }
+        const parsed = ESPNX.extractEvents(await ESPNX.summary(ev.id, true));
+        _mdEspnRender(parsed, ESPNX.espnLink(ev));
+        _mdPostEspnEvents(m.event_id, ev, parsed);
+    })().catch(() => { /* ESPN non raggiungibile */ }).finally(done);
+}
+
+function _mdEspnEventsHTML(parsed, link) {
+    const ic = e => {
+        if (e.kind === 'yellow') return '<span class="ev-card ev-card-y" title="Cartellino giallo"></span>';
+        if (e.kind === 'red') return '<span class="ev-card ev-card-r" title="Cartellino rosso"></span>';
+        if (e.kind === 'sub') return '<span title="Cambio" style="color:var(--text-muted); font-weight:700;">⇄</span>';
+        if (e.kind === 'penalty') return '<span title="Gol su rigore">⚽</span>';
+        if (e.kind === 'own') return '<span title="Autogol">⚽</span>';
+        return '<span title="Gol">⚽</span>';
+    };
+    const tag = e => e.kind === 'penalty' ? ' (rig.)' : (e.kind === 'own' ? ' (aut.)' : '');
+    const rows = parsed.events.map(e => {
+        const min = e.minute != null ? e.minute + "'" : '';
+        const txt = e.kind === 'sub'
+            ? `<b>${escapeHTML(e.player)}</b> <span style="color:var(--text-muted);">entra${e.assist ? ` (esce ${escapeHTML(e.assist)})` : ''}</span>`
+            : `<b>${escapeHTML(e.player)}</b>${tag(e)}${e.assist ? ` <span style="color:var(--text-muted); font-size:0.72rem;">assist ${escapeHTML(e.assist)}</span>` : ''}`;
+        return `<div class="md-ev ${e.side === 'away' ? 'away' : 'home'}">${ic(e)}<span class="md-ev-min">${min}</span><span>${txt}</span></div>`;
+    }).join('');
+    const linkHtml = link ? `<a href="${link}" target="_blank" rel="noopener" style="color:var(--primary); font-size:0.72rem; font-weight:600; text-decoration:none;">Dettagli su ESPN <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.6rem;"></i></a>` : '';
+    return `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px; flex-wrap:wrap;">
+            <b style="font-size:0.86rem; color:var(--text-main);"><i class="fa-solid fa-list" style="color:var(--text-muted); margin-right:6px;"></i>Gol, cartellini &amp; cambi <span style="font-weight:400; color:var(--text-muted); font-size:0.72rem;">(ESPN)</span></b>
+            ${linkHtml}
+        </div>
+        <div class="md-ev-grid">${rows || '<span style="color:var(--text-muted); font-size:0.78rem;">Nessun evento registrato.</span>'}</div>`;
+}
+
+function loadMatchDetailFallback(eventId) {
+    // Partita senza dati stage 11/12: prova a ricostruirla dalle fixture gia'
+    // in memoria + dati live ESPN.
+    const el = document.getElementById('mdScoreline');
+    let fixture = null;
+    if (matchesData && matchesData.available) {
+        for (const rnd of (matchesData.rounds || [])) {
+            const hit = (rnd.matches || []).find(x => x.fixture_id === eventId);
+            if (hit) { fixture = hit; break; }
+        }
+    }
+    if (!fixture || !window.ESPNX) {
+        if (el) el.textContent = 'Partita';
+        ['mdHomeLineup', 'mdAwayLineup'].forEach(id => {
+            const c = document.getElementById(id);
+            if (c) c.innerHTML = '<div style="font-style:italic;">Dati non disponibili (esegui gli stage 11 e 12)</div>';
+        });
+        return;
+    }
+    const subEl = document.getElementById('mdSub');
+    if (subEl) subEl.textContent = `Serie A · Giornata ${fixture.round || '—'} · ${formatMatchDate(fixture.date)}`;
+    ['mdHomeLineup', 'mdAwayLineup'].forEach(id => {
+        const c = document.getElementById(id);
+        if (c) c.innerHTML = '<div style="font-style:italic;">Formazioni disponibili dopo la partita (stage 12)</div>';
+    });
+    ESPNX.ensureSeason().then(() => {
+        const ev = ESPNX.lookup(fixture.date, fixture.home_code, fixture.away_code);
+        const es = ev ? ESPNX.scoresOf(ev) : null;
+        const hs = (es && es.home.score != null) ? es.home.score : fixture.home_score;
+        const as = (es && es.away.score != null) ? es.away.score : fixture.away_score;
+        if (el) {
+            const home = escapeHTML(fixture.home_display || fixture.home_team || '?');
+            const away = escapeHTML(fixture.away_display || fixture.away_team || '?');
+            el.innerHTML = (hs != null && as != null)
+                ? `<span>${home}</span><span class="md-score">${hs} – ${as}</span><span>${away}</span>`
+                : `<span>${home}</span><span class="md-score md-score-tbd">vs</span><span>${away}</span>`;
+        }
+        if (es && es.live) {
+            const strip = document.getElementById('mdScorersStrip');
+            if (strip) {
+                strip.innerHTML = `<span class="match-meta-live" style="margin:0 auto;"><span class="live-dot"></span>LIVE${es.clock ? ' · ' + escapeHTML(es.clock) : ''}</span>`;
+                strip.style.display = 'flex';
+                strip.style.justifyContent = 'center';
+            }
+        }
+        if (ev) {
+            _mdCurrentMatch = Object.assign({}, fixture, { event_id: fixture.fixture_id });
+            enrichMatchDetailEspn({ match: _mdCurrentMatch });
+        } else {
+            _mdEspnReset();
+        }
+    });
 }
 
 function _mdRatingBadge(rating) {
@@ -446,6 +648,10 @@ async function init() {
 
     runBootSplash(() => {});
 
+    // ESPN non viene contattato all'avvio: la stagione si scarica in modo
+    // lazy solo quando si apre il tab Partite (loghi/live) o una pagina
+    // partita (eventi) — vedi renderMatches() ed enrichMatchDetailEspn().
+
     // Apertura diretta pagina giocatore (route /player/<name>)
     if (window.__initialPlayer) {
         openPlayerDetailDrawer(window.__initialPlayer, { noPush: true });
@@ -547,21 +753,37 @@ function renderMatchCard(m) {
     const homeWin = finished && m.home_score > m.away_score;
     const awayWin = finished && m.away_score > m.home_score;
 
-    const scoreHtml = finished
-        ? `<span class="match-score">${m.home_score}<span class="match-score-sep">–</span>${m.away_score}</span>`
-        : `<span class="match-score match-score-tbd">vs</span>`;
+    // Enrichment ESPN (browser-side): logo squadre + stato live/punteggio aggiornato
+    const espnEv = (window.ESPNX && ESPNX.ready()) ? ESPNX.lookup(m.date, m.home_code, m.away_code) : null;
+    const es = espnEv ? ESPNX.scoresOf(espnEv) : null;
+
+    let scoreHtml, meta;
+    if (es && es.live) {
+        scoreHtml = `<span class="match-score match-score-live">${es.home.score != null ? es.home.score : 0}<span class="match-score-sep">–</span>${es.away.score != null ? es.away.score : 0}</span>`;
+        meta = `<div class="match-meta match-meta-live"><span class="live-dot"></span>LIVE${es.clock ? ' ' + escapeHTML(es.clock) : ''}</div>`;
+    } else if (finished) {
+        scoreHtml = `<span class="match-score">${m.home_score}<span class="match-score-sep">–</span>${m.away_score}</span>`;
+        meta = `<div class="match-meta">Finale${(m.status && m.status !== 'FT') ? ` (${m.status})` : ''}</div>`;
+    } else if (es && es.finished && es.home.score != null && es.away.score != null) {
+        // risultato importato da ESPN prima che lo stage 11 lo registrasse
+        scoreHtml = `<span class="match-score">${es.home.score}<span class="match-score-sep">–</span>${es.away.score}</span>`;
+        meta = `<div class="match-meta">Finale</div>`;
+    } else {
+        scoreHtml = `<span class="match-score match-score-tbd">vs</span>`;
+        meta = `<div class="match-meta">${formatMatchDate(m.date)}</div>`;
+    }
 
     const htHtml = (finished && m.ht_home_score != null && m.ht_away_score != null)
         ? `<div class="match-ht">HT ${m.ht_home_score}–${m.ht_away_score}</div>` : '';
 
-    const meta = finished
-        ? `<div class="match-meta">Finale${(m.status && m.status !== 'FT') ? ` (${m.status})` : ''}</div>`
-        : `<div class="match-meta">${formatMatchDate(m.date)}</div>`;
+    const homeLogo = (es && es.home.logo) ? `<img class="match-logo" src="${escapeHTML(es.home.logo)}" alt="" loading="lazy">` : '';
+    const awayLogo = (es && es.away.logo) ? `<img class="match-logo" src="${escapeHTML(es.away.logo)}" alt="" loading="lazy">` : '';
 
     return `
         <div class="match-card" data-finished="${finished ? 1 : 0}" onclick="openMatchPage(${m.fixture_id})" title="Dettaglio partita">
             <div class="match-team match-team-home ${homeWin ? 'win' : ''}">
                 <span class="match-team-name">${m.home_display || m.home_team || '?'}</span>
+                ${homeLogo}
                 <span class="match-team-code">${m.home_code || ''}</span>
             </div>
             <div class="match-center">
@@ -571,6 +793,7 @@ function renderMatchCard(m) {
             </div>
             <div class="match-team match-team-away ${awayWin ? 'win' : ''}">
                 <span class="match-team-code">${m.away_code || ''}</span>
+                ${awayLogo}
                 <span class="match-team-name">${m.away_display || m.away_team || '?'}</span>
             </div>
         </div>
@@ -607,6 +830,157 @@ function renderMatches() {
     }
 
     container.innerHTML = rnd.matches.map(m => renderMatchCard(m)).join('');
+
+    // Loghi/stato live ESPN: fetch stagionale lazy, solo quando si apre il tab
+    // Partite; al primo arrivo dei dati, ri-renderizza una volta.
+    if (window.ESPNX && !ESPNX.ready()) {
+        ESPNX.ensureSeason();
+        ESPNX.whenReady(() => {
+            const tab = document.getElementById('tab-partite');
+            if (tab && tab.classList.contains('active') && currentPartiteView === 'partite') renderMatches();
+        });
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   PARTITE: viste ESPN (classifica e marcatori, fetch browser-side)
+   ───────────────────────────────────────────────────────────── */
+let currentPartiteView = 'partite';
+
+function showPartiteView(v) {
+    currentPartiteView = v;
+    ['partite', 'classifica', 'marcatori'].forEach(k => {
+        const btn = document.getElementById('pvBtn-' + k);
+        if (btn) btn.classList.toggle('active', k === v);
+    });
+    const nav = document.getElementById('matchdayNav');
+    if (nav) nav.style.display = (v === 'partite') ? '' : 'none';
+    const toggle = (id, on) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = on ? '' : 'none';
+    };
+    toggle('matchesContainer', v === 'partite');
+    toggle('espClassifica', v === 'classifica');
+    toggle('espMarcatori', v === 'marcatori');
+    if (v === 'classifica') renderEspClassifica();
+    if (v === 'marcatori') renderEspMarcatori();
+}
+
+function _espnUnavailable(msg) {
+    return `<div style="text-align:center; color:var(--text-muted); padding:24px; font-size:0.83rem; line-height:1.6;">
+        <i class="fa-solid fa-satellite-dish" style="font-size:1.2rem; display:block; margin-bottom:8px; opacity:0.6;"></i>
+        ${msg || 'Dati ESPN non disponibili in questo momento.<br>Riprova tra poco.'}
+    </div>`;
+}
+
+function renderEspClassifica() {
+    const el = document.getElementById('espClassifica');
+    if (!el) return;
+    if (!window.ESPNX) { el.innerHTML = _espnUnavailable(); return; }
+    el.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:24px; font-size:0.85rem;">Caricamento classifica…</div>';
+    ESPNX.standings()
+        .then(rows => { el.innerHTML = (rows && rows.length) ? _espnStandingsHTML(rows) : _espnUnavailable(); })
+        .catch(() => { el.innerHTML = _espnUnavailable(); });
+}
+
+function renderEspMarcatori() {
+    const el = document.getElementById('espMarcatori');
+    if (!el) return;
+    if (!window.ESPNX) { el.innerHTML = _espnUnavailable(); return; }
+    el.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:24px; font-size:0.85rem;">Carico i marcatori… <span id="espScorersProgress"></span></div>';
+    ESPNX.scorers((made, tot) => {
+        const p = document.getElementById('espScorersProgress');
+        if (p) p.textContent = `(${made}/${tot})`;
+    })
+        .then(rows => { el.innerHTML = (rows && rows.length) ? _espnScorersHTML(rows) : _espnUnavailable('Classifica marcatori non ancora disponibile.'); })
+        .catch(() => { el.innerHTML = _espnUnavailable(); });
+}
+
+function _espnStandingsHTML(rows) {
+    const cutIdx = rows.length >= 20 ? rows.length - 3 : -1;
+    const logo = r => r.logo ? `<img class="match-logo" src="${escapeHTML(r.logo)}" alt="" loading="lazy">` : '';
+    const body = rows.map((r, i) => `
+        <tr${i === cutIdx ? ' class="esp-cut"' : ''}>
+            <td class="esp-pos">${r.pos}</td>
+            <td class="l">${logo(r)}<span style="font-weight:600;">${escapeHTML(r.name)}</span></td>
+            <td style="font-weight:700;">${r.pts}</td>
+            <td>${r.gp}</td>
+            <td>${r.w}</td>
+            <td>${r.d}</td>
+            <td>${r.l}</td>
+            <td>${r.gf}</td>
+            <td>${r.ga}</td>
+            <td>${escapeHTML(r.gd)}</td>
+        </tr>`).join('');
+    return `
+        <table class="esp-table">
+            <thead><tr><th>#</th><th class="l">Squadra</th><th>Pt</th><th>G</th><th>V</th><th>N</th><th>P</th><th>GF</th><th>GS</th><th>DR</th></tr></thead>
+            <tbody>${body}</tbody>
+        </table>
+        <div class="esp-note">
+            <span>La linea separa le ultime tre posizioni (retrocessione in Serie B).</span>
+            <span>Fonte: ESPN</span>
+        </div>`;
+}
+
+/* Risolve un giocatore ESPN (nome completo, es. "Ricardo Orsolini") nel
+   giocatore del dataset (nomi brevi, es. "Orsolini"): 1) match normale del
+   nome completo; 2) match sul cognome (ultimo token ESPN vs primo token
+   dataset, gestendo anche le forme "Kamara H."); se piu' candidati,
+   disambigua per squadra quando il codice e' risolvibile. */
+function _espnNormName(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z]+/g, '');
+}
+
+function _resolveDatasetPlayer(espnName, espnTeamLabel) {
+    if (!Array.isArray(allPlayers) || !allPlayers.length || !espnName) return null;
+    const target = _espnNormName(espnName);
+    const tokens = String(espnName).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .split(/[^a-z]+/).filter(Boolean);
+    const surname = tokens.length ? tokens[tokens.length - 1] : '';
+    let hits = allPlayers.filter(p => _espnNormName(p.player) === target);
+    if (!hits.length && surname) {
+        hits = allPlayers.filter(p => {
+            const first = String(p.player || '').split(/\s+/)[0] || '';
+            return _espnNormName(first) === _espnNormName(surname);
+        });
+    }
+    if (!hits.length) return null;
+    if (hits.length > 1) {
+        const code = (window.ESPNX && ESPNX.codeFromLabel) ? String(ESPNX.codeFromLabel(espnTeamLabel) || '').toUpperCase() : '';
+        const sameTeam = code ? hits.find(p => String(p.team || '').toUpperCase() === code) : null;
+        if (sameTeam) return sameTeam;
+    }
+    return hits[0];
+}
+
+function _espnScorersHTML(rows) {
+    const body = rows.map((s, i) => {
+        const p = _resolveDatasetPlayer(s.player, s.team);
+        let nameHtml = escapeHTML(s.player);
+        if (p) {
+            const enc = encodeURIComponent(p.player);
+            nameHtml = `<a href="/player/${enc}" style="color:var(--text-main); text-decoration:none; font-weight:600;"
+                title="Statistiche di ${escapeHTML(p.player)}" onclick="event.preventDefault(); openPlayerDetailDrawer(decodeURIComponent('${enc}'))">${escapeHTML(s.player)}</a>`;
+        }
+        return `
+        <tr>
+            <td class="esp-pos">${i + 1}</td>
+            <td class="l">${nameHtml}</td>
+            <td class="l" style="color:var(--text-muted);">${escapeHTML(s.team)}</td>
+            <td style="font-weight:700;">${s.goals}</td>
+        </tr>`;
+    }).join('');
+    return `
+        <table class="esp-table">
+            <thead><tr><th>#</th><th class="l">Giocatore</th><th class="l">Squadra</th><th>Gol</th></tr></thead>
+            <tbody>${body}</tbody>
+        </table>
+        <div class="esp-note">
+            <span>Conteggio dalle partite della stagione: rigori inclusi, autogol esclusi.</span>
+            <span>Fonte: ESPN</span>
+        </div>`;
 }
 
 function renderTeamForm(teamCode) {
