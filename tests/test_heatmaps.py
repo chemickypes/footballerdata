@@ -22,10 +22,14 @@ from web.matches_api import _player_heatmap_response
 def test_points_to_grid_counts_and_bounds():
     grid = stage13.points_to_grid([{"x": 0, "y": 0}, {"x": 100, "y": 100}, {"x": 50, "y": 50},
                                    {"x": 50, "y": 50}])
-    assert len(grid) == stage13.HEATMAP_GRID_COLS * stage13.HEATMAP_GRID_ROWS
-    assert grid[0] == 1  # angolo alto-sinistra
-    assert grid[-1] == 1  # angolo basso-destra (clampato)
-    center = (stage13.HEATMAP_GRID_ROWS // 2) * stage13.HEATMAP_GRID_COLS + stage13.HEATMAP_GRID_COLS // 2
+    cols, rows = stage13.HEATMAP_GRID_COLS, stage13.HEATMAP_GRID_ROWS
+    assert len(grid) == cols * rows
+    # y Sofascore invertita: y=0 = linea inferiore -> riga ultima (basso-sinistra)
+    assert grid[(rows - 1) * cols] == 1
+    # x=100, y=100 -> alto-destra (clampato)
+    assert grid[cols - 1] == 1
+    # centro: y=50 -> cy_raw=10 -> riga 9
+    center = (rows // 2 - 1) * cols + cols // 2
     assert grid[center] == 2
 
 

@@ -25,11 +25,12 @@ function runBootSplash(onComplete) {
 /* ─────────────────────────────────────────────────────────────
    PLAYER DETAIL DRAWER (Finestra Medica & Metriche Avanzate)
 ───────────────────────────────────────────────────────────── */
-function openPlayerDetailDrawer(playerName) {
+function openPlayerDetailDrawer(playerName, opts) {
+    opts = opts || {};
     const p = (typeof allPlayers !== 'undefined' ? allPlayers : []).find(x => x.player === playerName) ||
               (typeof allPlayers !== 'undefined' ? allPlayers : []).find(x => (x.player || '').trim().toLowerCase() === (playerName || '').trim().toLowerCase());
     if (!p) {
-        console.warn('Player not found for detail drawer:', playerName);
+        console.warn('Player not found for detail page:', playerName);
         return;
     }
     _currentDetailPlayer = p;
@@ -169,17 +170,43 @@ function openPlayerDetailDrawer(playerName) {
     document.getElementById('pdMarketValue').textContent = fmtMV(p.market_value_eur);
     document.getElementById('pdContract').textContent = p.contract_until || 'N/D';
 
-    // Show drawer with slide animation
-    const drawer = document.getElementById('playerDetailDrawer');
-    if (drawer) {
-        drawer.style.display = 'flex';
-        drawer.classList.add('active');
-        requestAnimationFrame(() => {
-            const panel = document.getElementById('playerDetailPanel');
-            if (panel) panel.style.right = '0px';
-        });
+    // Show full-page player view
+    const page = document.getElementById('playerPage');
+    if (page) {
+        page.style.display = 'block';
+        page.scrollTop = 0;
+    }
+    if (!opts.noPush) {
+        const target = '/player/' + encodeURIComponent(p.player);
+        if (window.location.pathname !== target) {
+            try { history.pushState({ playerPage: p.player }, '', target); } catch (e) { /* noop */ }
+        }
     }
 }
+
+function _hidePlayerPage() {
+    const page = document.getElementById('playerPage');
+    if (page) page.style.display = 'none';
+    _currentDetailPlayer = null;
+}
+
+window.addEventListener('popstate', function(e) {
+    const st = e.state || {};
+    if (st.playerPage) {
+        _hideMatchPage();
+        if (!_currentDetailPlayer || _currentDetailPlayer.player !== st.playerPage) {
+            openPlayerDetailDrawer(st.playerPage, { noPush: true });
+        }
+    } else if (st.matchPage) {
+        if (_currentDetailPlayer) _hidePlayerPage();
+        if (!_currentMatchDetailId || _currentMatchDetailId !== st.matchPage) {
+            openMatchPage(st.matchPage, { noPush: true });
+        }
+    } else {
+        if (_currentDetailPlayer) _hidePlayerPage();
+        if (_currentMatchDetailId) _hideMatchPage();
+    }
+});
 
 function _normalizePlayerName(s) {
     return String(s || '').toLowerCase().trim().replace(/[.'\-\s]/g, '');
@@ -257,23 +284,149 @@ function renderTrajectorySVG(hist) {
 }
 
 function closePlayerDetailDrawer() {
-    const panel = document.getElementById('playerDetailPanel');
-    if (panel) panel.style.right = '-480px';
-    setTimeout(() => {
-        const drawer = document.getElementById('playerDetailDrawer');
-        if (drawer) {
-            drawer.style.display = 'none';
-            drawer.classList.remove('active');
-        }
-    }, 350);
-    _currentDetailPlayer = null;
+    if (history.state && history.state.playerPage) {
+        history.back();  // il popstate chiama _hidePlayerPage()
+        return;
+    }
+    _hidePlayerPage();
 }
 
-// Close drawer on backdrop click
-const _detailDrawerEl = document.getElementById('playerDetailDrawer');
-if (_detailDrawerEl) {
-    _detailDrawerEl.addEventListener('click', function(e) {
-        if (e.target === this) closePlayerDetailDrawer();
+/* ─────────────────────────────────────────────────────────────
+   MATCH PAGE (dettaglio partita: formazioni, marcatori, MOTM)
+   ───────────────────────────────────────────────────────────── */
+let _currentMatchDetailId = null;
+
+function openMatchPage(eventId, opts) {
+    opts = opts || {};
+    eventId = parseInt(eventId, 10);
+    if (!eventId) return;
+    if (_currentDetailPlayer) _hidePlayerPage();
+    _currentMatchDetailId = eventId;
+
+    const page = document.getElementById('matchPage');
+    if (page) {
+        page.style.display = 'block';
+        page.scrollTop = 0;
+    }
+    if (!opts.noPush) {
+        const target = '/match/' + eventId;
+        if (window.location.pathname !== target) {
+            try { history.pushState({ matchPage: eventId }, '', target); } catch (err) { /* noop */ }
+        }
+    }
+    loadMatchDetail(eventId);
+}
+
+function _hideMatchPage() {
+    const page = document.getElementById('matchPage');
+    if (page) page.style.display = 'none';
+    _currentMatchDetailId = null;
+}
+
+function closeMatchPage() {
+    if (history.state && history.state.matchPage) {
+        history.back();
+        return;
+    }
+    _hideMatchPage();
+}
+
+function loadMatchDetail(eventId) {
+    const el = document.getElementById('mdScoreline');
+    if (el) el.textContent = 'Caricamento…';
+    fetch(`/api/match_detail?event=${parseInt(eventId, 10)}`)
+        .then(r => r.ok ? r.json() : Promise.reject(new Error(r.status === 404 ? 'no-data' : 'error')))
+        .then(data => renderMatchDetail(data))
+        .catch(() => {
+            if (el) el.textContent = 'Partita';
+            ['mdHomeLineup', 'mdAwayLineup'].forEach(id => {
+                const c = document.getElementById(id);
+                if (c) c.innerHTML = '<div style="font-style:italic;">Dati non disponibili (esegui gli stage 11 e 12)</div>';
+            });
+        });
+}
+
+function _mdRatingBadge(rating) {
+    if (rating == null) return '<span class="md-rating" style="color:var(--text-muted);">—</span>';
+    let bg = 'rgba(255,255,255,0.08)', color = 'var(--text-muted)';
+    if (rating >= 7.5) { bg = 'rgba(63,185,117,0.16)'; color = '#3fb975'; }
+    else if (rating >= 6.8) { bg = 'rgba(94,139,255,0.16)'; color = 'var(--primary)'; }
+    return `<span class="md-rating" style="background:${bg}; color:${color};">${rating.toFixed(1)}</span>`;
+}
+
+function _mdLineupRow(p) {
+    const name = p.player || p.player_sofascore || '?';
+    const enc = encodeURIComponent(name);
+    const hasDataset = !!p.player;
+    const nameHtml = hasDataset
+        ? `<a href="/player/${enc}" style="color:var(--text-main); text-decoration:none; font-weight:600;"
+              onclick="event.preventDefault(); openPlayerDetailDrawer(decodeURIComponent('${enc}'))">${name}</a>`
+        : `<span style="color:var(--text-muted);">${name}</span>`;
+    const evBits = [];
+    if (p.goals > 0) evBits.push(`<span title="Gol">⚽${p.goals > 1 ? p.goals : ''}</span>`);
+    if (p.assists > 0) evBits.push(`<span title="Assist" style="color:var(--primary);">🅰${p.assists > 1 ? p.assists : ''}</span>`);
+    if (!p.is_starter) evBits.push(`<span title="Subentrato" style="color:var(--text-muted);">↺</span>`);
+    return `
+        <div class="md-row">
+            <span class="md-shirt">${p.shirt_number != null ? p.shirt_number : ''}</span>
+            ${nameHtml}
+            <span class="md-events">${evBits.join(' ')}</span>
+            <span class="md-min">${p.minutes_played != null ? p.minutes_played + "'" : ''}</span>
+            ${_mdRatingBadge(p.rating)}
+        </div>`;
+}
+
+function renderMatchDetail(data) {
+    const m = data.match || {};
+    const subEl = document.getElementById('mdSub');
+    const scoreEl = document.getElementById('mdScoreline');
+    if (subEl) subEl.textContent = `Serie A · Giornata ${m.round || '—'} · ${formatMatchDate(m.date)}`;
+
+    const finished = m.finished && m.home_score != null && m.away_score != null;
+    if (scoreEl) {
+        scoreEl.innerHTML = finished
+            ? `<span>${m.home_team}</span>
+               <span class="md-score">${m.home_score} – ${m.away_score}</span>
+               <span>${m.away_team}</span>`
+            : `<span>${m.home_team}</span>
+               <span class="md-score md-score-tbd">vs</span>
+               <span>${m.away_team}</span>`;
+    }
+
+    const strip = document.getElementById('mdScorersStrip');
+    if (strip) {
+        const bits = [];
+        if (data.scorers && data.scorers.length) {
+            bits.push('⚽ ' + data.scorers.map(s => `${s.player}${s.goals > 1 ? ` (${s.goals})` : ''}`).join(', '));
+        }
+        if (data.motm) {
+            bits.push(`<span style="margin-left:auto;"><i class="fa-solid fa-star" style="color:var(--gold);"></i> MOTM: <b style="color:var(--text-main);">${data.motm.player}</b> (${data.motm.rating.toFixed(1)})</span>`);
+        }
+        if (bits.length) {
+            strip.innerHTML = bits.join('');
+            strip.style.display = 'flex';
+            strip.style.flexWrap = 'wrap';
+            strip.style.gap = '8px';
+        } else {
+            strip.style.display = 'none';
+        }
+    }
+
+    const homeEl = document.getElementById('mdHomeName');
+    const awayEl = document.getElementById('mdAwayName');
+    if (homeEl) homeEl.textContent = data.home ? data.home.name : '—';
+    if (awayEl) awayEl.textContent = data.away ? data.away.name : '—';
+
+    const noLineups = '<div style="font-style:italic;">Formazioni disponibili dopo la partita (stage 12)</div>';
+    ['mdHomeLineup', 'mdAwayLineup'].forEach((id, i) => {
+        const c = document.getElementById(id);
+        if (!c) return;
+        const side = i === 0 ? data.home : data.away;
+        if (!data.lineups_available || !side || !side.players.length) {
+            c.innerHTML = noLineups;
+        } else {
+            c.innerHTML = side.players.map(_mdLineupRow).join('');
+        }
     });
 }
 
@@ -288,10 +441,19 @@ function toggleMobileSidebar() {
 async function init() {
     await fetchPlayers();
     fetchAIStatus();
-    fetchMatches();
+    await fetchMatches();
     renderListone();
 
     runBootSplash(() => {});
+
+    // Apertura diretta pagina giocatore (route /player/<name>)
+    if (window.__initialPlayer) {
+        openPlayerDetailDrawer(window.__initialPlayer, { noPush: true });
+    }
+    // Apertura diretta pagina partita (route /match/<id>)
+    if (window.__initialMatch) {
+        openMatchPage(window.__initialMatch, { noPush: true });
+    }
 
     if (window.location.hash) {
         const tabName = window.location.hash.replace('#', '');
@@ -397,7 +559,7 @@ function renderMatchCard(m) {
         : `<div class="match-meta">${formatMatchDate(m.date)}</div>`;
 
     return `
-        <div class="match-card" data-finished="${finished ? 1 : 0}">
+        <div class="match-card" data-finished="${finished ? 1 : 0}" onclick="openMatchPage(${m.fixture_id})" title="Dettaglio partita">
             <div class="match-team match-team-home ${homeWin ? 'win' : ''}">
                 <span class="match-team-name">${m.home_display || m.home_team || '?'}</span>
                 <span class="match-team-code">${m.home_code || ''}</span>
@@ -1285,7 +1447,8 @@ function renderListone() {
                 <div class="player-info">
                     <div class="player-name">
                         <span class="badge badge-${p.role}">${p.role}</span>
-                        <span style="font-weight:600; font-size:0.98rem; cursor:pointer;" data-player="${encPlayer}" onclick="openPlayerDetailDrawer(decodeURIComponent(this.getAttribute('data-player')))"> ${p.player}</span>
+                        <a href="/player/${encPlayer}" style="font-weight:600; font-size:0.98rem; cursor:pointer; color:var(--text-main); text-decoration:none;"
+                           onclick="event.preventDefault(); openPlayerDetailDrawer(decodeURIComponent('${encPlayer}'))"> ${p.player}</a>
                         <button data-player="${encPlayer}" onclick="openPlayerDetailDrawer(decodeURIComponent(this.getAttribute('data-player')))"
                             title="Dettaglio Giocatore" style="background:transparent; border:none; cursor:pointer; font-size:0.85rem; padding:0 3px; color:var(--primary); opacity:0.75; transition:opacity 0.2s;"
                             onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.75'"><i class="fa-solid fa-circle-info"></i></button>

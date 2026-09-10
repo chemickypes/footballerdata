@@ -38,7 +38,9 @@ def add_cache_headers(response):
 
 
 @app.route("/")
-def index():
+@app.route("/player/<name>")
+@app.route("/match/<int:event_id>")
+def index(name=None, event_id=None):
     return render_template(
         "index.html",
         bot_name=BOT_NAME,
@@ -47,7 +49,9 @@ def index():
         bot_avatar_image=BOT_AVATAR_IMAGE,
         bot_badge=BOT_BADGE,
         bot_greeting=BOT_GREETING,
-        is_personal=IS_PERSONAL
+        is_personal=IS_PERSONAL,
+        initial_player=name,
+        initial_match=event_id
     )
 
 

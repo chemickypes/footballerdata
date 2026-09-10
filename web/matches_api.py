@@ -400,3 +400,175 @@ def api_player_advanced():
     if payload is None:
         return jsonify({"error": "no advanced stats for this player"}), 404
     return jsonify(payload)
+
+
+def _num_or_none(value):
+    try:
+        if value is None or str(value).strip() in ("", "None", "nan"):
+            return None
+        return round(float(value), 2)
+    except (TypeError, ValueError):
+        return None
+
+
+MATCH_PLAYER_FIELDS = [
+    "player", "player_sofascore", "position", "shirt_number", "is_starter",
+    "minutes_played", "rating", "goals", "assists", "key_passes",
+    "shots", "shots_on_target", "xg", "xa", "passes_acc", "passes_tot",
+    "tackles", "interceptions", "duels_won", "duels_lost", "touches",
+    "fouls", "saves", "goals_prevented",
+]
+
+
+def _match_player_row(r):
+    """Riga giocatore normalizzata per il payload match_detail."""
+    out = {}
+    for f in MATCH_PLAYER_FIELDS:
+        v = r.get(f)
+        if f in ("player", "player_sofascore", "position"):
+            out[f] = None if pd.isna(v) else str(v)
+        elif f in ("shirt_number", "minutes_played", "goals", "assists", "key_passes",
+                   "shots", "shots_on_target", "passes_acc", "passes_tot", "tackles",
+                   "interceptions", "duels_won", "duels_lost", "touches", "fouls", "saves"):
+            out[f] = _int_or_none(v)
+        else:  # rating, xg, xa, goals_prevented
+            out[f] = _num_or_none(v)
+    out["is_starter"] = bool(out.get("is_starter")) if out.get("is_starter") is not None else False
+    return out
+
+
+def _sort_lineup(players):
+    """Titolari per numero di maglia, poi subentrati per minuti."""
+    starters = sorted((p for p in players if p["is_starter"]),
+                      key=lambda p: (p["shirt_number"] is None,
+                                     p["shirt_number"] or 0))
+    subs = sorted((p for p in players if not p["is_starter"]),
+                  key=lambda p: -(p["minutes_played"] or 0))
+    return starters + subs
+
+
+def _build_match_detail_payload(pm_df, fixture_id, matches_payload):
+    """Payload /api/match_detail: meta partita + formazioni per lato +
+    marcatori + MOTM, dal CSV stage 12. None se la partita non esiste."""
+    meta = None
+    if matches_payload and matches_payload.get("available"):
+        for rnd in matches_payload.get("rounds", []):
+            for m in rnd.get("matches", []):
+                if m.get("fixture_id") == fixture_id:
+                    meta = m
+                    break
+            if meta:
+                break
+    if meta is None:
+        return None
+
+    result = {
+        "match": {
+            "event_id": fixture_id,
+            "round": meta.get("round"),
+            "date": meta.get("date"),
+            "home_team": meta.get("home_display") or meta.get("home_team"),
+            "home_code": meta.get("home_code"),
+            "away_team": meta.get("away_display") or meta.get("away_team"),
+            "away_code": meta.get("away_code"),
+            "home_score": meta.get("home_score"),
+            "away_score": meta.get("away_score"),
+            "ht_home_score": meta.get("ht_home_score"),
+            "ht_away_score": meta.get("ht_away_score"),
+            "status": meta.get("status"),
+            "finished": meta.get("finished"),
+        },
+        "lineups_available": False,
+        "home": {"code": meta.get("home_code"),
+                 "name": meta.get("home_display") or meta.get("home_team"),
+                 "players": []},
+        "away": {"code": meta.get("away_code"),
+                 "name": meta.get("away_display") or meta.get("away_team"),
+                 "players": []},
+        "scorers": [],
+        "motm": None,
+    }
+
+    if pm_df is None:
+        return result
+
+    ev = pm_df[pm_df["event_id"] == fixture_id]
+    if not len(ev):
+        return result
+
+    home_code = meta.get("home_code")
+    away_code = meta.get("away_code")
+    sides = {"home": [], "away": []}
+    all_rows = []
+    for _, r in ev.iterrows():
+        row = _match_player_row(r)
+        code = r.get("team_code")
+        code = None if pd.isna(code) else str(code)
+        if code == home_code or (code is None and str(r.get("venue")) == "home"):
+            sides["home"].append(row)
+        elif code == away_code or (code is None and str(r.get("venue")) == "away"):
+            sides["away"].append(row)
+        else:
+            continue
+        all_rows.append(row)
+
+    if not all_rows:
+        return result
+
+    result["lineups_available"] = True
+    result["home"]["players"] = _sort_lineup(sides["home"])
+    result["away"]["players"] = _sort_lineup(sides["away"])
+
+    # Marcatori (gol per giocatore aggregati)
+    scorers = {}
+    for row in all_rows:
+        g = row.get("goals") or 0
+        if g > 0 and row.get("player"):
+            scorers[row["player"]] = scorers.get(row["player"], 0) + g
+    result["scorers"] = [{"player": p, "goals": g}
+                         for p, g in sorted(scorers.items(), key=lambda kv: -kv[1])]
+
+    # MOTM: rating massimo tra i due lati
+    rated = [(row, side) for side in ("home", "away")
+             for row in result[side]["players"] if row.get("rating") is not None]
+    if rated:
+        best, best_side = max(rated, key=lambda t: t[0]["rating"])
+        result["motm"] = {
+            "player": best.get("player") or best.get("player_sofascore"),
+            "team": result[best_side]["code"],
+            "team_name": result[best_side]["name"],
+            "rating": best["rating"],
+        }
+    return result
+
+
+_md_cache = {"mtime": None, "pm_df": None}
+
+
+@matches_bp.route("/api/match_detail")
+def api_match_detail():
+    """Dettaglio partita (stage 11+12): formazioni, marcatori, MOTM."""
+    event_id = request.args.get("event", type=int)
+    if not event_id:
+        return jsonify({"error": "event parameter required"}), 400
+
+    matches_payload = _load_payload()
+    if matches_payload is None:
+        return jsonify({"error": "match results not available (run stage 11)"}), 404
+
+    if not os.path.exists(PLAYER_MATCH_STATS_CSV):
+        payload = _build_match_detail_payload(None, event_id, matches_payload)
+        if payload is None:
+            return jsonify({"error": "match not found"}), 404
+        return jsonify(payload)
+
+    mtime = os.path.getmtime(PLAYER_MATCH_STATS_CSV)
+    if _md_cache["pm_df"] is None or _md_cache["mtime"] != mtime:
+        _md_cache["mtime"] = mtime
+        _md_cache["pm_df"] = pd.read_csv(PLAYER_MATCH_STATS_CSV)
+    pm_df = _md_cache["pm_df"]
+
+    payload = _build_match_detail_payload(pm_df, event_id, matches_payload)
+    if payload is None:
+        return jsonify({"error": "match not found"}), 404
+    return jsonify(payload)

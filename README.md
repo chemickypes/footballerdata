@@ -6,7 +6,7 @@
 [![Local AI: Ollama](https://img.shields.io/badge/AI-Ollama%20gemma4:e4b-8b5cf6.svg)](https://ollama.com/)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Donate-yellow.svg?logo=buy-me-a-coffee)](https://buymeacoffee.com/blueskies360)
 
-A modular pipeline that scrapes, models and serves **player data & statistics for Serie A**: historical ratings, xG/xA shot volumes, injury history, lineups/minutes, market profile & contract — plus ML quantile projections and VORP-based quality scores — exposed through a fast Flask web explorer with a local-AI chat assistant.
+A modular pipeline that scrapes, models and serves **player data & statistics for Serie A**: historical ratings and career trajectories, xG/xA shot volumes, injury history, lineups/minutes, per-match logs, touch heatmaps, advanced season statistics, market profile & contract — plus ML quantile projections and VORP-based quality scores — exposed through a fast Flask web explorer with a local-AI chat assistant.
 
 > **Fork notice**: this project is a fork of [**La FantaOfficina**](https://github.com/spectrelabo/fantaofficina) by [SpectreLabo](https://github.com/spectrelabo). The upstream project is a full Fantacalcio auction framework; this fork pivots the same engine into a **player data & statistics explorer**. All league/auction/team management (live draft, rosters, lineups, trades, budgets, admin auth) has been removed. What remains is everything that describes *players*.
 
@@ -18,14 +18,19 @@ A modular pipeline that scrapes, models and serves **player data & statistics fo
 
 ### Web Explorer (`python3 web/app.py` → http://localhost:5050)
 
-- **Listone** — 533 Serie A players × 62 features: filters by role/team/search, sortable columns, fascia tiers.
-- **Player Detail Drawer** — per-player deep dive:
+- **Listone** — 533 Serie A players × 62 features: filters by role/team/search, sortable columns, fascia tiers. Player names are real links (ctrl/middle-click opens in a new tab).
+- **Player Page** — dedicated full-page deep dive (`/player/<name>`, bento layout, browser back button works):
   - **Traiettoria Carriera**: SVG chart of per-season average rating (MV) across 11 historical seasons (from `data/player_history.json`)
   - **Finestra Medica**: 3-year injury audit (days lost, recurrence) from Transfermarkt
   - **Understat volumes**: xG, xA, npxG, shots (per-90 aggregates)
   - **Profilo & Contratto**: age, height, foot, market value, contract until (Transfermarkt)
   - **Proiezioni**: P10/P50/P90 quantile profile and volatility spread
-  - Titolarità & minutes from Sofascore early-matchday lineups
+  - **Titolarità & minutes** from Sofascore early-matchday lineups
+  - **Ultime Partite**: per-match log (minutes, rating, goals, assists, xG/xA…) + season summary and rating sparkline (stage 12)
+  - **Mappa di Gioco**: season touch heatmap (30×20 grid on an SVG pitch, own goal left) with "fino alla giornata N" period selector (stage 13)
+  - **Statistiche Avanzate**: season totals/per-90/percentages with role-relative percentile bars, cards included (stage 14)
+  - **Forma Squadra**: last-5 W/D/L chips + season record for the player's team
+- **Partite tab** — Serie A results & schedule with matchday navigation; match cards open a dedicated **Match Page** (`/match/<id>`) with lineups, scorers and MOTM (player names link to the player page; a "run stage 11" hint shows when results data is absent).
 - **"Analista" AI chat** — grounded Q&A over the dataset (see below).
 
 ### Conversational AI Copilot ("Analista")
@@ -45,7 +50,7 @@ VORP, `prezzo_fair_*` and `surplus_value_cr` are retained and work as **general 
 
 ## Data Pipeline
 
-Ordered stages (`python run_pipeline.py`, CLI step 7 = Excel export runs last):
+Ordered stages (`python run_pipeline.py`; CLI order: 1, 3, 4, 5, 6, 8, 9, 10, 7, then 11–14):
 
 | Step | File | Source | Output |
 |---|---|---|---|
@@ -60,6 +65,10 @@ Ordered stages (`python run_pipeline.py`, CLI step 7 = Excel export runs last):
 | 9 | `09_vorp_auction_pricing.py` | stage-6 dataset + ML P50 | `vorp_points`, fair/target/clearing prices, surplus value |
 | 10 | `10_roster_optimizer.py` | legacy upstream (MILP knapsack demo) | prints an optimal squad; kept for reference |
 | 7 | `07_generate_excel.py` | legacy upstream | styled multi-tab Excel export |
+| 11 | `11_scrape_match_results.py` | Sofascore (default, no key) or api-football (`--source apifootball`, needs key) | `data/match_results.csv` (fixtures, FT/HT scores) + `data/team_form.json` (last-5 form, season record) |
+| 12 | `12_harvest_player_match_stats.py` | Sofascore lineups (1 req/match, incremental) | `data/player_match_stats.csv`: per-player-per-match rows (minutes, rating, goals, assists, key passes, shots, xG/xA, duels, saves) |
+| 13 | `13_scrape_heatmaps.py` | Sofascore heatmap endpoint (1 req/player-match, incremental, `--limit` for chunks) | `data/player_heatmaps.json`: 30×20 touch grid per player per match + season aggregate (raw y flipped at ingestion: row 0 = top touchline) |
+| 14 | `14_scrape_advanced_stats.py` | Sofascore season statistics (1 req/player, incremental, `--refresh` to redo) | `data/player_advanced.json`: curated totals/per-90/percentages + cards + role-relative percentiles |
 
 Out-of-sample validation (2025-26 season): 80% CI coverage 75.4%, P50 MAE 49.4 rating-points.
 
@@ -104,7 +113,7 @@ python export_player_history.py     # data/player_history.json (career trajector
 python export_dataset.py            # dataset_finale_{500,1000}.csv exports
 python demo.py                      # zero-config terminal demo (no scraping needed)
 
-python -m pytest tests/ -q          # 64 unit tests
+python -m pytest tests/ -q          # 130 unit tests
 ```
 
 ---
@@ -124,9 +133,13 @@ footballerdata/
 │   ├── app.py                     # Flask entrypoint (~75 lines)
 │   ├── config.py / data.py / pricing.py
 │   ├── players_api.py             # /api/players payload builder
+│   ├── matches_api.py             # /api/matches, /api/player_matches, /api/player_heatmap,
+│   │                              # /api/player_advanced, /api/match_detail
 │   ├── ai_api.py                  # /api/ai_{status,test,query}
 │   └── templates/ static/         # Jinja template, theme CSS, app.js + tutorial.js
-├── data/                          # Generated artifacts (dataset_finale.csv, caches, exports)
+├── data/                          # Generated artifacts (dataset_finale.csv, player_history.json,
+│                                  # match_results.csv, player_match_stats.csv, player_heatmaps.json,
+│                                  # player_advanced.json, caches, exports)
 ├── dataset_finale.csv             # Root copy of the master dataset (533 players, 62 cols)
 ├── run_pipeline.py                # CLI: --step N / --from N over ordered stages
 ├── export_player_history.py       # Career-trajectory JSON for the drawer chart
@@ -171,7 +184,7 @@ This project stands on the shoulders of the open-source football analytics commu
 - **[Scrape-FBref-data](https://github.com/parth1902/Scrape-FBref-data)**: Utility for structured data extraction.
 - **[Understat.com](https://understat.com/)**: Shot-level analytics, Expected Goals ($xG$), and Expected Assists ($xA$).
 - **[Transfermarkt.com](https://www.transfermarkt.com/)**: Comprehensive injury logs, missed match records, medical histories, and player profiles.
-- **[Sofascore.com](https://www.sofascore.com/)**: Lineups, starts and minutes data.
+- **[Sofascore.com](https://www.sofascore.com/)**: lineups, starts and minutes, match results, per-match player statistics, touch heatmaps and advanced season statistics.
 - **[Ollama](https://ollama.com/)** + Google **Gemma**: free local LLM inference powering the "Analista" copilot.
 
 ---

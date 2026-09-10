@@ -123,7 +123,12 @@ def main():
     html = r_html.text
     r_appjs = requests.get(f"{BASE_URL}/static/js/app.js", timeout=10)
     app_js = r_appjs.text
-    check("HTML contiene 'playerDetailDrawer'", "playerDetailDrawer" in html)
+    check("HTML contiene 'playerPage' (vista giocatore)", "playerPage" in html)
+    check("HTML contiene 'pv-grid'", "pv-grid" in html)
+    r_ppage = requests.get(f"{BASE_URL}/player/Bastoni", timeout=10)
+    check("GET /player/Bastoni → 200", r_ppage.status_code == 200, f"status={r_ppage.status_code}")
+    check("Route player passa initial_player", '__initialPlayer = &quot;Bastoni&quot;'.lower() in r_ppage.text.lower()
+          or '__initialPlayer = "Bastoni"' in r_ppage.text)
     check("app.js contiene 'openPlayerDetailDrawer'", "openPlayerDetailDrawer" in app_js)
     check("app.js contiene 'pdMedBadge' (Finestra Medica)", "pdMedBadge" in app_js)
     check("app.js contiene 'pdXg90' (Understat)", "pdXg90" in app_js)
@@ -342,6 +347,43 @@ def main():
     check("HTML contiene 'pdAdvanced' (Statistiche Avanzate)", "pdAdvanced" in html)
     check("app.js contiene 'renderPlayerHeatmap'", "renderPlayerHeatmap" in app_js)
     check("app.js contiene 'renderPlayerAdvanced'", "renderPlayerAdvanced" in app_js)
+
+    # ── SEZIONE 18: DETTAGLIO PARTITA (formazioni, marcatori, MOTM) ───
+    print("\n[18] Dettaglio partita con formazioni e marcatori")
+
+    r_md = requests.get(f"{BASE_URL}/api/match_detail?event=16283050", timeout=15)
+    check("GET /api/match_detail?event=16283050 → 200", r_md.status_code == 200, f"status={r_md.status_code}")
+    if r_md.ok:
+        md = r_md.json()
+        check("Nodi match/home/away/lineups_available",
+              all(k in md for k in ["match", "home", "away", "lineups_available"]))
+        check("Meta partita (Inter 4-1 Monza, G1)",
+              md.get("match", {}).get("home_score") == 4 and md.get("match", {}).get("away_score") == 1
+              and md.get("match", {}).get("round") == 1,
+              f"{md.get('match', {}).get('home_score')}-{md.get('match', {}).get('away_score')}")
+        if md.get("lineups_available"):
+            n_home = len(md.get("home", {}).get("players", []))
+            n_away = len(md.get("away", {}).get("players", []))
+            check("Formazioni presenti per entrambe le squadre", n_home > 0 and n_away > 0,
+                  f"home={n_home} away={n_away}")
+            check("Marcatori presenti", len(md.get("scorers", [])) > 0)
+            check("MOTM presente", md.get("motm") is not None)
+            p0 = (md.get("home", {}).get("players") or [{}])[0]
+            check("Riga giocatore completa", all(k in p0 for k in ["player", "is_starter", "minutes_played", "rating"]))
+        else:
+            check("lineups_available=false gestito", True)
+
+    r_md_404 = requests.get(f"{BASE_URL}/api/match_detail?event=999999999", timeout=15)
+    check("Partita sconosciuta → 404", r_md_404.status_code == 404, f"status={r_md_404.status_code}")
+    r_md_400 = requests.get(f"{BASE_URL}/api/match_detail", timeout=15)
+    check("Dettaglio senza parametro → 400", r_md_400.status_code == 400, f"status={r_md_400.status_code}")
+
+    r_mpage = requests.get(f"{BASE_URL}/match/16283050", timeout=10)
+    check("GET /match/16283050 → 200", r_mpage.status_code == 200, f"status={r_mpage.status_code}")
+    check("Route match passa initial_match", '__initialMatch = 16283050' in r_mpage.text)
+    check("HTML contiene 'matchPage'", "matchPage" in html)
+    check("app.js contiene 'openMatchPage'", "openMatchPage" in app_js)
+    check("app.js contiene 'renderMatchDetail'", "renderMatchDetail" in app_js)
 
     # ── SUMMARY ───────────────────────────────────────────────────────
     print("\n" + "=" * 72)

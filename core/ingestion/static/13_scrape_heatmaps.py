@@ -15,8 +15,12 @@ giornata, oltre alla stagione completa.
 
 Griglia: HEATMAP_GRID_COLS x HEATMAP_GRID_ROWS celle su campo normalizzato
 100x100. Coordinate Sofascore team-normalizzate (verificato empiricamente su
-portieri casa/trasferta della stessa partita): x=0 porta propria, x=100 porta
-avversaria, y=0..100 larghezza — nessun mirroring necessario.
+portieri casa/trasferta della stessa partita e su estimatori larghi casa/trasferta):
+x=0 porta propria, x=100 porta avversaria (nessun flip). L'asse y SOFASCORE e'
+invertito rispetto alla resa grafica: y=0 e' la linea laterale INFERIORE nel
+frame "attacco verso destra" (ala destra), y=100 quella superiore (ala sinistra)
+— confronto diretto con le heatmap renderizzate dall'app Sofascore. Qui si
+riporta alla convenzione canonica riga 0 = alto: cy = rows-1 - y_raw.
 
 Incrementale: le coppie (giocatore, evento) gia' presenti in by_event non
 vengono riscaricate. Salvataggio a chunk (ogni CHUNK_SIZE coppie) per non
@@ -46,7 +50,11 @@ FAIL_FAST_CONSECUTIVE = 10
 
 
 def points_to_grid(points, cols=HEATMAP_GRID_COLS, rows=HEATMAP_GRID_ROWS):
-    """Converte una lista di punti {x, y} (0-100) in una griglia piatta di conteggi."""
+    """Converte una lista di punti {x, y} (0-100) in una griglia piatta di conteggi.
+
+    x: 0 porta propria -> 100 porta avversaria (colonna 0 = sinistra, invariata).
+    y Sofascore: 0 = linea laterale inferiore nel frame attacco->destra, quindi
+    riga_griglia = rows-1 - y (riga 0 = linea laterale superiore)."""
     grid = [0] * (cols * rows)
     for p in points or []:
         try:
@@ -56,7 +64,8 @@ def points_to_grid(points, cols=HEATMAP_GRID_COLS, rows=HEATMAP_GRID_ROWS):
         if not (0 <= x <= 100 and 0 <= y <= 100):
             continue
         cx = min(int(x / 100.0 * cols), cols - 1)
-        cy = min(int(y / 100.0 * rows), rows - 1)
+        cy_raw = min(int(y / 100.0 * rows), rows - 1)
+        cy = rows - 1 - cy_raw
         grid[cy * cols + cx] += 1
     return grid
 

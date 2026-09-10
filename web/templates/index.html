@@ -225,46 +225,42 @@
     </div> <!-- end .main-wrapper -->
     </div> <!-- end .app-layout -->
 
-    <!-- PLAYER DETAIL DRAWER (Finestra Medica & Metriche Avanzate) -->
-    <div id="playerDetailDrawer" class="modal-backdrop" style="display:none; z-index:9999;">
-        <div id="playerDetailPanel" style="
-            position:fixed; top:0; right:-480px; width:min(480px, 96vw); height:100vh;
-            background:var(--surface); border-left:1px solid var(--border);
-            overflow-y:auto; padding:20px 18px 32px; transition:right 0.35s cubic-bezier(.4,0,.2,1);
-            box-shadow:-12px 0 24px rgba(0,0,0,0.5); z-index:10000;
-        ">
+    <!-- PLAYER PAGE (vista dedicata giocatore) -->
+    <div id="playerPage" style="display:none; position:fixed; inset:0; overflow-y:auto; background:var(--bg); z-index:9000;">
+        <div class="pv-container">
             <!-- Header -->
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                <div>
-                    <div id="pdName" style="font-size:1.2rem; font-weight:600; color:var(--text-main);"></div>
-                    <div style="display:flex; gap:6px; align-items:center; margin-top:3px;">
-                        <span id="pdRole" class="role-badge" style="font-size:0.72rem; padding:2px 8px; border-radius:6px;"></span>
-                        <span id="pdTeam" style="font-size:0.82rem; color:var(--text-muted); font-weight:500;"></span>
+            <div class="pv-header">
+                <button class="pv-back" onclick="closePlayerDetailDrawer()"><i class="fa-solid fa-arrow-left"></i> Listone</button>
+                <div class="pv-identity">
+                    <div id="pdName" style="font-size:1.5rem; font-weight:700; color:var(--text-main); line-height:1.2;"></div>
+                    <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
+                        <span id="pdRole" class="role-badge" style="font-size:0.74rem; padding:2px 9px; border-radius:6px;"></span>
+                        <span id="pdTeam" style="font-size:0.88rem; color:var(--text-muted); font-weight:600;"></span>
                     </div>
                 </div>
-                <button onclick="closePlayerDetailDrawer()" style="background:transparent; border:none; color:var(--text-muted); font-size:1.3rem; cursor:pointer; padding:4px 8px;">✕</button>
             </div>
 
             <!-- Price & Value Summary Bar -->
-            <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; margin-bottom:16px;">
-                <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:8px 6px; text-align:center;">
+            <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:16px;">
+                <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:10px 6px; text-align:center;">
                     <div style="font-size:0.62rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Fair Value</div>
-                    <div id="pdFairPrice" style="font-size:1.05rem; font-weight:600; color:var(--gold);"></div>
+                    <div id="pdFairPrice" style="font-size:1.15rem; font-weight:600; color:var(--gold);"></div>
                 </div>
-                <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:8px 6px; text-align:center;">
+                <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:10px 6px; text-align:center;">
                     <div style="font-size:0.62rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">VORP</div>
-                    <div id="pdVorp" style="font-size:1.05rem; font-weight:600; color:var(--primary);"></div>
+                    <div id="pdVorp" style="font-size:1.15rem; font-weight:600; color:var(--primary);"></div>
                 </div>
-                <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:8px 6px; text-align:center;">
+                <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:10px 6px; text-align:center;">
                     <div style="font-size:0.62rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Score</div>
-                    <div id="pdScore" style="font-size:1.05rem; font-weight:600; color:var(--text-main);"></div>
+                    <div id="pdScore" style="font-size:1.15rem; font-weight:600; color:var(--text-main);"></div>
                 </div>
-                <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:8px 6px; text-align:center;">
+                <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:10px 6px; text-align:center;">
                     <div style="font-size:0.62rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Fascia</div>
-                    <div id="pdFascia" style="font-size:1.05rem; font-weight:600; color:var(--primary);"></div>
+                    <div id="pdFascia" style="font-size:1.15rem; font-weight:600; color:var(--primary);"></div>
                 </div>
             </div>
 
+            <div class="pv-grid">
             <!-- SECTION: Econometria Aste (Target & Clearing Pricing) -->
             <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-bottom:14px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -446,6 +442,33 @@
                     </div>
                 </div>
             </div>
+            </div> <!-- end .pv-grid -->
+        </div>
+    </div>
+
+    <!-- MATCH PAGE (vista dedicata partita) -->
+    <div id="matchPage" style="display:none; position:fixed; inset:0; overflow-y:auto; background:var(--bg); z-index:8800;">
+        <div class="pv-container">
+            <div class="pv-header">
+                <button class="pv-back" onclick="closeMatchPage()"><i class="fa-solid fa-arrow-left"></i> Partite</button>
+                <div class="pv-identity">
+                    <div id="mdSub" style="font-size:0.78rem; color:var(--text-muted); font-weight:600; margin-bottom:2px;"></div>
+                    <div id="mdScoreline" style="font-size:1.5rem; font-weight:700; color:var(--text-main); line-height:1.25;"></div>
+                </div>
+            </div>
+
+            <div id="mdScorersStrip" style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:0.8rem; color:var(--text-muted); display:none;"></div>
+
+            <div class="pv-grid" id="mdLineups">
+                <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:14px;">
+                    <b style="font-size:0.9rem; font-weight:600; color:var(--text-main); display:block; margin-bottom:10px;"><i class="fa-solid fa-shield-halved" style="color:var(--text-muted); margin-right:6px;"></i><span id="mdHomeName">—</span></b>
+                    <div id="mdHomeLineup" style="font-size:0.78rem; color:var(--text-muted);">Caricamento…</div>
+                </div>
+                <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:8px; padding:14px;">
+                    <b style="font-size:0.9rem; font-weight:600; color:var(--text-main); display:block; margin-bottom:10px;"><i class="fa-solid fa-shield-halved" style="color:var(--text-muted); margin-right:6px;"></i><span id="mdAwayName">—</span></b>
+                    <div id="mdAwayLineup" style="font-size:0.78rem; color:var(--text-muted);">Caricamento…</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -506,6 +529,8 @@
         </button>
     </nav>
 
+    <script>window.__initialPlayer = {{ initial_player|tojson if initial_player is not none else 'null' }};</script>
+    <script>window.__initialMatch = {{ initial_match|tojson if initial_match is not none else 'null' }};</script>
     <script src="/static/js/app.js"></script>
     <script src="/static/js/tutorial.js"></script>
 </body>
